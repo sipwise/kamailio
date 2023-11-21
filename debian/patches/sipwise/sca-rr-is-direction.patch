@@ -10,7 +10,7 @@ Subject: sca-rr-is-direction
  4 files changed, 57 insertions(+), 11 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index c2347bb..c0042b9 100644
+index 0298610..2c0dc32 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -62,6 +62,7 @@ sca_mod *sca = NULL;

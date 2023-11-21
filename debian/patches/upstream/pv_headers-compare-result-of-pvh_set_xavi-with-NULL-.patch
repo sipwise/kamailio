@@ -9,7 +9,7 @@ Subject: pv_headers: compare result of pvh_set_xavi() with NULL for error
  1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
-index 6f63015..3bc32d2 100644
+index fb9a714..b715baa 100644
 --- a/src/modules/pv_headers/pvh_xavp.c
 +++ b/src/modules/pv_headers/pvh_xavp.c
 @@ -618,11 +618,11 @@ int pvh_set_header(

@@ -37,7 +37,6 @@ sipwise/sca-add-pai_avp-parameter.patch
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
 sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
-sipwise/presence-active_watcher-cleanup-timer.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
@@ -53,10 +52,9 @@ sipwise/lcr-stats.patch
 sipwise/lcr_read_id.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
-sipwise/pv_headers-pvh_xavi_get_child-fix-fallback-logic.patch
 sipwise/presence_vqr.patch
-### active development
 sipwise/dialog-dlg_get_ttag.patch
+### active development
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
