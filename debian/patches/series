@@ -42,6 +42,7 @@ upstream/core-parse-privacy-recompute-lenght-of-rest-to-parse.patch
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
 sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
+upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
