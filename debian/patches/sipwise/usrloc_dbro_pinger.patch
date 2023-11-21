@@ -7,7 +7,7 @@ Subject: usrloc_dbro_pinger
  1 file changed, 11 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/usrloc/dlist.c b/src/modules/usrloc/dlist.c
-index 57a9b4a..50dd4c1 100644
+index 57a9b4a..ceca3f4 100644
 --- a/src/modules/usrloc/dlist.c
 +++ b/src/modules/usrloc/dlist.c
 @@ -307,6 +307,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
@@ -39,7 +39,7 @@ index 57a9b4a..50dd4c1 100644
  		}
 -		if(ul_dbf.query(
 -				   ul_dbh, keys1, ops1, vals1, keys2, n[0], n[1], NULL, &res)
-+		if(dbf.query(
++		if(dbf->query(
 +				   dbh, keys1, ops1, vals1, keys2, n[0], n[1], NULL, &res)
  				< 0) {
  			LM_ERR("query error\n");
@@ -47,7 +47,7 @@ index 57a9b4a..50dd4c1 100644
  		}
  		if(RES_ROW_N(res) == 0) {
 -			ul_dbf.free_result(ul_dbh, res);
-+			dbf.free_result(dbh, res);
++			dbf->free_result(dbh, res);
  			continue;
  		}
  
