@@ -49,6 +49,7 @@ upstream/topos_use_direction_for_loading_invite_record_for_other_early_dialog_re
 upstream/topos_restore_attributes_based_on_direction_for_early_dialog_requests.patch
 upstream/topos_redis_use_tag_based_on_direction_for_early_dialog_transaction_record_loading.patch
 upstream/dialog-deactivate-print-variable-function-which-is-o.patch
+upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
