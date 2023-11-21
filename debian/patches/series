@@ -42,6 +42,7 @@ upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
 upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
 sipwise/dialog-dlg_get_var-changes-in-API.patch
 upstream/presence-No-autocommit-rollback-if-no-active-watcher.patch
+upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
