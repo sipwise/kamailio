@@ -1,10 +1,22 @@
-ngcp-kamailio (5.7.2-1+0~mr12.1.0.0) unstable; urgency=medium
+ngcp-kamailio (5.7.3-1+0~mr12.1.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
-  * [4c9d844] reorder patches
-  * [6febdcb] refresh patches
+  * MT#56847 presence: active_watcher cleanup timer
+  * MT#58408 pv_headers: don't fallback to Request headers at Replay msg
+  * MT#58627 presence_vqr
+  * MT#58587 dialog: dlg_get_ttag("<callid>", "<from-tag>", "<pv_dst>")
+  * New upstream version 5.7.3
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sun, 15 Oct 2023 08:23:06 +0200
+  [ Alessio Garzi ]
+  * MT#58613 Add gw_lcr_id param for lcr module
+  * MT#58613 revert lcr_stats_flags_as_id.patch
+
+  [ Guillem Jover ]
+  * MT#58381 Use short name for GPL-2 in debian/copyright
+  * MT#58381 debian: Move license location on Debian systems into a Comment
+  * MT#58381 debian: Move common License texts into their own stanza at the end
+
+ -- Victor Seva <vseva@debian.org>  Tue, 21 Nov 2023 09:09:01 +0100
 
 ngcp-kamailio (5.7.2-1+0~mr12.0.1.0) unstable; urgency=medium
 
