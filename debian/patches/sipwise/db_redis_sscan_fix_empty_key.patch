@@ -7,15 +7,15 @@ Subject: db_redis_sscan_fix_empty_key
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index 8569aa0..f61a6b1 100644
+index b98e0f3..c0b9416 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -784,7 +784,7 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
-     do {
-         snprintf(cursor_str, sizeof(cursor_str), "%lu", cursor);
+@@ -854,7 +854,7 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con,
+ 	do {
+ 		snprintf(cursor_str, sizeof(cursor_str), "%lu", cursor);
  
--        if (!index_key) {
-+        if (!index_key || !index_key->len) {
-             if (db_redis_key_add_string(&query_v, "SCAN", 4) != 0) {
-                 LM_ERR("Failed to add scan command to scan query\n");
-                 goto err;
+-		if(!index_key) {
++		if(!index_key || !index_key->len) {
+ 			if(db_redis_key_add_string(&query_v, "SCAN", 4) != 0) {
+ 				LM_ERR("Failed to add scan command to scan query\n");
+ 				goto err;

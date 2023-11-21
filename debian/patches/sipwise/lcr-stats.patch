@@ -3,13 +3,13 @@ Date: Fri, 10 Mar 2023 11:58:50 +0100
 Subject: lcr: add stats per gw
 
 ---
- src/modules/lcr/lcr_mod.c | 327 +++++++++++++++++++++++++++++++-
+ src/modules/lcr/lcr_mod.c | 323 +++++++++++++++++++++++++++++++++
  src/modules/lcr/lcr_mod.h |  53 ++++++
- src/modules/lcr/lcr_rpc.c | 460 +++++++++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 833 insertions(+), 7 deletions(-)
+ src/modules/lcr/lcr_rpc.c | 451 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 827 insertions(+)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 3d49365..1300ffb 100644
+index 826f853..834612c 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -65,6 +65,7 @@
@@ -40,7 +40,7 @@ index 3d49365..1300ffb 100644
  /*
   * Functions that are defined later
   */
-@@ -271,6 +278,10 @@ static int to_gw_1(struct sip_msg *_m, char *_s1, char *_s2);
+@@ -272,6 +279,10 @@ static int to_gw_1(struct sip_msg *_m, char *_s1, char *_s2);
  static int to_gw_3(struct sip_msg *_m, char *_s1, char *_s2, char *_s3);
  static int to_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2);
  static int to_any_gw_2(struct sip_msg *_m, char *_s1, char *_s2);
@@ -51,7 +51,7 @@ index 3d49365..1300ffb 100644
  
  /* clang-format off */
  /*
-@@ -361,6 +372,7 @@ static param_export_t params[] = {
+@@ -362,6 +373,7 @@ static param_export_t params[] = {
      {"ping_from",                PARAM_STR, &ping_from_param},
      {"ping_socket",              PARAM_STR, &ping_socket_param},
      {"stopper_mode",             PARAM_INT, &stopper_mode_param},
@@ -59,7 +59,7 @@ index 3d49365..1300ffb 100644
      {0, 0, 0}
  };
  
-@@ -426,6 +438,180 @@ static void lcr_db_close(void)
+@@ -427,6 +439,180 @@ static void lcr_db_close(void)
  	}
  }
  
@@ -240,7 +240,7 @@ index 3d49365..1300ffb 100644
  
  /*
   * Module initialization function that is called before the main process forks
-@@ -438,6 +624,28 @@ static int mod_init(void)
+@@ -439,6 +625,28 @@ static int mod_init(void)
  	unsigned int i;
  	char *at, *past, *sep;
  
@@ -269,7 +269,7 @@ index 3d49365..1300ffb 100644
  	/* Register RPC commands */
  	if(rpc_register_array(lcr_rpc) != 0) {
  		LM_ERR("failed to register RPC commands\n");
-@@ -1013,6 +1221,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
+@@ -1022,6 +1230,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
  		append_str(at, transport, transport_len);
  	}
  	gws[i].uri_len = at - &(gws[i].uri[0]);
@@ -280,7 +280,7 @@ index 3d49365..1300ffb 100644
  	LM_DBG("inserted gw <%u, %.*s, %.*s> at index %u\n", gw_id, gw_name_len,
  			gw_name, gws[i].uri_len, gws[i].uri, i);
  	return 1;
-@@ -2281,6 +2493,65 @@ done:
+@@ -2288,6 +2500,65 @@ done:
  	return j;
  }
  
@@ -346,18 +346,7 @@ index 3d49365..1300ffb 100644
  
  /*
   * Load info of matching GWs into gw_uri_avps
-@@ -3279,8 +3550,8 @@ static int from_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2)
-  * Checks if request comes from ip address of a gateway taking source
-  * IP address, transport protocol and source port from parameters.
-  */
--static int ki_from_any_gw_addr_port(sip_msg_t *_m, str *addr_str, int transport,
--		int src_port)
-+static int ki_from_any_gw_addr_port(
-+		sip_msg_t *_m, str *addr_str, int transport, int src_port)
- {
- 	unsigned int i;
- 	struct ip_addr *ip, src_addr;
-@@ -3713,3 +3984,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+@@ -3726,3 +3997,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
  	sr_kemi_modules_add(sr_kemi_lcr_exports);
  	return 0;
  }
@@ -492,24 +481,13 @@ index 193e216..e14ffd7 100644
  
  #endif /* LCR_MOD_H */
 diff --git a/src/modules/lcr/lcr_rpc.c b/src/modules/lcr/lcr_rpc.c
-index 3a990c7..fb38912 100644
+index 614d027..755fe58 100644
 --- a/src/modules/lcr/lcr_rpc.c
 +++ b/src/modules/lcr/lcr_rpc.c
-@@ -99,11 +99,176 @@ static void dump_gw(rpc_t *rpc, void *st, struct gw_info *gw, unsigned int gw_in
- 	prefix.len = gw->prefix_len;
- 	tag.s = gw->tag;
- 	tag.len = gw->tag_len;
--	start = int2strbuf(
--			gw->defunct_until, &(buf[0]), INT2STR_MAX_LEN, &len);
--	rpc->struct_add(st, "dSSdds", "strip", gw->strip, "prefix",
--			&prefix, "tag", &tag, "flags", gw->flags, "state",
--			gw->state, "defunct_until", start);
-+	start = int2strbuf(gw->defunct_until, &(buf[0]), INT2STR_MAX_LEN, &len);
-+	rpc->struct_add(st, "dSSdds", "strip", gw->strip, "prefix", &prefix, "tag",
-+			&tag, "flags", gw->flags, "state", gw->state, "defunct_until",
-+			start);
-+}
-+
+@@ -102,6 +102,172 @@ static void dump_gw(rpc_t *rpc, void *st, struct gw_info *gw,
+ 			start);
+ }
+ 
 +static void print_gw_stat(rpc_t *rpc, void *st, struct gw_info *gw)
 +{
 +	str gw_name;
@@ -674,10 +652,12 @@ index 3a990c7..fb38912 100644
 +{
 +	reset_gw_stats(gw);
 +	print_gw_stat(rpc, st, gw);
- }
- 
++}
++
  static void dump_gws(rpc_t *rpc, void *c)
-@@ -302,6 +467,288 @@ static void load_gws(rpc_t *rpc, void *c)
+ {
+ 	void *st;
+@@ -303,6 +469,288 @@ static void load_gws(rpc_t *rpc, void *c)
  	return;
  }
  
@@ -966,7 +946,7 @@ index 3a990c7..fb38912 100644
  /* clang-format off */
  rpc_export_t lcr_rpc[] = {
      {"lcr.reload", reload, reload_doc, 0},
-@@ -309,6 +756,9 @@ rpc_export_t lcr_rpc[] = {
+@@ -310,6 +758,9 @@ rpc_export_t lcr_rpc[] = {
      {"lcr.dump_rules", dump_rules, dump_rules_doc, 0},
      {"lcr.defunct_gw", defunct_gw, defunct_gw_doc, 0},
      {"lcr.load_gws", load_gws, load_gws_doc, 0},

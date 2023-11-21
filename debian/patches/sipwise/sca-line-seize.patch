@@ -16,7 +16,7 @@ Subject: sca-line-seize
  10 files changed, 410 insertions(+), 201 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index 07dac39..c2347bb 100644
+index c856a2a..0298610 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -64,6 +64,12 @@ db_func_t dbf;		 // db api

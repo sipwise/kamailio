@@ -7,7 +7,7 @@ Subject: cfgt: don't dump same node
  1 file changed, 40 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 6314878..ed29d29 100644
+index ed2204b..15f0606 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -32,6 +32,7 @@

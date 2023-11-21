@@ -9,7 +9,7 @@ Subject: cfgt: skip_unknown
  3 files changed, 36 insertions(+)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index f484f02..6314878 100644
+index 2509b3e..ed2204b 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -43,6 +43,7 @@ cfgt_hash_p _cfgt_uuid = NULL;
@@ -62,7 +62,7 @@ index f484f02..6314878 100644
  		if(jobj == NULL) {
  			LM_ERR("cannot create json object\n");
 diff --git a/src/modules/cfgt/cfgt_mod.c b/src/modules/cfgt/cfgt_mod.c
-index 8806d0c..10b0889 100644
+index 728d228..7dec36a 100644
 --- a/src/modules/cfgt/cfgt_mod.c
 +++ b/src/modules/cfgt/cfgt_mod.c
 @@ -42,6 +42,7 @@ unsigned int init_flag = 0;
@@ -82,7 +82,7 @@ index 8806d0c..10b0889 100644
  };
  
 diff --git a/src/modules/cfgt/doc/cfgt_admin.xml b/src/modules/cfgt/doc/cfgt_admin.xml
-index 2a2b158..84d3df6 100644
+index 920b1bf..b3af2de 100644
 --- a/src/modules/cfgt/doc/cfgt_admin.xml
 +++ b/src/modules/cfgt/doc/cfgt_admin.xml
 @@ -143,6 +143,26 @@ modparam("cfgt", "mask", 12)

@@ -5,19 +5,19 @@ Subject: pv_headers: rework pvh_remove_header_param, take two
 * pvh_set_xavi changes/removes xavi, so we need the new value
 * after pvh_remove_header, search for the header again
 ---
- src/modules/pv_headers/pv_headers.c | 18 ++++++++++++++----
+ src/modules/pv_headers/pv_headers.c | 22 ++++++++++++++++------
  src/modules/pv_headers/pvh_func.c   | 12 ++++++++----
  src/modules/pv_headers/pvh_xavp.c   | 34 +++++++++++++++-------------------
  src/modules/pv_headers/pvh_xavp.h   |  2 +-
- 4 files changed, 38 insertions(+), 28 deletions(-)
+ 4 files changed, 40 insertions(+), 30 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index 7561b08..3e9e5a6 100644
+index a833b96..fdb6f2e 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -223,12 +223,15 @@ static int w_pvh_header_param_exists(
- 
- static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRemove)
+@@ -224,12 +224,15 @@ static int w_pvh_header_param_exists(struct sip_msg *msg, char *p1, char *p2)
+ static int ki_pvh_remove_header_param(
+ 		struct sip_msg *msg, str *hname, str *toRemove)
  {
 -	int idx;
 +	int next;
@@ -26,33 +26,37 @@ index 7561b08..3e9e5a6 100644
  	str dst = STR_NULL;
  	sr_xavp_t *avi = pvh_xavi_get_child(msg, &xavi_name, hname);
  
--	for(idx=0; avi != NULL; avi = xavi_get_next(avi)) {
+-	for(idx = 0; avi != NULL; avi = xavi_get_next(avi)) {
 +	while(avi) {
 +		next = 1;
 +		LM_DBG("hname:%.*s[%d]\n", STR_FMT(hname), idx);
- 		if (avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL) {
+ 		if(avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL) {
  			if(str_casesearch(&avi->val.v.s, toRemove) != NULL) {
- 				new_size = pvh_remove_header_param_helper(&avi->val.v.s, toRemove, &dst);
-@@ -237,13 +240,17 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
+ 				new_size = pvh_remove_header_param_helper(
+@@ -239,15 +242,19 @@ static int ki_pvh_remove_header_param(
  							STR_FMT(hname), idx);
  					if(pvh_remove_header(msg, hname, idx) < 0)
  						return -1;
 +					avi = pvh_xavi_get_child(msg, &xavi_name, hname);
-+					if(idx > 0) idx = 0;
++					if(idx > 0)
++						idx = 0;
 +					next = 0;
  				} else if(dst.len < 0 || new_size == avi->val.v.s.len) {
  					LM_DBG("'%.*s' not found at '%.*s'\n", STR_FMT(toRemove),
- 						STR_FMT(&avi->val.v.s));
+ 							STR_FMT(&avi->val.v.s));
  				} else {
  					LM_DBG("old_value:'%.*s' new_value:'%.*s'\n",
- 						STR_FMT(&avi->val.v.s), STR_FMT(&dst));
--					if(pvh_set_xavi(msg, &xavi_name, hname, &dst, SR_XTYPE_STR, idx, 0) < 0) {
-+					avi = pvh_set_xavi(msg, &xavi_name, hname, &dst, SR_XTYPE_STR, idx, 0);
+ 							STR_FMT(&avi->val.v.s), STR_FMT(&dst));
+-					if(pvh_set_xavi(msg, &xavi_name, hname, &dst, SR_XTYPE_STR,
+-							   idx, 0)
+-							< 0) {
++					avi = pvh_set_xavi(
++							msg, &xavi_name, hname, &dst, SR_XTYPE_STR, idx, 0);
 +					if(avi == NULL) {
  						LM_ERR("can't set new value\n");
  						return -1;
  					}
-@@ -253,7 +260,10 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
+@@ -257,7 +264,10 @@ static int ki_pvh_remove_header_param(
  						STR_FMT(&avi->val.v.s));
  			}
  		}
@@ -65,7 +69,7 @@ index 7561b08..3e9e5a6 100644
  	return 1;
  }
 diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
-index 918733c..09f70ba 100644
+index 7b1c6f9..b0e7a82 100644
 --- a/src/modules/pv_headers/pvh_func.c
 +++ b/src/modules/pv_headers/pvh_func.c
 @@ -325,12 +325,16 @@ int pvh_check_header(struct sip_msg *msg, str *hname)
@@ -103,7 +107,7 @@ index 918733c..09f70ba 100644
  	}
  
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
-index 4f90808..6f63015 100644
+index e52f9da..fb9a714 100644
 --- a/src/modules/pv_headers/pvh_xavp.c
 +++ b/src/modules/pv_headers/pvh_xavp.c
 @@ -131,18 +131,18 @@ static sr_xavp_t *pvh_xavi_new_value(str *name, sr_xval_t *val)

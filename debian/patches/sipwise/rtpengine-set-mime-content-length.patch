@@ -4,74 +4,74 @@ Subject: rtpengine-set-mime-content-length
 
 ---
  src/modules/rtpengine/rtpengine.c       | 43 ++++++++++++++++++++++++---------
- src/modules/rtpengine/rtpengine_funcs.c | 10 +++++---
+ src/modules/rtpengine/rtpengine_funcs.c |  9 ++++---
  src/modules/rtpengine/rtpengine_funcs.h |  3 +--
- 3 files changed, 39 insertions(+), 17 deletions(-)
+ 3 files changed, 38 insertions(+), 17 deletions(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 51bd9e3..11438b7 100644
+index 442df8d..1c7da31 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2506,7 +2506,7 @@ error:
- }
+@@ -2550,7 +2550,7 @@ error:
  
- static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_msg *msg,
--	enum rtpe_operation op, const char *flags_str, str *body_out)
-+	enum rtpe_operation op, const char *flags_str, str *body_out, str *cl_field)
+ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
+ 		struct sip_msg *msg, enum rtpe_operation op, const char *flags_str,
+-		str *body_out)
++		str *body_out, str *cl_field)
  {
  	struct ng_flags_parse ng_flags;
  	bencode_item_t *item, *resp;
-@@ -2570,7 +2570,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
+@@ -2616,7 +2616,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
  				body = pv_val.rs;
  			}
  
--		} else if ((cont_type = extract_body(msg, &body)) == -1) {
-+		} else if ((cont_type = extract_body(msg, &body, cl_field)) == -1) {
+-		} else if((cont_type = extract_body(msg, &body)) == -1) {
++		} else if((cont_type = extract_body(msg, &body, cl_field)) == -1) {
  			LM_ERR("can't extract body from the message\n");
  			goto error;
  		}
-@@ -2876,7 +2876,7 @@ static int rtpp_function_call_simple(struct sip_msg *msg, enum rtpe_operation op
+@@ -2953,7 +2953,7 @@ static int rtpp_function_call_simple(
  	bencode_buffer_t bencbuf;
  	bencode_item_t *ret;
  
 -	ret = rtpp_function_call(&bencbuf, msg, op, flags_str, NULL);
 +	ret = rtpp_function_call(&bencbuf, msg, op, flags_str, NULL, NULL);
- 	if (!ret)
+ 	if(!ret)
  		return -1;
  
-@@ -2896,11 +2896,11 @@ static int rtpengine_simple_wrap(struct sip_msg *msg, void *d, int more, enum rt
+@@ -2976,11 +2976,11 @@ static int rtpengine_simple_wrap(
  
- 
- static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
--		enum rtpe_operation op, const char *flags_str, str *body)
-+		enum rtpe_operation op, const char *flags_str, str *body, str *cl_field)
+ static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf,
+ 		struct sip_msg *msg, enum rtpe_operation op, const char *flags_str,
+-		str *body)
++		str *body, str *cl_field)
  {
  	bencode_item_t *ret;
  
 -	ret = rtpp_function_call(bencbuf, msg, op, flags_str, body);
 +	ret = rtpp_function_call(bencbuf, msg, op, flags_str, body, cl_field);
- 	if (!ret)
+ 	if(!ret)
  		return NULL;
  
-@@ -3695,7 +3695,7 @@ static void parse_call_stats(bencode_item_t *dict, struct sip_msg *msg) {
- 
- static int rtpengine_delete(struct sip_msg *msg, const char *flags) {
+@@ -3804,7 +3804,7 @@ static int rtpengine_delete(struct sip_msg *msg, const char *flags)
+ {
  	bencode_buffer_t bencbuf;
--	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_DELETE, flags, NULL);
-+	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_DELETE, flags, NULL, NULL);
- 	if (!ret)
+ 	bencode_item_t *ret =
+-			rtpp_function_call_ok(&bencbuf, msg, OP_DELETE, flags, NULL);
++			rtpp_function_call_ok(&bencbuf, msg, OP_DELETE, flags, NULL, NULL);
+ 	if(!ret)
  		return -1;
  	parse_call_stats(ret, msg);
-@@ -3705,7 +3705,7 @@ static int rtpengine_delete(struct sip_msg *msg, const char *flags) {
- 
- static int rtpengine_query(struct sip_msg *msg, const char *flags) {
+@@ -3816,7 +3816,7 @@ static int rtpengine_query(struct sip_msg *msg, const char *flags)
+ {
  	bencode_buffer_t bencbuf;
--	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, flags, NULL);
-+	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, flags, NULL, NULL);
- 	if (!ret)
+ 	bencode_item_t *ret =
+-			rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, flags, NULL);
++			rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, flags, NULL, NULL);
+ 	if(!ret)
  		return -1;
  	parse_call_stats(ret, msg);
-@@ -3979,9 +3979,11 @@ rtpengine_offer_answer(struct sip_msg *msg, const char *flags, enum rtpe_operati
+@@ -4097,9 +4097,11 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  	str body, newbody;
  	struct lump *anchor;
  	pv_value_t pv_val;
@@ -82,69 +82,69 @@ index 51bd9e3..11438b7 100644
  
 -	dict = rtpp_function_call_ok(&bencbuf, msg, op, flags, &body);
 +	dict = rtpp_function_call_ok(&bencbuf, msg, op, flags, &body, &cl_field);
- 	if (!dict)
+ 	if(!dict)
  		return -1;
  
-@@ -4009,6 +4011,21 @@ rtpengine_offer_answer(struct sip_msg *msg, const char *flags, enum rtpe_operati
+@@ -4129,6 +4131,21 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  			pkg_free(newbody.s);
  
  		} else {
-+			if (cl_field.len) {
++			if(cl_field.len) {
 +				anchor = del_lump(msg, cl_field.s - msg->buf, cl_field.len, 0);
 +				cl_repl.s = pkg_malloc(10);
-+				if (!cl_repl.s) {
++				if(!cl_repl.s) {
 +					LM_ERR("pkg_malloc for Content-Length failed\n");
 +					goto error_free;
 +				}
-+				cl_repl.len = snprintf(cl_repl.s, 10, "%i", (int) newbody.len);
-+				if (!insert_new_lump_after(anchor, cl_repl.s, cl_repl.len, 0)) {
++				cl_repl.len = snprintf(cl_repl.s, 10, "%i", (int)newbody.len);
++				if(!insert_new_lump_after(anchor, cl_repl.s, cl_repl.len, 0)) {
 +					LM_ERR("insert_new_lump_after failed\n");
 +					goto error_free;
 +				}
 +				cl_repl.s = NULL;
 +			}
 +
- 			if (read_sdp_pvar_str.len > 0) {
+ 			if(read_sdp_pvar_str.len > 0) {
  				/* get the body from the message as body ptr may have changed
  				 * when using read_sdp_pv */
-@@ -4036,6 +4053,8 @@ rtpengine_offer_answer(struct sip_msg *msg, const char *flags, enum rtpe_operati
+@@ -4156,6 +4173,8 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  
  error_free:
  	pkg_free(newbody.s);
-+	if (cl_repl.s)
++	if(cl_repl.s)
 +		pkg_free(cl_repl.s);
  error:
  	bencode_buffer_free(&bencbuf);
  	return -1;
-@@ -4104,7 +4123,7 @@ static int rtpengine_play_media(struct sip_msg *msg, void *d, int more, enum rtp
+@@ -4219,7 +4238,7 @@ static int rtpengine_play_media(
  	pv_value_t val;
  	int retval = 1;
  
 -	ret = rtpp_function_call_ok(&bencbuf, msg, OP_PLAY_MEDIA, d, NULL);
 +	ret = rtpp_function_call_ok(&bencbuf, msg, OP_PLAY_MEDIA, d, NULL, NULL);
- 	if (!ret)
+ 	if(!ret)
  		return -1;
- 	if (media_duration_pvar) {
-@@ -4168,7 +4187,7 @@ static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more, enum r
+ 	if(media_duration_pvar) {
+@@ -4283,7 +4302,7 @@ static int rtpengine_rtpstat_wrap(
  	param = parms[0];
  	res = parms[1];
  
 -	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL);
 +	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL, NULL);
- 	if (!dict)
+ 	if(!dict)
  		return -1;
  
-@@ -4336,7 +4355,7 @@ static int rtpengine_query_v_wrap(struct sip_msg *msg, void *d, int more,
+@@ -4452,7 +4471,7 @@ static int rtpengine_query_v_wrap(
  	fmt = parms[0];
  	dst = parms[1];
  
 -	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL);
 +	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL, NULL);
- 	if (!dict) {
+ 	if(!dict) {
  		return -1;
  	}
 diff --git a/src/modules/rtpengine/rtpengine_funcs.c b/src/modules/rtpengine/rtpengine_funcs.c
-index 4863ec6..35272b4 100644
+index 7ef7c8b..dde9cf5 100644
 --- a/src/modules/rtpengine/rtpengine_funcs.c
 +++ b/src/modules/rtpengine/rtpengine_funcs.c
 @@ -66,7 +66,7 @@
@@ -154,41 +154,40 @@ index 4863ec6..35272b4 100644
 -int check_content_type(struct sip_msg *msg)
 +static int check_content_type(struct sip_msg *msg)
  {
- 	static unsigned int appl[16] = {
- 		0x6c707061/*appl*/,0x6c707041/*Appl*/,0x6c705061/*aPpl*/,
-@@ -161,7 +161,7 @@ other:
+ 	static unsigned int appl[16] = {0x6c707061 /*appl*/, 0x6c707041 /*Appl*/,
+ 			0x6c705061 /*aPpl*/, 0x6c705041 /*APpl*/, 0x6c507061 /*apPl*/,
+@@ -156,7 +156,7 @@ other:
  /*
   * Get message body and check Content-Type header field
   */
--int extract_body(struct sip_msg *msg, str *body )
+-int extract_body(struct sip_msg *msg, str *body)
 +int extract_body(struct sip_msg *msg, str *body, str *cl_field)
  {
  	char c;
  	int ret;
-@@ -241,7 +241,11 @@ int extract_body(struct sip_msg *msg, str *body )
+@@ -234,7 +234,10 @@ int extract_body(struct sip_msg *msg, str *body)
  				break;
- 			if(hf.type==HDR_ERROR_T)
+ 			if(hf.type == HDR_ERROR_T)
  				return -1;
--			if(hf.type==HDR_CONTENTTYPE_T) {
+-			if(hf.type == HDR_CONTENTTYPE_T) {
 +			if(hf.type == HDR_CONTENTLENGTH_T) {
-+				if (cl_field)
++				if(cl_field)
 +					*cl_field = hf.body;
-+			}
-+			else if(hf.type == HDR_CONTENTTYPE_T) {
- 				if(decode_mime_type(hf.body.s, hf.body.s + hf.body.len,
- 						&mime)==NULL)
++			} else if(hf.type == HDR_CONTENTTYPE_T) {
+ 				if(decode_mime_type(hf.body.s, hf.body.s + hf.body.len, &mime)
+ 						== NULL)
  					return -1;
 diff --git a/src/modules/rtpengine/rtpengine_funcs.h b/src/modules/rtpengine/rtpengine_funcs.h
-index 6071fb9..b92298e 100644
+index a1221bd..ea0a720 100644
 --- a/src/modules/rtpengine/rtpengine_funcs.h
 +++ b/src/modules/rtpengine/rtpengine_funcs.h
 @@ -27,8 +27,7 @@
  #include "../../core/parser/msg_parser.h"
  #include "../../core/parser/contact/contact.h"
  
--int extract_body(struct sip_msg * , str *);
--int check_content_type(struct sip_msg * );
-+int extract_body(struct sip_msg * , str *, str *);
+-int extract_body(struct sip_msg *, str *);
+-int check_content_type(struct sip_msg *);
++int extract_body(struct sip_msg *, str *, str *);
  int get_callid(struct sip_msg *, str *);
  int get_to_tag(struct sip_msg *, str *);
  int get_from_tag(struct sip_msg *, str *);

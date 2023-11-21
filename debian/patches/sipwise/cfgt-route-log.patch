@@ -10,7 +10,7 @@ Subject: cfgt: route log
  4 files changed, 62 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index ed29d29..21433a3 100644
+index 15f0606..56e3376 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -1,6 +1,6 @@
@@ -149,7 +149,7 @@ index 197e4bb..1564daa 100644
  } cfgt_str_list_t, *cfgt_str_list_p;
  
 diff --git a/src/modules/cfgt/cfgt_mod.c b/src/modules/cfgt/cfgt_mod.c
-index 10b0889..1d004ef 100644
+index 7dec36a..4809426 100644
 --- a/src/modules/cfgt/cfgt_mod.c
 +++ b/src/modules/cfgt/cfgt_mod.c
 @@ -1,5 +1,5 @@
@@ -176,7 +176,7 @@ index 10b0889..1d004ef 100644
  };
  
 diff --git a/src/modules/cfgt/doc/cfgt_admin.xml b/src/modules/cfgt/doc/cfgt_admin.xml
-index 84d3df6..73f8565 100644
+index b3af2de..4975a5c 100644
 --- a/src/modules/cfgt/doc/cfgt_admin.xml
 +++ b/src/modules/cfgt/doc/cfgt_admin.xml
 @@ -163,6 +163,25 @@ modparam("cfgt", "callid_prefix", "TEST-ID%")
