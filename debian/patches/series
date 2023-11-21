@@ -38,6 +38,7 @@ sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
 sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 upstream/http_client-Add-parameter-timeout_mode-timeout-in-se.patch
+upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
@@ -56,6 +57,7 @@ sipwise/rtpengine-set-mime-content-length.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
 ### active development
+#
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
