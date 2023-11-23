@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.2-1+0~mr12.0.1.2) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [2e1e3dd] MT#58613 Add gw_lcr_id param for lcr module
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 23 Nov 2023 10:28:15 +0100
+
 ngcp-kamailio (5.7.2-1+0~mr12.0.1.1) unstable; urgency=medium
 
   * New release.
