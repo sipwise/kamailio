@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.2-1+0~mr12.0.1.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [4bd8755] MT#58587 dialog: dlg_get_ttag("<callid>", "<from-tag>", "<pv_dst>")
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 28 Nov 2023 15:58:22 +0100
+
 ngcp-kamailio (5.7.2-1+0~mr12.0.1.2) unstable; urgency=medium
 
   [ Alessio Garzi ]
