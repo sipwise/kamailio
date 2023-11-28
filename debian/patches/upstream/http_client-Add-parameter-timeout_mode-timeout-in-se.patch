@@ -1,0 +1,183 @@
+From: Nicolas C <nchaigne@capgemini.fr>
+Date: Tue, 24 Oct 2023 17:10:09 +0200
+Subject: http_client: Add parameter timeout_mode (timeout in seconds or
+ milliseconds)
+
+A new parameter timeout_mode is added.
+This parameter defines if timeouts are enabled, and in which unit timeout values are expressed.
+- 0 - Timeouts are disabled.
+- 1 - Timeout values are in seconds (default).
+- 2 - Timeout values are in milliseconds.
+
+Implementation detail:
+
+default global timeout = 0 (unconfigured).
+
+Parse connections as usual. If they have a timeout configured, use it.
+
+In mod_init:
+  if global timeout == 0 (unconfigured), and timeout_mode is 1 or 2:
+    if timeout_mode == 1 -> global timeout = 4 (seconds)
+    if timeout_mode == 2 -> global timeout = 4000 (milliseconds)
+
+  for each connection "conn" (fixup):
+    if timeout_mode is not 1 or 2 -> conn.timeout = 0 (to reflect the fact that no timeout will be handled)
+    else if conn.timeout is not configured -> conn.timeout = global timeout (in seconds or milliseconds, depending on timeout_mode).
+
+When doing Curl requests (curL_request_url):
+  if timeout_mode == 1: set CURLOPT_TIMEOUT
+  if timeout_mode == 2: set CURLOPT_TIMEOUT_MS
+---
+ src/modules/http_client/curlcon.c     | 28 +++++++++++++++++++++++++++-
+ src/modules/http_client/curlcon.h     |  4 ++++
+ src/modules/http_client/functions.c   | 13 ++++++++++++-
+ src/modules/http_client/http_client.c | 27 +++++++++++++++++++++++----
+ src/modules/http_client/http_client.h |  1 +
+ 5 files changed, 67 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/http_client/curlcon.c b/src/modules/http_client/curlcon.c
+index bffd26c..35735b7 100644
+--- a/src/modules/http_client/curlcon.c
++++ b/src/modules/http_client/curlcon.c
+@@ -403,7 +403,7 @@ int curl_parse_param(char *val)
+ 			} else if(pit->name.len == 7
+ 					  && strncmp(pit->name.s, "timeout", 7) == 0) {
+ 				if(str2int(&tok, &timeout) != 0) {
+-					/* Bad timeout */
++					/* Bad value */
+ 					LM_WARN("curl connection [%.*s]: timeout bad value. Using "
+ 							"default\n",
+ 							name.len, name.s);
+@@ -854,3 +854,29 @@ curl_con_t *curl_init_con(str *name)
+ 	LM_DBG("CURL: Added connection [%.*s]\n", name->len, name->s);
+ 	return cc;
+ }
++
++/*! Fixup CURL connections - if timeout is not configured, Use as default global connection_timeout.
++ */
++void curl_conn_list_fixup(void)
++{
++	curl_con_t *cc;
++	cc = _curl_con_root;
++	while (cc) {
++		if (!(timeout_mode == 1 || timeout_mode == 2)) {
++			/* Timeout is disabled globally. Set timeout to 0 for all connections to reflect this. */
++			if (cc->timeout > 0) {
++				LM_WARN("curl connection [%.*s]: configured timeout is ignored "
++				"because timeouts are disabled (timeout_mode)\n",
++					cc->name.len, cc->name.s);
++				cc->timeout = 0;
++			}
++		}
++		else if (cc->timeout == 0) {
++			/* Timeout is not configured for that connection.
++			 * Use as default global connection_timeout (which can be seconds or milliseconds).
++			 */
++			cc->timeout = default_connection_timeout;
++		}
++		cc = cc->next;
++	}
++}
+\ No newline at end of file
+diff --git a/src/modules/http_client/curlcon.h b/src/modules/http_client/curlcon.h
+index ff5ebe1..3f77476 100644
+--- a/src/modules/http_client/curlcon.h
++++ b/src/modules/http_client/curlcon.h
+@@ -52,4 +52,8 @@ int curl_parse_param(char *val);
+ curl_con_t *curl_get_connection(str *name);
+ curl_con_pkg_t *curl_get_pkg_connection(curl_con_t *con);
+ 
++/*! Fixup CURL connections - if timeout is not configured, Use as default global connection_timeout.
++ */
++void curl_conn_list_fixup(void);
++
+ #endif
+diff --git a/src/modules/http_client/functions.c b/src/modules/http_client/functions.c
+index 1472da7..dda4721 100644
+--- a/src/modules/http_client/functions.c
++++ b/src/modules/http_client/functions.c
+@@ -262,7 +262,18 @@ static int curL_request_url(struct sip_msg *_m, const char *_met,
+ 			curl, CURLOPT_SSL_VERIFYHOST, (long)params->verify_host ? 2 : 0);
+ 
+ 	res |= curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
+-	res |= curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)params->timeout);
++
++	/* timeout_mode parameter:
++	 * - 0 : timeout is disabled.
++	 * - 1 (default) : timeout value is in seconds.
++	 * - 2 : timeout value is in milliseconds.
++	 */
++	if (timeout_mode == 1) { /* timeout is in seconds (default) */
++		res |= curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)params->timeout);
++	} else if (timeout_mode == 2) { /* timeout is in milliseconds */
++		res |= curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)params->timeout);
++	}
++
+ 	res |= curl_easy_setopt(
+ 			curl, CURLOPT_FOLLOWLOCATION, (long)params->http_follow_redirect);
+ 	if(params->http_follow_redirect) {
+diff --git a/src/modules/http_client/http_client.c b/src/modules/http_client/http_client.c
+index 430933e..4884424 100644
+--- a/src/modules/http_client/http_client.c
++++ b/src/modules/http_client/http_client.c
+@@ -76,7 +76,8 @@ MODULE_VERSION
+ #define CURL_USER_AGENT_LEN (sizeof(CURL_USER_AGENT) - 1)
+ 
+ /* Module parameter variables */
+-unsigned int default_connection_timeout = 4;
++unsigned int default_connection_timeout = 0; /*!< 0 = not user configured - the default (4 seconds) will be used */
++unsigned int timeout_mode = 1; /*!< 0 = timeout disabled, 1 (default) = timeout in seconds, 2 = timeout in ms */
+ char *default_tls_cacert =
+ 		NULL; /*!< File name: Default CA cert to use for curl TLS connection */
+ str default_tls_clientcert =
+@@ -195,6 +196,7 @@ static cmd_export_t cmds[] = {
+ /* Exported parameters */
+ static param_export_t params[] = {
+ 	{"connection_timeout", PARAM_INT, &default_connection_timeout},
++	{"timeout_mode", PARAM_INT, &timeout_mode},
+ 	{"cacert", PARAM_STRING,  &default_tls_cacert },
+ 	{"client_cert", PARAM_STR, &default_tls_clientcert },
+ 	{"client_key", PARAM_STR, &default_tls_clientkey },
+@@ -310,10 +312,27 @@ static int mod_init(void)
+ 		}
+ 	}
+ 
+-	if(default_connection_timeout == 0) {
+-		LM_ERR("CURL connection timeout set to zero. Using default 4 secs\n");
+-		default_connection_timeout = 4;
++	/* timeout_mode parameter:
++	 * - 0 : timeout is disabled.
++	 * - 1 (default) : timeout value is in seconds.
++	 * - 2 : timeout value is in milliseconds.
++	 */
++	if (!(timeout_mode == 1 || timeout_mode == 2)) {
++		if (default_connection_timeout > 0) {
++			LM_WARN("configured connection_timeout is ignored "
++				"because timeouts are disabled (timeout_mode)\n");
++		}
++	} else if (default_connection_timeout == 0) {
++		LM_INFO("curl connection timeout set to zero. Using default 4 secs\n");
++		if (timeout_mode == 1) { /* timeout is in seconds (default) */
++			default_connection_timeout = 4;
++		} else if (timeout_mode == 2) { /* timeout is in milliseconds */
++			default_connection_timeout = 4000;
++		}
+ 	}
++	/* Fixup named connections for which no specific timeout is configured. */
++	curl_conn_list_fixup();
++
+ 	if(default_http_proxy_port == 0) {
+ 		LM_INFO("HTTP proxy port set to 0. Disabling HTTP proxy\n");
+ 	}
+diff --git a/src/modules/http_client/http_client.h b/src/modules/http_client/http_client.h
+index 0f659f9..c56f411 100644
+--- a/src/modules/http_client/http_client.h
++++ b/src/modules/http_client/http_client.h
+@@ -40,6 +40,7 @@
+ #include "../../lib/srdb1/db.h"
+ 
+ extern unsigned int default_connection_timeout;
++extern unsigned int timeout_mode;
+ extern char *
+ 		default_tls_cacert; /*!< File name: Default CA cert to use for curl TLS connection */
+ extern str
