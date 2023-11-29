@@ -1,3 +1,12 @@
+ngcp-kamailio (5.7.3-1+0~mr12.2.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [1bd3687] MT#58795 refresh patches
+  * [4df060d] MT#58795 fix sipwise/usrloc_dbro_pinger.patch
+  * [4d4aa39] MT#58732 http_client timeout_mode
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 29 Nov 2023 13:36:14 +0100
+
 ngcp-kamailio (5.7.3-1+0~mr12.1.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
