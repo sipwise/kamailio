@@ -98,6 +98,10 @@ export RADCLI = 1
 else
 export FREERADIUS = 1
 endif
+# tlsa
+export KTLS_INCLUDE_TLSA=yes
+export LIBSSL_STATIC_SRCLIB=yes
+export LIBSSL_STATIC_SRCPATH=/usr/$(LIBDIR)
 
 # FTBFS on powerpcspe because of AltiVec assumption #729635.
 ifeq ($(DEB_HOST_ARCH),powerpcspe)
