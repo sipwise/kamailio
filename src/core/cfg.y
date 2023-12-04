@@ -419,6 +419,11 @@ extern char *default_routename;
 %token CFGENGINE
 %token MAXBUFFER
 %token SQL_BUFFER_SIZE
+%token MSG_RECV_MAX_SIZE
+%token TCP_MSG_READ_TIMEOUT
+%token TCP_MSG_DATA_TIMEOUT
+%token TCP_ACCEPT_IPLIMIT
+%token TCP_CHECK_TIMER
 %token USER
 %token GROUP
 %token CHROOT
@@ -886,7 +891,7 @@ assign_stm:
 			_ksr_xavp_via_params.len=strlen($3);
 		}
 	| XAVPVIAPARAMS EQUAL error { yyerror("string value expected"); }
-	| XAVPVIAFIELDS EQUAL STRING { _ksr_xavp_via_params.s=$3;
+	| XAVPVIAFIELDS EQUAL STRING { _ksr_xavp_via_fields.s=$3;
 			_ksr_xavp_via_fields.len=strlen($3);
 		}
 	| XAVPVIAFIELDS EQUAL error { yyerror("string value expected"); }
@@ -993,11 +998,21 @@ assign_stm:
 	| IP_FREE_BIND EQUAL intno { _sr_ip_free_bind=$3; }
 	| IP_FREE_BIND EQUAL error { yyerror("int value expected"); }
 	| PORT EQUAL NUMBER   { port_no=$3; }
+	| PORT EQUAL error    { yyerror("number expected"); }
 	| MAXBUFFER EQUAL NUMBER { maxbuffer=$3; }
 	| MAXBUFFER EQUAL error { yyerror("number expected"); }
     | SQL_BUFFER_SIZE EQUAL NUMBER { sql_buffer_size=$3; }
 	| SQL_BUFFER_SIZE EQUAL error { yyerror("number expected"); }
-	| PORT EQUAL error    { yyerror("number expected"); }
+	| MSG_RECV_MAX_SIZE EQUAL NUMBER { ksr_msg_recv_max_size=$3; }
+	| MSG_RECV_MAX_SIZE EQUAL error { yyerror("number expected"); }
+	| TCP_MSG_READ_TIMEOUT EQUAL NUMBER { ksr_tcp_msg_read_timeout=$3; }
+	| TCP_MSG_READ_TIMEOUT EQUAL error { yyerror("number expected"); }
+	| TCP_MSG_DATA_TIMEOUT EQUAL NUMBER { ksr_tcp_msg_data_timeout=$3; }
+	| TCP_MSG_DATA_TIMEOUT EQUAL error { yyerror("number expected"); }
+	| TCP_ACCEPT_IPLIMIT EQUAL NUMBER { ksr_tcp_accept_iplimit=$3; }
+	| TCP_ACCEPT_IPLIMIT EQUAL error { yyerror("number expected"); }
+	| TCP_CHECK_TIMER EQUAL NUMBER { ksr_tcp_check_timer=$3; }
+	| TCP_CHECK_TIMER EQUAL error { yyerror("number expected"); }
 	| CHILDREN EQUAL NUMBER { children_no=$3; }
 	| CHILDREN EQUAL error { yyerror("number expected"); }
 	| STATS_NAMESEP EQUAL STRING { ksr_stats_namesep=$3; }

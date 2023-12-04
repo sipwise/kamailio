@@ -6,9 +6,9 @@
  * Based on functions from siputil
  * 	Copyright (C) 2008 Juha Heinanen
  * 	Copyright (C) 2013 Carsten Bock, ng-voice GmbH
- * 
+ *
  * SPDX-License-Identifier: GPL-2.0-or-later
- * 
+ *
  * This file is part of Kamailio, a free SIP server.
  *
  * Kamailio is free software; you can redistribute it and/or modify
@@ -21,8 +21,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
@@ -155,14 +155,16 @@ static int curL_request_url(struct sip_msg *_m, const char *_met,
 	res = curl_easy_setopt(curl, CURLOPT_URL, _url);
 
 	/* Limit to HTTP and HTTPS protocols */
-#if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 85, 0)
+#if LIBCURL_VERSION_NUM >= 0x075500
+	/* #if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 85, 0) */
 	res = curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
 #else
 	res = curl_easy_setopt(
 			curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
 #endif
 
-#if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 85, 0)
+#if LIBCURL_VERSION_NUM >= 0x075500
+	/* #if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 85, 0) */
 	res = curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
 #else
 	res = curl_easy_setopt(
@@ -271,7 +273,7 @@ static int curL_request_url(struct sip_msg *_m, const char *_met,
 	}
 
 	res |= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
-	res |= curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)(&stream));
+	res |= curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)(&stream));
 
 	if(params->useragent)
 		res |= curl_easy_setopt(curl, CURLOPT_USERAGENT, params->useragent);
@@ -392,7 +394,9 @@ static int curL_request_url(struct sip_msg *_m, const char *_met,
 
 	if((stat >= 200) && (stat < 500)) {
 		double datasize = 0;
-#if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 55, 0)
+
+#if LIBCURL_VERSION_NUM >= 0x073700
+		/* #if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 55, 0) */
 		curl_off_t dlsize;
 		curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD_T, &dlsize);
 		download_size = (double)dlsize;
@@ -656,7 +660,7 @@ int curl_con_query_url(struct sip_msg *_m, const str *connection,
  * Similar to http_client_request but supports setting a content type attribute.
  */
 int http_client_request_c(sip_msg_t *_m, char *_url, str *_dst, char *_body,
-		char* _ctype, char *_hdrs, char *_met)
+		char *_ctype, char *_hdrs, char *_met)
 {
 	int res;
 	curl_query_t query_params;
@@ -712,8 +716,8 @@ int http_client_request_c(sip_msg_t *_m, char *_url, str *_dst, char *_body,
  * to pvar.
  * This is the same http_query as used to be in the utils module.
  */
-int http_client_request(
-		sip_msg_t *_m, char *_url, str *_dst, char *_body, char *_hdrs, char *_met)
+int http_client_request(sip_msg_t *_m, char *_url, str *_dst, char *_body,
+		char *_hdrs, char *_met)
 {
 	return http_client_request_c(_m, _url, _dst, _body, NULL, _hdrs, _met);
 }
@@ -734,8 +738,8 @@ int http_client_query(
  * to pvar.
  * This is the same http_query as used to be in the utils module.
  */
-int http_client_query_c(
-		struct sip_msg *_m, char *_url, str *_dst, char *_post, char *_ctype, char *_hdrs)
+int http_client_query_c(struct sip_msg *_m, char *_url, str *_dst, char *_post,
+		char *_ctype, char *_hdrs)
 {
 	return http_client_request_c(_m, _url, _dst, _post, _ctype, _hdrs, 0);
 }
