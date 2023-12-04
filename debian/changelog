@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.2-1+0~mr12.0.1.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [0f18fc4] MT#58875 include tlsa module on tls package
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 04 Dec 2023 16:33:35 +0100
+
 ngcp-kamailio (5.7.2-1+0~mr12.0.1.3) unstable; urgency=medium
 
   [ Victor Seva ]
