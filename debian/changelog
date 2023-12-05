@@ -1,8 +1,20 @@
-ngcp-kamailio (5.7.1-1+0~mr11.5.2.0) unstable; urgency=medium
+ngcp-kamailio (5.7.3-1+0~mr11.5.2.0) unstable; urgency=medium
 
-  * New release.
+  [ Alessio Garzi ]
+  * MT#58314 Use gw flags as id
+  * MT#58613 Add gw_lcr_id param for lcr module
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 18 Sep 2023 13:50:41 +0200
+  [ Victor Seva ]
+  * MT#56847 presence: active_watcher cleanup timer
+  * MT#58408 pv_headers: don't fallback to Request headers at Replay msg
+  * New upstream version 5.7.3
+  * MT#58587 dialog: dlg_get_ttag("<callid>", "<from-tag>", "<pv_dst>")
+  * MT#58875 include tlsa module on tls package
+  * MT#58795 refresh patches
+  * MT#58795 fix sipwise/usrloc_dbro_pinger.patch
+  * MT#58722 don't execute timers on shutdown phase
+
+ -- Victor Seva <vseva@debian.org>  Tue, 05 Dec 2023 11:42:22 +0100
 
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.0) unstable; urgency=medium
 
