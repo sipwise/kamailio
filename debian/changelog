@@ -1,3 +1,11 @@
+ngcp-kamailio (5.7.1-1+0~mr11.5.1.8) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [3014957] MT#58875 tls fixes from upstream 5.7 branch (5.7.3)
+  * [3cc96c9] MT#58875 tls fixes from upstream 5.7 branch
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 12 Dec 2023 15:26:03 +0100
+
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.7) unstable; urgency=medium
 
   [ Victor Seva ]
