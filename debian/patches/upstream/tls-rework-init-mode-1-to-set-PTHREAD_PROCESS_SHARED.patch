@@ -1,0 +1,218 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 7 Dec 2023 13:00:50 +0100
+Subject: tls: rework init mode 1 to set PTHREAD_PROCESS_SHARED
+
+- pthread mutex set in shm
+- GH #3635
+
+(cherry picked from commit 4b068f49b618dca5fa85a1687bd9054c1d98ae6a)
+---
+ src/modules/tls/tls_init.c | 62 ++++++++++++++++++++++++++++++++--------------
+ src/modules/tls/tls_mod.c  |  8 +++---
+ 2 files changed, 47 insertions(+), 23 deletions(-)
+
+diff --git a/src/modules/tls/tls_init.c b/src/modules/tls/tls_init.c
+index ae06e85..4f20af9 100644
+--- a/src/modules/tls/tls_init.c
++++ b/src/modules/tls/tls_init.c
+@@ -70,20 +70,31 @@ static int tls_mod_preinitialized = 0;
+ static int tls_mod_initialized = 0;
+ 
+ extern int ksr_tls_init_mode;
+-pthread_mutex_t ksr_tls_lock_shm;
++static pthread_mutex_t *ksr_tls_lock_shm = NULL;
+ 
+ /**
+  *
+  */
+ int ksr_tls_lock_init(void)
+ {
++	pthread_mutexattr_t attr;
++
+ 	if(!(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)) {
+ 		return 0;
+ 	}
+-    if (pthread_mutex_init(&ksr_tls_lock_shm, NULL) != 0) {
++	ksr_tls_lock_shm = (pthread_mutex_t *)shm_mallocxz(sizeof(pthread_mutex_t));
++	if(ksr_tls_lock_shm == NULL) {
++		LM_ERR("mutex allocation failed\n");
++		return -1;
++	}
++	pthread_mutexattr_init(&attr);
++	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	if(pthread_mutex_init(ksr_tls_lock_shm, &attr) != 0) {
++		pthread_mutexattr_destroy(&attr);
+         LM_ERR("mutex init failed\n");
+         return -1;
+     }
++	pthread_mutexattr_destroy(&attr);
+ 	return 0;
+ }
+ 
+@@ -95,7 +106,8 @@ void ksr_tls_lock_destroy(void)
+ 	if(!(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)) {
+ 		return;
+ 	}
+-    pthread_mutex_destroy(&ksr_tls_lock_shm);
++	pthread_mutex_destroy(ksr_tls_lock_shm);
++	shm_free(ksr_tls_lock_shm);
+ 	return;
+ }
+ 
+@@ -245,7 +257,7 @@ static void* ser_malloc(size_t size, const char* file, int line)
+ #endif
+ 
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 
+ #ifdef RAND_NULL_MALLOC
+ 	/* start random null returns only after
+@@ -273,7 +285,7 @@ static void* ser_malloc(size_t size, const char* file, int line)
+ 	}
+ #endif
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ 	return p;
+ }
+ 
+@@ -288,7 +300,7 @@ static void* ser_realloc(void *ptr, size_t size, const char* file, int line)
+ #endif
+ 
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 
+ #ifdef RAND_NULL_MALLOC
+ 	/* start random null returns only after
+@@ -317,10 +329,22 @@ static void* ser_realloc(void *ptr, size_t size, const char* file, int line)
+ #endif
+ 
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ 
+ 	return p;
+ }
++
++static void ser_free(void *ptr, const char *fname, int fline)
++{
++	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
++		pthread_mutex_lock(ksr_tls_lock_shm);
++	if(ptr) {
++		shm_free(ptr);
++	}
++	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
++		pthread_mutex_unlock(ksr_tls_lock_shm);
++}
++
+ #endif /* LIBRESSL_VERSION_NUMBER */
+ 
+ #else /*TLS_MALLOC_DBG */
+@@ -333,10 +357,10 @@ static void* ser_malloc(size_t size)
+ 	void *p;
+ 
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 	p = shm_malloc(size);
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ 	return p;
+ }
+ 
+@@ -345,10 +369,10 @@ static void* ser_realloc(void *ptr, size_t size)
+ {
+ 	void *p;
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 	p = shm_realloc(ptr, size);
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ 	return p;
+ }
+ #else
+@@ -356,10 +380,10 @@ static void* ser_malloc(size_t size, const char *fname, int fline)
+ {
+ 	void *p;
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 	p = shm_malloc(size);
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ 	return p;
+ }
+ 
+@@ -368,10 +392,10 @@ static void* ser_realloc(void *ptr, size_t size, const char *fname, int fline)
+ {
+ 	void *p;
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 	p = shm_realloc(ptr, size);
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ 	return p;
+ }
+ #endif
+@@ -389,23 +413,23 @@ static void ser_free(void *ptr)
+ 	 * here in the wrapper function.
+ 	 */
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 	if (ptr) {
+ 		shm_free(ptr);
+ 	}
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ }
+ #else
+ static void ser_free(void *ptr, const char *fname, int fline)
+ {
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_lock(&ksr_tls_lock_shm);
++		pthread_mutex_lock(ksr_tls_lock_shm);
+ 	if (ptr) {
+ 		shm_free(ptr);
+ 	}
+ 	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+-		pthread_mutex_unlock(&ksr_tls_lock_shm);
++		pthread_mutex_unlock(ksr_tls_lock_shm);
+ }
+ #endif
+ 
+diff --git a/src/modules/tls/tls_mod.c b/src/modules/tls/tls_mod.c
+index e57a98c..f62e859 100644
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -401,10 +401,6 @@ static int mod_init(void)
+ 	if (tls_check_sockets(*tls_domains_cfg) < 0)
+ 		goto error;
+ 
+-	if (ksr_tls_lock_init() < 0) {
+-		goto error;
+-	}
+-
+ 	LM_INFO("use OpenSSL version: %08x\n", (uint32_t)(OPENSSL_VERSION_NUMBER));
+ #ifndef OPENSSL_NO_ECDH
+ 	LM_INFO("With ECDH-Support!\n");
+@@ -670,6 +666,10 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+ 	if(!shm_initialized() && init_shm()<0)
+ 		return -1;
+ 
++	if (ksr_tls_lock_init() < 0) {
++		return -1;
++	}
++
+ 	if(tls_pre_init()<0)
+ 		return -1;
+ 
