@@ -1,3 +1,12 @@
+ngcp-kamailio (5.7.3-1+0~mr12.1.1.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [2ac203c] MT#58875 include tlsa module on tls package
+  * [3a2d7b1] MT#58722 don't execute timers on shutdown phase
+  * [94926a6] MT#58875 tls fixes from upstream 5.7 branch
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 13 Dec 2023 10:19:35 +0100
+
 ngcp-kamailio (5.7.3-1+0~mr12.1.1.0) unstable; urgency=medium
 
   [ Victor Seva ]
