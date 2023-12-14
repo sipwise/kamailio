@@ -32,7 +32,7 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.6
-#
+upstream/topos-fix-early-dialog-b-side-UPDATE-requests-routin.patch
 ## upstream master
 upstream/dialog-dlg_get_var-ci-ft-tt-key-dst_var.patch
 upstream/dialog-dlg_set_var-callid-ft-tt-key-value.patch
