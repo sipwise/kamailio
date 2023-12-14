@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.4-1+0~mr10.5.5.3) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [a984cfb] MT#58982 topos: fix early-dialog b-side UPDATE requests routing
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 14 Dec 2023 16:55:00 +0100
+
 ngcp-kamailio (5.6.4-1+0~mr10.5.5.2) unstable; urgency=medium
 
   [ Victor Seva ]
