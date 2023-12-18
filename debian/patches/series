@@ -32,8 +32,6 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
-upstream/tls-Add-and-apply-tls_openssl_clear_errors-function.patch
-upstream/tls-include-file-to-fix-warning-about-tls_openssl_cl.patch
 upstream/Makefile.groups-tlsa-in-packaging-group-ktls-if-KTLS.patch
 upstream/tls-rework-init-mode-1-to-set-PTHREAD_PROCESS_SHARED.patch
 upstream/tls-init-early-the-local-lock-for-memory.patch
