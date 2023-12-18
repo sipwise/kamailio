@@ -1,3 +1,14 @@
+ngcp-kamailio (5.7.3-1+0~mr11.5.1.9) unstable; urgency=medium
+
+  * New upstream version 5.7.3
+  * MT#58795 refresh patches
+  * MT#58795 fix sipwise/usrloc_dbro_pinger.patch
+  * MT#58722 don't execute timers on shutdown phase
+  * MT#58875 tls fixes from upstream 5.7 branch
+  * MT#58875 remove already included patches in 5.7.3
+
+ -- Victor Seva <vseva@debian.org>  Mon, 18 Dec 2023 09:42:15 +0100
+
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.8) unstable; urgency=medium
 
   [ Victor Seva ]
