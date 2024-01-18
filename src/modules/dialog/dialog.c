@@ -551,8 +551,8 @@ static int mod_init(void)
 #ifdef STATISTICS
 	/* register statistics */
 	if(dlg_enable_stats
-			&& (register_module_stats(exports.name, mod_stats) != 0)) {
-		LM_ERR("failed to register %s statistics\n", exports.name);
+			&& (register_module_stats("dialog", mod_stats) != 0)) {
+		LM_ERR("failed to register statistics\n");
 		return -1;
 	}
 #endif
