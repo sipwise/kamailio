@@ -13,7 +13,7 @@ Subject: add_lcr_rate_module
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 15fec0d..87e624a 100644
+index 4dcac9e..c419f7d 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -112,6 +112,9 @@ mod_list_sctp=sctp
