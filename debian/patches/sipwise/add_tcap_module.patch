@@ -11,7 +11,7 @@ Subject: add_tcap_module
  create mode 100644 src/modules/tcap/tcap_mod.c
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 87e624a..4aee35f 100644
+index c419f7d..b85c1c5 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -217,6 +217,9 @@ mod_list_erlang=erlang

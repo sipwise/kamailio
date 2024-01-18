@@ -10,7 +10,7 @@ Subject: dialog: support profile_get_size for all profiles
  4 files changed, 69 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index e937947..7a416ee 100644
+index 79221a1..0127e61 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -3026,6 +3026,31 @@ static void internal_rpc_profile_get_size(
