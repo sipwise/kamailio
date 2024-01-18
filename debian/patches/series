@@ -32,18 +32,7 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
-upstream/Makefile.groups-tlsa-in-packaging-group-ktls-if-KTLS.patch
-upstream/tls-rework-init-mode-1-to-set-PTHREAD_PROCESS_SHARED.patch
-upstream/tls-init-early-the-local-lock-for-memory.patch
-upstream/core-parse-privacy-recompute-lenght-of-rest-to-parse.patch
-upstream/tls-OpenSSL-3.x-thread-local-init-libssl-in-thread-o.patch
-upstream/tls-fix-compilation-with-OpenSSL-1.1.1.patch
-upstream/tls-OpenSSL-1.1.1-thread-local-init-libssl-in-thread.patch
-upstream/tls-thread-local-revert-1a9b0b6361-as-double-layer-l.patch
-upstream/tls-OpenSSL-3.x-1.1.1-thread-local-clean-up-dead-cod.patch
-upstream/outbound-OpenSSL-3.x-thread-local-init-libssl-in-thr.patch
-upstream/outbound-OpenSSL-1.1.1-thread-local-init-libssl-in-t.patch
-upstream/outbound-build-fix-missing-argument-name.patch
+#
 ## upstream master
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch

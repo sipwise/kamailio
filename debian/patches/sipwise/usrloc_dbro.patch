@@ -8,7 +8,7 @@ Subject: usrloc_dbro
  2 files changed, 69 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index de75545..fcbb171 100644
+index 16a48e4..2c77f29 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
 @@ -198,6 +198,7 @@ str ulattrs_last_mod_col = str_init(
