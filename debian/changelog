@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.4-1+0~mr12.2.2.0) unstable; urgency=medium
+
+  * New upstream version 5.7.4
+  * MT#59178 remove already applied patches
+
+ -- Victor Seva <vseva@debian.org>  Wed, 31 Jan 2024 12:38:54 +0100
+
 ngcp-kamailio (5.7.3-1+0~mr12.2.2.0) unstable; urgency=medium
 
   * New release.
