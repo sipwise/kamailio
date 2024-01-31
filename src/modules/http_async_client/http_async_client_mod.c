@@ -232,7 +232,7 @@ static int mod_init(void)
 
 #ifdef STATISTICS
 	/* register statistics */
-	if(register_module_stats(exports.name, mod_stats) != 0) {
+	if(register_module_stats("http_async_client", mod_stats) != 0) {
 		LM_ERR("failed to register core statistics\n");
 		return -1;
 	}
@@ -295,7 +295,7 @@ static int mod_init(void)
 
 	if(load_tm_api(&tmb) < 0) {
 		LM_INFO("cannot load the TM-functions - async relay disabled\n");
-		memset(&tmb, 0, sizeof(tm_api_t));
+		return -1;
 	}
 
 	/* allocate workers array */

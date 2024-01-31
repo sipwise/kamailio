@@ -619,6 +619,7 @@ int fix_actions(struct action *a)
 	enum rval_type rve_type, err_type, expected_type;
 	struct rvalue *rv;
 	int rve_param_no;
+	int proto;
 
 	if(a == 0) {
 		LM_CRIT("null pointer\n");
@@ -646,8 +647,23 @@ int fix_actions(struct action *a)
 					case STRING_ST:
 						s.s = t->val[0].u.string;
 						s.len = strlen(s.s);
-						p = add_proxy(
-								&s, t->val[1].u.number, 0); /* FIXME proto*/
+						switch(t->type) {
+							case FORWARD_TCP_T:
+								proto = PROTO_TCP;
+								break;
+							case FORWARD_TLS_T:
+								proto = PROTO_TCP;
+								break;
+							case FORWARD_SCTP_T:
+								proto = PROTO_TCP;
+								break;
+							case FORWARD_UDP_T:
+								proto = PROTO_TCP;
+								break;
+							default:
+								proto = 0;
+						}
+						p = add_proxy(&s, t->val[1].u.number, proto);
 						if(p == 0) {
 							ret = E_BAD_ADDRESS;
 							goto error;
@@ -1543,6 +1559,11 @@ inline static int comp_rve(int op, struct rval_expr *rve, int rtype,
 	if(unlikely(rv)) {
 		/* no int => str */
 		rv1 = rval_convert(h, msg, RV_STR, rv, &c1);
+		if(rv1 == NULL) {
+			LM_ERR("failure converting expression\n");
+			i = 0; /* false */
+			goto int_expr;
+		}
 		i = comp_str(op, &rv1->v.s, rtype, r, msg, h);
 		rval_destroy(rv1);
 		rval_destroy(rv);

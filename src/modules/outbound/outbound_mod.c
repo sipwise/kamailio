@@ -75,6 +75,28 @@ struct module_exports exports = {
 		destroy						 /* destroy function */
 };
 
+static void *mod_init_openssl(void *arg) {
+    if(flow_token_secret.s) {
+        assert(ob_key.len == SHA_DIGEST_LENGTH);
+        LM_DBG("flow_token_secret mod param set. use persistent ob_key");
+#if OPENSSL_VERSION_NUMBER < 0x030000000L
+        SHA1((const unsigned char *)flow_token_secret.s, flow_token_secret.len,
+             (unsigned char *)ob_key.s);
+#else
+        EVP_Q_digest(NULL, "SHA1", NULL, flow_token_secret.s,
+                     flow_token_secret.len, (unsigned char *)ob_key.s, NULL);
+#endif
+    } else {
+        if(RAND_bytes((unsigned char *)ob_key.s, ob_key.len) == 0) {
+            LM_ERR("unable to get %d cryptographically strong pseudo-"
+                   "random bytes\n",
+                   ob_key.len);
+        }
+    }
+
+    return NULL;
+}
+
 static int mod_init(void)
 {
 	if(ob_force_flag != -1 && !flag_in_range(ob_force_flag)) {
@@ -93,18 +115,14 @@ static int mod_init(void)
 	}
 	ob_key.len = OB_KEY_LEN;
 
-	if(flow_token_secret.s) {
-		assert(ob_key.len == SHA_DIGEST_LENGTH);
-		LM_DBG("flow_token_secret mod param set. use persistent ob_key");
-		SHA1((const unsigned char *)flow_token_secret.s, flow_token_secret.len,
-				(unsigned char *)ob_key.s);
-	} else {
-		if(RAND_bytes((unsigned char *)ob_key.s, ob_key.len) == 0) {
-			LM_ERR("unable to get %d cryptographically strong pseudo-"
-				   "random bytes\n",
-					ob_key.len);
-		}
-	}
+#if OPENSSL_VERSION_NUMBER < 0x010101000L
+        mod_init_openssl(NULL);
+#else
+        pthread_t tid;
+        void *retval;
+        pthread_create(&tid, NULL, mod_init_openssl, NULL);
+        pthread_join(tid, &retval);
+#endif
 
 	if(cfg_declare("outbound", outbound_cfg_def, &default_outbound_cfg,
 			   cfg_sizeof(outbound), &outbound_cfg)) {
