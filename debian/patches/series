@@ -56,6 +56,7 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
+sipwise/rtpengine_rework_rtpp_flags.patch
 ### active development
 #
 ### Don't just put stuff in any order
