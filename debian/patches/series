@@ -95,6 +95,8 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
+sipwise/cfgutils-expose-optional-second-string-key-for-lock.patch
+sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
 ### active development
 #
 ### Don't just put stuff in any order
