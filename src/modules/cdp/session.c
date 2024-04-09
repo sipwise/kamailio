@@ -491,7 +491,7 @@ int cdp_sessions_timer(time_t now, void *ptr)
 								15; //15 seconds - TODO: add as config parameter
 						//we should check for reservation expiring if the state is open
 						if(x->u.cc_acc.state == ACC_CC_ST_OPEN) {
-							if(last_res_timestamp) {
+							if(last_res_timestamp && res_valid_for) {
 								//we have obv already started reservations
 								if((last_res_timestamp + res_valid_for)
 										< (time(0) + last_reservation
@@ -603,8 +603,8 @@ AAASession *AAAMakeSession(int app_id, int type, str session_id)
 	memcpy(id.s, session_id.s, session_id.len);
 	id.len = session_id.len;
 	s = cdp_new_session(id, type);
-	s->application_id = app_id;
 	if(s) {
+		s->application_id = app_id;
 		cdp_add_session(s);
 	}
 	return s;

@@ -22,8 +22,8 @@ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
 mod_list_extra=avp auth_diameter call_control call_obj dmq domainpolicy msrp \
 			carrierroute pdb qos sca seas sms sst timer tmrec uac_redirect \
 			xhttp xhttp_rpc xprint jsonrpcs nosip dmq_usrloc statsd rtjson \
-			log_custom keepalive ss7ops app_sqlang acc_diameter evrexec \
-			sipjson lrkproxy math posops xhttp_prom
+			log_custom keepalive ss7ops acc_diameter evrexec file_out \
+			sipjson lrkproxy math posops xhttp_prom dlgs sworker influxdbc
 
 # - common modules depending on database
 mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
@@ -90,9 +90,6 @@ mod_list_tlsdeps=crypto tls
 
 # - modules depending on static openssl library
 mod_list_tlsa=tlsa
-
-# - modules depending on openssl (+curl) library
-mod_list_tlsdeps_curl=auth_identity
 
 # - modules depending on static wolfssl library
 mod_list_tls_wolfssl=tls_wolfssl
@@ -214,7 +211,7 @@ mod_list_erlang=erlang
 # - modules depending on systemd library
 mod_list_systemd=log_systemd systemdops
 
-# - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
+# - modules depending on libnsq (+libev libevbuffsock libcurl libjson-c) library
 mod_list_nsq=nsq
 
 # - modules depending on librabbitmq library
@@ -235,6 +232,12 @@ mod_list_nats=nats
 # - modules depending on ruxc library
 mod_list_ruxc=ruxc
 
+# - modules depending on microhttpd library
+mod_list_microhttpd=microhttpd
+
+# - modules depending on libgcrypt library
+mod_list_gcrypt=gcrypt
+
 # - modules depending on secsipid library
 mod_list_secsipid=secsipid secsipid_proc
 
@@ -252,7 +255,7 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_xmpp) \
 			   $(mod_list_berkeley) $(mod_list_utils) \
 			   $(mod_list_memcached) \
-			   $(mod_list_tlsdeps) $(mod_list_tlsdeps_curl) \
+			   $(mod_list_tlsdeps) \
 			   $(mod_list_websocket) \
 			   $(mod_list_snmpstats) $(mod_list_presence) \
 			   $(mod_list_lua) $(mod_list_python) \
@@ -284,6 +287,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_stirshaken) \
 			   $(mod_list_tlsa) \
 			   $(mod_list_tls_wolfssl) \
+			   $(mod_list_microhttpd) \
+			   $(mod_list_gcrypt) \
 			   $(mod_list_rtp_media_server)
 
 
@@ -310,7 +315,7 @@ module_group_standard=$(mod_list_basic) $(mod_list_extra) \
 module_group_common=$(mod_list_db) $(mod_list_dbuid) \
 					$(mod_list_pcre) $(mod_list_radius) \
 					$(mod_list_xmldeps) $(mod_list_presence) \
-					$(mod_list_tlsdeps) $(mod_list_tlsdeps_curl)
+					$(mod_list_tlsdeps)
 
 # For db use (db modules, excluding drivers)
 module_group_db=$(mod_list_db)
@@ -405,10 +410,10 @@ module_group_ktls_basic=$(mod_list_tlsdeps)
 
 ifeq ($(KTLS_INCLUDE_TLSA),yes)
 # pkg tls module with curl
-module_group_ktls=$(mod_list_tlsdeps) $(mod_list_tlsdeps_curl) $(mod_list_tlsa)
+module_group_ktls=$(mod_list_tlsdeps) $(mod_list_tlsa)
 else
 # pkg tls module with curl
-module_group_ktls=$(mod_list_tlsdeps) $(mod_list_tlsdeps_curl)
+module_group_ktls=$(mod_list_tlsdeps)
 
 # pkg tlsa module
 module_group_ktlsa=$(mod_list_tlsa)
@@ -533,6 +538,12 @@ module_group_knats=$(mod_list_nats)
 
 # K ruxc modules
 module_group_kruxc=$(mod_list_ruxc)
+
+# K microhttpd module
+module_group_kmicrohttpd=$(mod_list_microhttpd)
+
+# K gcrypt module
+module_group_kgcrypt=$(mod_list_gcrypt)
 
 # K secsipid modules
 module_group_ksecsipid=$(mod_list_secsipid)

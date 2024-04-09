@@ -52,7 +52,7 @@
 						- sizeof(((tm_cell_t *)0)->md5)))
 
 
-static enum kill_reason kr;
+static enum kill_reason _tm_kr;
 
 /* pointer to the big table where all the transaction data lives */
 struct s_table *_tm_table;
@@ -64,18 +64,18 @@ struct s_table *tm_get_table(void)
 
 void reset_kr(void)
 {
-	kr = 0;
+	_tm_kr = 0;
 }
 
 void set_kr(enum kill_reason _kr)
 {
-	kr |= _kr;
+	_tm_kr |= _kr;
 }
 
 
 enum kill_reason get_kr()
 {
-	return kr;
+	return _tm_kr;
 }
 
 
@@ -329,7 +329,7 @@ struct cell *build_cell(struct sip_msg *p_msg)
 
 	/* allocs a new cell, add space for:
 	 * md5 (MD5_LEN - sizeof(struct cell.md5))
-	 * uac (sr_dst_max_banches * sizeof(struct ua_client) ) */
+	 * uac (sr_dst_max_branches * sizeof(struct ua_client) ) */
 	cell_size = sizeof(struct cell) + MD5_LEN - sizeof(((struct cell *)0)->md5)
 				+ (sr_dst_max_branches * sizeof(struct ua_client));
 
@@ -516,7 +516,7 @@ error0:
  * backup xdata from/to msg context to local var and use T lists
  * - mode = 0 - from msg context to _txdata and use T lists
  * - mode = 1 - restore to msg context from _txdata
- * the function can be also used to restore the core context from transacation data
+ * the function can be also used to restore the core context from transaction data
  */
 void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
 {

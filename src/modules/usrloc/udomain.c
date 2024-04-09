@@ -221,7 +221,7 @@ void print_udomain(FILE *_f, udomain_t *_d)
  * \brief Convert database values into ucontact_info
  *
  * Convert database values into ucontact_info,
- * expects 12 rows (contact, expirs, q, callid, cseq, flags,
+ * expects 12 rows (contact, expires, q, callid, cseq, flags,
  * ua, received, path, socket, methods, last_modified)
  * \param vals database values
  * \param contact contact
@@ -1071,7 +1071,7 @@ int udomain_contact_expired_cb(db1_con_t *_c, udomain_t *_d)
 				continue;
 			}
 			user.len = strlen(user.s);
-			if(user.len < AORBUF_SIZE) {
+			if(user.len + 1 < AORBUF_SIZE) {
 				memcpy(aorbuf, user.s, user.len);
 				aor.s = aorbuf;
 				aor.len = user.len;
@@ -1090,7 +1090,7 @@ int udomain_contact_expired_cb(db1_con_t *_c, udomain_t *_d)
 			if(ul_use_domain) {
 				domain.s = (char *)VAL_STRING(ROW_VALUES(row) + 20);
 				domain.len = strlen(domain.s);
-				if(domain.len + aor.len < AORBUF_SIZE) {
+				if(domain.len + aor.len + 2 < AORBUF_SIZE) {
 					aorbuf[aor.len] = '@';
 					memcpy(aorbuf + aor.len + 1, domain.s, domain.len);
 					aor.len += domain.len + 1;

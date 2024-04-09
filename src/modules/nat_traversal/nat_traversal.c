@@ -1168,7 +1168,7 @@ static void __dialog_destroy(
 
 	lock_get(&param->lock);
 
-	// remove all keepalives on unanswered branches. this is neded because
+	// remove all keepalives on unanswered branches. This is needed because
 	// we may transit from early to ended without going through confirmed
 	for(i = 0; i < param->callee_candidates.count; i++) {
 		h = HASH(nat_table, param->callee_candidates.uri[i]);
@@ -1724,10 +1724,12 @@ static void restore_keepalive_state(void)
 	res = fscanf(f, STATE_FILE_HEADER); // skip header
 
 	while(true) {
+		ll_1 = 0;
+		ll_2 = 0;
+		uri[0] = '\0';
+		socket[0] = '\0';
 		res = fscanf(f, "%63s %63s %" TIME_T_FMT " %" TIME_T_FMT, uri, socket,
 				&ll_1, &ll_2);
-		rtime = ll_1;
-		stime = ll_2;
 		if(res == EOF) {
 			if(ferror(f))
 				LM_ERR("error while reading keepalive state file: %s\n",
@@ -1738,6 +1740,8 @@ static void restore_keepalive_state(void)
 				   "entries.\n");
 			break;
 		} else {
+			rtime = ll_1;
+			stime = ll_2;
 			if(now > rtime && now > stime)
 				continue; // expired entry
 

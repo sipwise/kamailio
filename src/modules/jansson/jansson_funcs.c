@@ -34,12 +34,15 @@
 #include "jansson_utils.h"
 
 int janssonmod_get_helper(
-		sip_msg_t *msg, str *path_s, str *src_s, pv_spec_t *dst_pv)
+		sip_msg_t *msg, str *path_s, int pmode, str *src_s, pv_spec_t *dst_pv)
 {
 	char c;
 	pv_value_t dst_val;
 	json_t *json = NULL;
 	json_error_t parsing_error;
+	char *path = NULL;
+	char *freeme = NULL;
+
 	STR_VTOZ(src_s->s[src_s->len], c);
 	json = json_loads(src_s->s, JSON_REJECT_DUPLICATES, &parsing_error);
 	STR_ZTOV(src_s->s[src_s->len], c);
@@ -50,14 +53,13 @@ int janssonmod_get_helper(
 		goto fail;
 	}
 
-	char *path = path_s->s;
+	path = path_s->s;
 
-	json_t *v = json_path_get(json, path);
+	json_t *v = json_path_get(json, path, pmode);
 	if(!v) {
 		goto fail;
 	}
 
-	char *freeme = NULL;
 
 	if(jansson_to_val(&dst_val, &freeme, v) < 0)
 		goto fail;
@@ -91,7 +93,26 @@ int janssonmod_get(struct sip_msg *msg, char *path_in, char *src_in, char *dst)
 		return -1;
 	}
 
-	return janssonmod_get_helper(msg, &path_s, &src_s, (pv_spec_t *)dst);
+	return janssonmod_get_helper(msg, &path_s, 0, &src_s, (pv_spec_t *)dst);
+}
+
+int janssonmod_get_field(
+		struct sip_msg *msg, char *field_in, char *src_in, char *dst)
+{
+	str src_s;
+	str field_s;
+
+	if(fixup_get_svalue(msg, (gparam_p)field_in, &field_s) != 0) {
+		ERR("cannot get field name string value\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)src_in, &src_s) != 0) {
+		ERR("cannot get json string value\n");
+		return -1;
+	}
+
+	return janssonmod_get_helper(msg, &field_s, 1, &src_s, (pv_spec_t *)dst);
 }
 
 int janssonmod_pv_get(
@@ -111,7 +132,7 @@ int janssonmod_pv_get(
 		return -1;
 	}
 
-	ret = janssonmod_get_helper(msg, &path_s, &val.rs, (pv_spec_t *)dst);
+	ret = janssonmod_get_helper(msg, &path_s, 0, &val.rs, (pv_spec_t *)dst);
 
 	pv_value_destroy(&val);
 
@@ -130,6 +151,12 @@ int janssonmod_set(unsigned int append, struct sip_msg *msg, char *type_in,
 	char c;
 	pv_spec_t *result_pv;
 	pv_value_t result_val;
+	json_t *result_json = NULL;
+	json_t *value = NULL;
+	char *freeme = NULL;
+	json_error_t parsing_error = {0};
+	char *endptr;
+	char *path = NULL;
 
 	if(fixup_get_svalue(msg, (gparam_p)type_in, &type_s) != 0) {
 		ERR("cannot get type string value\n");
@@ -160,12 +187,6 @@ int janssonmod_set(unsigned int append, struct sip_msg *msg, char *type_in,
 	LM_DBG("path is: %.*s\n", path_s.len, path_s.s);
 	LM_DBG("value is: %.*s\n", value_s.len, value_s.s);
 	LM_DBG("result is: %.*s\n", result_val.rs.len, result_val.rs.s);
-
-	json_t *result_json = NULL;
-	json_t *value = NULL;
-	char *freeme = NULL;
-	json_error_t parsing_error = {0};
-	char *endptr;
 
 	/* check the type */
 	if(STR_EQ_STATIC(type_s, "object") || STR_EQ_STATIC(type_s, "obj")) {
@@ -241,7 +262,8 @@ int janssonmod_set(unsigned int append, struct sip_msg *msg, char *type_in,
 		goto fail;
 	}
 
-	char *path = path_s.s;
+	path = path_s.s;
+
 	STR_VTOZ(result_val.rs.s[result_val.rs.len], c);
 	result_json =
 			json_loads(result_val.rs.s, JSON_REJECT_DUPLICATES, &parsing_error);
@@ -252,7 +274,7 @@ int janssonmod_set(unsigned int append, struct sip_msg *msg, char *type_in,
 		goto fail;
 	}
 
-	if(json_path_set(result_json, path, value, append) < 0) {
+	if(json_path_set(result_json, path, 0, value, append) < 0) {
 		goto fail;
 	}
 
@@ -281,6 +303,8 @@ int janssonmod_array_size(
 	str path_s;
 	pv_spec_t *dst_pv;
 	pv_value_t dst_val;
+	char *path = NULL;
+	int size = 0;
 
 	if(fixup_get_svalue(msg, (gparam_p)src_in, &src_s) != 0) {
 		ERR("cannot get json string value\n");
@@ -305,9 +329,9 @@ int janssonmod_array_size(
 		goto fail;
 	}
 
-	char *path = path_s.s;
+	path = path_s.s;
 
-	json_t *v = json_path_get(json, path);
+	json_t *v = json_path_get(json, path, 0);
 	if(!v) {
 		ERR("failed to find %s in json\n", path);
 		goto fail;
@@ -318,7 +342,7 @@ int janssonmod_array_size(
 		goto fail;
 	}
 
-	int size = json_array_size(v);
+	size = json_array_size(v);
 	dst_val.ri = size;
 	dst_val.flags = PV_TYPE_INT | PV_VAL_INT;
 

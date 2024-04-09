@@ -31,7 +31,9 @@
  */
 
 #ifdef KSR_PTHREAD_MUTEX_SHARED
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <pthread.h>
 #include <dlfcn.h>
 #endif
@@ -167,10 +169,12 @@ Options:\n\
     --atexit=val Control atexit callbacks execution from external libraries\n\
                   which may access destroyed shm memory causing crash on shutdown.\n\
                   Can be y[es] or 1 to enable atexit callbacks, n[o] or 0 to disable,\n\
-                  default is yes.\n\
+                  default is no.\n\
     -A define    Add config pre-processor define (e.g., -A WITH_AUTH,\n\
                   -A 'FLT_ACC=1', -A 'DEFVAL=\"str-val\"')\n\
     -b nr        Maximum OS UDP receive buffer size which will not be exceeded by\n\
+                  auto-probing-and-increase procedure even if OS allows\n\
+    -B nr        Maximum OS UDP send buffer size which will not be exceeded by\n\
                   auto-probing-and-increase procedure even if OS allows\n\
     -c           Check configuration file for syntax errors\n\
     --cfg-print  Print configuration file evaluating includes and ifdefs\n\
@@ -262,9 +266,10 @@ void print_ct_constants(void)
 	/*
 	printf("SHM_MEM_SIZE %dMB, ", SHM_MEM_SIZE);
 */
-	printf("MAX_RECV_BUFFER_SIZE %d,"
+	printf("MAX_RECV_BUFFER_SIZE %d, MAX_SEND_BUFFER_SIZE %d,"
 		   " MAX_URI_SIZE %d, BUF_SIZE %d, DEFAULT PKG_SIZE %uMB\n",
-			MAX_RECV_BUFFER_SIZE, MAX_URI_SIZE, BUF_SIZE, PKG_MEM_SIZE);
+			MAX_RECV_BUFFER_SIZE, MAX_SEND_BUFFER_SIZE, MAX_URI_SIZE, BUF_SIZE,
+			PKG_MEM_SIZE);
 #ifdef USE_TCP
 	printf("poll method support: %s.\n", poll_support);
 #endif
@@ -279,6 +284,7 @@ void print_internals(void)
 	printf("  Default paths to modules: %s\n", MODS_DIR);
 	printf("  Compile flags: %s\n", ver_flags);
 	printf("  MAX_RECV_BUFFER_SIZE=%d\n", MAX_RECV_BUFFER_SIZE);
+	printf("  MAX_SEND_BUFFER_SIZE=%d\n", MAX_SEND_BUFFER_SIZE);
 	printf("  MAX_URI_SIZE=%d\n", MAX_URI_SIZE);
 	printf("  BUF_SIZE=%d\n", BUF_SIZE);
 	printf("  DEFAULT PKG_SIZE=%uMB\n", PKG_MEM_SIZE);
@@ -306,7 +312,13 @@ char *mods_dir = MODS_DIR; /* search path for dyn. loadable modules */
 int mods_dir_cmd = 0;	   /* mods dir path set in command lin e*/
 
 char *cfg_file = 0;
-unsigned int maxbuffer = MAX_RECV_BUFFER_SIZE; /* maximum buffer size we do
+unsigned int maxbuffer =
+		MAX_RECV_BUFFER_SIZE; /* maximum receive buffer size we do
+												  not want to exceed during the
+												  auto-probing procedure; may
+												  be re-configured */
+unsigned int maxsndbuffer =
+		MAX_SEND_BUFFER_SIZE; /* maximum send buffer size we do
 												  not want to exceed during the
 												  auto-probing procedure; may
 												  be re-configured */
@@ -326,8 +338,9 @@ int tcp_disable = 0;	 /* 1 if tcp is disabled */
 int tls_disable = 0; /* tls enabled by default */
 #else
 int tls_disable = 1; /* tls disabled by default */
-#endif /* CORE_TLS */
-#endif /* USE_TLS */
+#endif						  /* CORE_TLS */
+int ksr_tls_threads_mode = 0; /* threads execution mode for tls with libssl */
+#endif						  /* USE_TLS */
 #ifdef USE_SCTP
 int sctp_children_no = 0;
 int sctp_disable = 2; /* 1 if sctp is disabled, 2 if auto mode, 0 enabled */
@@ -363,7 +376,7 @@ int timerlog = L_WARN;
    good for trouble-shooting
 */
 int sip_warning = 0;
-/* should localy-generated messages include server's signature?
+/* should locally-generated messages include server's signature?
    be default yes, good for trouble-shooting
 */
 int server_signature = 1;
@@ -409,7 +422,7 @@ int open_files_limit = -1; /* don't touch it by default */
 
 /* memory options */
 int shm_force_alloc = 0; /* force immediate (on startup) page allocation
-						  (by writting 0 in the pages), useful if
+						  (by writing 0 in the pages), useful if
 						  mlock_pages is also 1 */
 int mlock_pages = 0;	 /* default off, try to disable swapping */
 
@@ -454,7 +467,7 @@ struct socket_info *sctp_listen = 0;
 #endif
 struct socket_info *bind_address = 0; /* pointer to the crt. proc.
 									 listening address*/
-struct socket_info *sendipv4; /* ipv4 socket to use when msg. comes from ipv6*/
+struct socket_info *sendipv4; /* ipv4 socket to use when msg comes from ipv6 */
 struct socket_info *sendipv6; /* same as above for ipv6 */
 #ifdef USE_RAW_SOCKS
 int raw_udp4_send_sock = -1; /* raw socket used for sending udp4 packets */
@@ -536,7 +549,8 @@ char *sr_memmng_shm = NULL;
 static int *_sr_instance_started = NULL;
 
 int ksr_cfg_print_mode = 0;
-int ksr_atexit_mode = 1;
+int ksr_atexit_mode = 0;
+int ksr_mem_add_size = 0;
 
 int ksr_wait_worker1_mode = 0;
 int ksr_wait_worker1_time = 4000000;
@@ -1064,7 +1078,7 @@ static void free_name_lst(struct name_lst *lst)
 
 
 /* parse h and returns a name lst (flags are set to SI_IS_MHOMED if
- * h contains more then one name or contains a name surrounded by '(' ')' )
+ * h contains more than one name or contains a name surrounded by '(' ')' )
  * valid formats:    "hostname"
  *                   "(hostname, hostname1, hostname2)"
  *                   "(hostname hostname1 hostname2)"
@@ -1148,7 +1162,7 @@ error:
  * where proto= udp|tcp|tls|sctp
  * @param s  - string (like above)
  * @param host - will be filled with the host part
- *               Note: for multi-homing it wil contain all the addresses
+ *               Note: for multi-homing it will contain all the addresses
  *               (e.g.: "sctp:(1.2.3.4, 5.6.7.8)" => host="(1.2.3.4, 5.6.7.8)")
  * @param hlen - will be filled with the length of the host part.
  * @param port - will be filled with the port if present or 0 if it's not.
@@ -1226,7 +1240,7 @@ int parse_phostport(char *s, char **host, int *hlen, int *port, int *proto)
 		*host = first + 1;
 		*hlen = (int)(p - *host);
 	} else {
-		/* valid port => its host:port */
+		/* valid port => it is host:port */
 		*proto = 0;
 		*host = s;
 		*hlen = (int)(first - *host);
@@ -1254,7 +1268,7 @@ error_port:
  * where proto= udp|tcp|tls|sctp
  * @param s  - string (like above)
  * @param host - will be filled with the host part
- *               Note: for multi-homing it wil contain all the addresses
+ *               Note: for multi-homing it will contain all the addresses
  *               (e.g.: "sctp:(1.2.3.4, 5.6.7.8)" => host="(1.2.3.4, 5.6.7.8)")
  * @param hlen - will be filled with the length of the host part.
  * @param port - will be filled with the port if present or 0 if it's not.
@@ -1279,7 +1293,7 @@ static struct name_lst *parse_phostport_mh(
  * determine the default path to the configuration file if the user did not
  * specify one using the command line option. If \c cfg_file contains an
  * absolute pathname then it is cloned unmodified, if it contains a relative
- * pathanme than the value returned by \c getcwd function will be added at the
+ * pathname then the value returned by \c getcwd function will be added at the
  * beginning. This function must be run before changing its current working
  * directory to / (in daemon mode).
  * @return Zero on success, negative number
@@ -2069,8 +2083,9 @@ int main(int argc, char **argv)
 	int c, r;
 	char *tmp;
 	int tmp_len;
-	int port;
-	int proto;
+	int port = 5060;
+	int proto = PROTO_NONE;
+	int aproto = PROTO_NONE;
 	char *ahost = NULL;
 	int aport = 0;
 	char *options;
@@ -2082,6 +2097,7 @@ int main(int argc, char **argv)
 	struct name_lst *n_lst;
 	char *p;
 	struct stat st = {0};
+	long l1 = 0;
 
 #define KSR_TBUF_SIZE 512
 	char tbuf[KSR_TBUF_SIZE];
@@ -2140,12 +2156,12 @@ int main(int argc, char **argv)
 	log_init();
 
 	/* command line options */
-	options = ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:";
+	options = ":f:cm:M:dVIhEeb:B:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:";
 	/* Handle special command line arguments, that must be treated before
-	 * intializing the various subsystem or before parsing other arguments:
+	 * initializing the various subsystem or before parsing other arguments:
 	 *  - get the startup debug and log_stderr values
-	 *  - look if pkg mem size is overriden on the command line (-M) and get
-	 *    the new value here (before intializing pkg_mem).
+	 *  - look if pkg mem size is overridden on the command line (-M) and get
+	 *    the new value here (before initializing pkg_mem).
 	 *  - look if there is a -h, e.g. -f -h construction won't be caught
 	 *    later
 	 */
@@ -2169,12 +2185,20 @@ int main(int argc, char **argv)
 					fprintf(stderr, "bad private mem size\n");
 					goto error;
 				}
-				pkg_mem_size = strtol(optarg, &tmp, 10) * 1024 * 1024;
+				l1 = strtol(optarg, &tmp, 10);
 				if(tmp && (*tmp)) {
 					fprintf(stderr, "bad private mem size number: -M %s\n",
 							optarg);
 					goto error;
-				};
+				}
+				/* safety check for upper limit of 1TB */
+				if(l1 <= 0 || l1 > 1024L * 1024) {
+					fprintf(stderr,
+							"out of limits private mem size number: -M %s\n",
+							optarg);
+					goto error;
+				}
+				pkg_mem_size = 1024UL * 1024 * l1;
 				break;
 			case 'x':
 				sr_memmng_shm = optarg;
@@ -2303,11 +2327,18 @@ int main(int argc, char **argv)
 					fprintf(stderr, "bad shared mem size\n");
 					goto error;
 				}
-				shm_mem_size = strtol(optarg, &tmp, 10) * 1024 * 1024;
+				l1 = strtol(optarg, &tmp, 10);
 				if(tmp && (*tmp)) {
 					fprintf(stderr, "bad shmem size number: -m %s\n", optarg);
 					goto error;
-				};
+				}
+				/* safety check for upper limit of 16TB */
+				if(l1 <= 0 || l1 > 16L * 1024 * 1024) {
+					fprintf(stderr, "out of limits shmem size number: -m %s\n",
+							optarg);
+					goto error;
+				}
+				shm_mem_size = 1024UL * 1024 * l1;
 				LM_INFO("shared memory: %ld bytes\n", shm_mem_size);
 				break;
 			case 'd':
@@ -2382,6 +2413,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'b':
+			case 'B':
 			case 'l':
 			case 'n':
 			case 'K':
@@ -2670,6 +2702,18 @@ int main(int argc, char **argv)
 					goto error;
 				}
 				break;
+			case 'B':
+				if(optarg == NULL) {
+					fprintf(stderr, "bad -B parameter\n");
+					goto error;
+				}
+				maxsndbuffer = strtol(optarg, &tmp, 10);
+				if(tmp && (*tmp)) {
+					fprintf(stderr, "bad max buffer size number: -B %s\n",
+							optarg);
+					goto error;
+				}
+				break;
 			case 'T':
 #ifdef USE_TCP
 				tcp_disable = 1;
@@ -2707,7 +2751,7 @@ int main(int argc, char **argv)
 					*p = '\0';
 					p++;
 					tmp_len = 0;
-					if(parse_phostport(p, &ahost, &tmp_len, &aport, &proto)
+					if(parse_phostport(p, &ahost, &tmp_len, &aport, &aproto)
 							< 0) {
 						fprintf(stderr,
 								"listen value with invalid advertise: %s\n",
@@ -2730,7 +2774,7 @@ int main(int argc, char **argv)
 				}
 				/* add a new addr. to our address list */
 				if(add_listen_advertise_iface(n_lst->name, n_lst->next, port,
-						   proto, ahost, aport, n_lst->flags)
+						   proto, aproto, ahost, aport, n_lst->flags)
 						!= 0) {
 					fprintf(stderr, "failed to add new listen address: %s\n",
 							optarg);
@@ -2991,7 +3035,7 @@ int main(int argc, char **argv)
 	ksr_sockets_index();
 	if(default_core_cfg.dns_try_ipv6 && !(socket_types & SOCKET_T_IPV6)) {
 		/* if we are not listening on any ipv6 address => no point
-		 * to try to resovle ipv6 addresses */
+		 * to try to resolve ipv6 addresses */
 		default_core_cfg.dns_try_ipv6 = 0;
 	}
 	/* print all the listen addresses */
@@ -3239,7 +3283,7 @@ error:
 #ifdef KSR_PTHREAD_MUTEX_SHARED
 
 /**
- * code to set PTHREAD_PROCESS_SHARED attribute for phtread mutex to cope
+ * code to set PTHREAD_PROCESS_SHARED attribute for pthread mutex to cope
  * with libssl 1.1+ thread-only mutex initialization
  */
 

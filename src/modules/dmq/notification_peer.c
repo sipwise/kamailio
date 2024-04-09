@@ -405,9 +405,17 @@ int extract_node_list(dmq_node_list_t *update_list, struct sip_msg *msg)
 		/* trim the \r, \n and \0's */
 		trim_r(tmp_uri);
 		find = build_dmq_node(&tmp_uri, 0);
-		if(find == NULL)
-			return -1;
+		if(find == NULL) {
+			LM_ERR("error building dmq node\n");
+			goto error;
+		}
 		ret = find_dmq_node(update_list, find);
+
+		if(!ret) {
+			LM_INFO("dmq node not found by name,try again with IP address\n");
+			ret = find_dmq_node_ip(update_list, find);
+		}
+
 		if(!ret) {
 			LM_DBG("found new node %.*s\n", STR_FMT(&tmp_uri));
 			cur = build_dmq_node(&tmp_uri, 1);

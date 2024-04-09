@@ -138,81 +138,92 @@ calc_response_t calc_response;
 
 
 /*! SL API structure */
-sl_api_t slb;
+sl_api_t _auth_slb;
 
+/* clang-format off */
 /*
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-		{"consume_credentials", w_consume_credentials, 0, 0, 0, REQUEST_ROUTE},
-		{"www_challenge", (cmd_function)www_challenge, 2, fixup_auth_challenge,
-				0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"proxy_challenge", (cmd_function)proxy_challenge, 2,
-				fixup_auth_challenge, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"auth_challenge", (cmd_function)w_auth_challenge, 2,
-				fixup_auth_challenge, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"pv_www_authorize", (cmd_function)pv_www_authenticate, 3,
-				fixup_pv_auth, 0, REQUEST_ROUTE},
-		{"pv_www_authenticate", (cmd_function)pv_www_authenticate, 3,
-				fixup_pv_auth, 0, REQUEST_ROUTE},
-		{"pv_www_authenticate", (cmd_function)pv_www_authenticate2, 4,
-				fixup_pv_auth, 0, REQUEST_ROUTE},
-		{"pv_proxy_authorize", (cmd_function)pv_proxy_authenticate, 3,
-				fixup_pv_auth, 0, REQUEST_ROUTE},
-		{"pv_proxy_authenticate", (cmd_function)pv_proxy_authenticate, 3,
-				fixup_pv_auth, 0, REQUEST_ROUTE},
-		{"auth_get_www_authenticate", (cmd_function)w_auth_get_www_authenticate,
-				3, fixup_auth_get_www_authenticate, 0, REQUEST_ROUTE},
-		{"has_credentials", w_has_credentials, 1, fixup_spve_null, 0,
-				REQUEST_ROUTE},
-		{"pv_auth_check", (cmd_function)w_pv_auth_check, 4, fixup_pv_auth_check,
-				0, REQUEST_ROUTE},
-		{"bind_auth_s", (cmd_function)bind_auth_s, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0}};
+	{"consume_credentials", w_consume_credentials, 0, 0, 0, REQUEST_ROUTE},
+	{"www_challenge", (cmd_function)www_challenge, 2, fixup_auth_challenge,
+			0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"proxy_challenge", (cmd_function)proxy_challenge, 2,
+			fixup_auth_challenge, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"auth_challenge", (cmd_function)w_auth_challenge, 2,
+			fixup_auth_challenge, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"pv_www_authorize", (cmd_function)pv_www_authenticate, 3,
+			fixup_pv_auth, 0, REQUEST_ROUTE},
+	{"pv_www_authenticate", (cmd_function)pv_www_authenticate, 3,
+			fixup_pv_auth, 0, REQUEST_ROUTE},
+	{"pv_www_authenticate", (cmd_function)pv_www_authenticate2, 4,
+			fixup_pv_auth, 0, REQUEST_ROUTE},
+	{"pv_proxy_authorize", (cmd_function)pv_proxy_authenticate, 3,
+			fixup_pv_auth, 0, REQUEST_ROUTE},
+	{"pv_proxy_authenticate", (cmd_function)pv_proxy_authenticate, 3,
+			fixup_pv_auth, 0, REQUEST_ROUTE},
+	{"auth_get_www_authenticate", (cmd_function)w_auth_get_www_authenticate,
+			3, fixup_auth_get_www_authenticate, 0, REQUEST_ROUTE},
+	{"has_credentials", w_has_credentials, 1, fixup_spve_null, 0,
+			REQUEST_ROUTE},
+	{"pv_auth_check", (cmd_function)w_pv_auth_check, 4, fixup_pv_auth_check,
+			0, REQUEST_ROUTE},
+	{"bind_auth_s", (cmd_function)bind_auth_s, 0, 0, 0},
+
+	{0, 0, 0, 0, 0, 0}
+};
 
 
 /*
  * Exported parameters
  */
-static param_export_t params[] = {{"secret", PARAM_STRING, &sec_param},
-		{"nonce_expire", PARAM_INT, &nonce_expire},
-		{"nonce_auth_max_drift", PARAM_INT, &nonce_auth_max_drift},
-		{"protect_contacts", PARAM_INT, &protect_contacts},
-		{"challenge_attr", PARAM_STR, &challenge_attr},
-		{"proxy_challenge_header", PARAM_STR, &proxy_challenge_header},
-		{"www_challenge_header", PARAM_STR, &www_challenge_header},
-		{"qop", PARAM_STR, &auth_qop.qop_str},
-		{"auth_checks_register", PARAM_INT, &auth_checks_reg},
-		{"auth_checks_no_dlg", PARAM_INT, &auth_checks_ood},
-		{"auth_checks_in_dlg", PARAM_INT, &auth_checks_ind},
-		{"nonce_count", PARAM_INT, &nc_enabled},
-		{"nc_array_size", PARAM_INT, &nc_array_size},
-		{"nc_array_order", PARAM_INT, &nc_array_k},
-		{"one_time_nonce", PARAM_INT, &otn_enabled},
-		{"otn_in_flight_no", PARAM_INT, &otn_in_flight_no},
-		{"otn_in_flight_order", PARAM_INT, &otn_in_flight_k},
-		{"nid_pool_no", PARAM_INT, &nid_pool_no},
-		{"force_stateless_reply", PARAM_INT, &force_stateless_reply},
-		{"realm_prefix", PARAM_STRING, &auth_realm_prefix.s},
-		{"use_domain", PARAM_INT, &auth_use_domain},
-		{"algorithm", PARAM_STR, &auth_algorithm},
-		{"add_authinfo_hdr", INT_PARAM, &add_authinfo_hdr}, {0, 0, 0}};
+static param_export_t params[] = {
+	{"secret", PARAM_STRING, &sec_param},
+	{"nonce_expire", PARAM_INT, &nonce_expire},
+	{"nonce_auth_max_drift", PARAM_INT, &nonce_auth_max_drift},
+	{"protect_contacts", PARAM_INT, &protect_contacts},
+	{"challenge_attr", PARAM_STR, &challenge_attr},
+	{"proxy_challenge_header", PARAM_STR, &proxy_challenge_header},
+	{"www_challenge_header", PARAM_STR, &www_challenge_header},
+	{"qop", PARAM_STR, &auth_qop.qop_str},
+	{"auth_checks_register", PARAM_INT, &auth_checks_reg},
+	{"auth_checks_no_dlg", PARAM_INT, &auth_checks_ood},
+	{"auth_checks_in_dlg", PARAM_INT, &auth_checks_ind},
+	{"nonce_count", PARAM_INT, &nc_enabled},
+	{"nc_array_size", PARAM_INT, &nc_array_size},
+	{"nc_array_order", PARAM_INT, &nc_array_k},
+	{"one_time_nonce", PARAM_INT, &otn_enabled},
+	{"otn_in_flight_no", PARAM_INT, &otn_in_flight_no},
+	{"otn_in_flight_order", PARAM_INT, &otn_in_flight_k},
+	{"nid_pool_no", PARAM_INT, &nid_pool_no},
+	{"force_stateless_reply", PARAM_INT, &force_stateless_reply},
+	{"realm_prefix", PARAM_STRING, &auth_realm_prefix.s},
+	{"use_domain", PARAM_INT, &auth_use_domain},
+	{"algorithm", PARAM_STR, &auth_algorithm},
+	{"add_authinfo_hdr", INT_PARAM, &add_authinfo_hdr},
+
+	{0, 0, 0}
+};
 
 
 /*
  * Module interface
  */
 struct module_exports exports = {
-		"auth", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds, params, 0,		 /* RPC methods */
-		0,						 /* pseudo-variables exports */
-		0,						 /* response function */
-		mod_init,				 /* module initialization function */
-		0,						 /* child initialization function */
-		destroy					 /* destroy function */
+	"auth",
+	DEFAULT_DLFLAGS,		/* dlopen flags */
+	cmds,
+	params,
+	0,						/* RPC methods */
+	0,						/* pseudo-variables exports */
+	0,						/* response function */
+	mod_init,				/* module initialization function */
+	0,						/* child initialization function */
+	destroy					/* destroy function */
 };
+/* clang-format on */
 
 
 /*
@@ -248,8 +259,6 @@ static inline int generate_random_secret(void)
 	secret2.s = sec_rand2;
 	secret2.len = RAND_SECRET_LEN;
 
-	/* DBG("Generated secret: '%.*s'\n", secret.len, secret.s); */
-
 	return 0;
 }
 
@@ -263,7 +272,7 @@ static int mod_init(void)
 	auth_realm_prefix.len = strlen(auth_realm_prefix.s);
 
 	/* bind the SL API */
-	if(sl_load_api(&slb) != 0) {
+	if(sl_load_api(&_auth_slb) != 0) {
 		LM_ERR("cannot bind to SL API\n");
 		return -1;
 	}
@@ -949,8 +958,8 @@ static int auth_send_reply(
 	reason_str.s = reason;
 	reason_str.len = strlen(reason);
 
-	return force_stateless_reply ? slb.sreply(msg, code, &reason_str)
-								 : slb.freply(msg, code, &reason_str);
+	return force_stateless_reply ? _auth_slb.sreply(msg, code, &reason_str)
+								 : _auth_slb.freply(msg, code, &reason_str);
 }
 
 /**

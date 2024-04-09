@@ -178,6 +178,8 @@ int t_reply_str(struct cell *t, struct sip_msg *, unsigned int, str *);
 int t_reply_unsafe(struct cell *t, struct sip_msg *, unsigned int, char *);
 int t_reply_str_unsafe(struct cell *t, struct sip_msg *, unsigned int, str *);
 
+int ki_t_reply_error(sip_msg_t *msg);
+
 
 enum rps relay_reply(struct cell *t, struct sip_msg *p_msg, int branch,
 		unsigned int msg_status, struct cancel_info *cancel_data,
@@ -197,11 +199,11 @@ void on_failure_reply(
    replies arrive
 */
 void t_on_failure(unsigned int go_to);
-unsigned int get_on_failure(void);
+int get_on_failure(void);
 void t_on_branch_failure(unsigned int go_to);
-unsigned int get_on_branch_failure(void);
+int get_on_branch_failure(void);
 void t_on_reply(unsigned int go_to);
-unsigned int get_on_reply(void);
+int get_on_reply(void);
 
 int t_retransmit_reply(struct cell *t);
 

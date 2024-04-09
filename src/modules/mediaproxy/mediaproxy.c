@@ -123,7 +123,7 @@ typedef struct MediaproxySocket
 {
 	char *name;				// name
 	int sock;				// socket
-	int timeout;			// how many miliseconds to wait for an answer
+	int timeout;			// how many milliseconds to wait for an answer
 	time_t last_failure;	// time of the last failure
 	char data[BUFFER_SIZE]; // buffer for the answer data
 } MediaproxySocket;
@@ -199,7 +199,7 @@ static str ice_candidate = str_init("none");
 static MediaproxySocket mediaproxy_socket = {
 		"/run/mediaproxy/dispatcher.sock", // name
 		-1,								   // sock
-		500, // timeout in 500 miliseconds if there is no answer
+		500, // timeout in 500 milliseconds if there is no answer
 		0,	 // time of the last failure
 		""	 // data
 };
@@ -754,7 +754,7 @@ err:
 }
 
 
-// Get the SDP message from SIP message and check it's Content-Type
+// Get the SDP message from SIP message and check its Content-Type
 // Return values:
 //    1 - success
 //   -1 - error in getting body or invalid content type
@@ -1614,7 +1614,7 @@ static int use_media_proxy(
 		if(session.supported_count == 0)
 			return 1; // there are no supported media streams. we have nothing to do.
 
-		len = sprintf(media_str, "%s", "media: ");
+		len = snprintf(media_str, sizeof(media_str), "%s", "media: ");
 		for(i = 0, str_buf.len = sizeof(media_str) - len - 2,
 		str_buf.s = media_str + len;
 				i < session.stream_count; i++) {
@@ -1628,15 +1628,15 @@ static int use_media_proxy(
 						(unsigned long)sizeof(media_str));
 				return -1;
 			}
-			len = sprintf(str_buf.s, "%.*s:%.*s:%.*s:%.*s:%s,", stream.type.len,
-					stream.type.s, stream.ip.len, stream.ip.s, stream.port.len,
-					stream.port.s, stream.direction.len, stream.direction.s,
-					stream.has_ice ? "ice=yes" : "ice=no");
+			len = snprintf(str_buf.s, str_buf.len, "%.*s:%.*s:%.*s:%.*s:%s,",
+					stream.type.len, stream.type.s, stream.ip.len, stream.ip.s,
+					stream.port.len, stream.port.s, stream.direction.len,
+					stream.direction.s, stream.has_ice ? "ice=yes" : "ice=no");
 			str_buf.s += len;
 			str_buf.len -= len;
 		}
 		*(str_buf.s - 1) = 0; // remove the last comma
-		sprintf(str_buf.s - 1, "%s", "\r\n");
+		snprintf(str_buf.s - 1, str_buf.len + 1, "%s", "\r\n");
 	} else {
 		media_str[0] = 0;
 	}
@@ -1819,7 +1819,7 @@ static int use_media_proxy(
 							   : ice_data->priority;
 			port = strtoint(&tokens[j]);
 			candidate.s = buf;
-			candidate.len = sprintf(candidate.s,
+			candidate.len = snprintf(candidate.s, sizeof(buf),
 					"a=candidate:R%x 1 UDP %u %.*s %i typ relay%.*s",
 					hexip.s_addr, priority, tokens[0].len, tokens[0].s, port,
 					session.separator.len, session.separator.s);
@@ -1833,7 +1833,7 @@ static int use_media_proxy(
 
 			if(stream.has_rtcp_ice) {
 				candidate.s = buf;
-				candidate.len = sprintf(candidate.s,
+				candidate.len = snprintf(candidate.s, sizeof(buf),
 						"a=candidate:R%x 2 UDP %u %.*s %i typ relay%.*s",
 						hexip.s_addr, priority - 1, tokens[0].len, tokens[0].s,
 						port + 1, session.separator.len, session.separator.s);

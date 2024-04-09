@@ -68,31 +68,31 @@ MODULE_VERSION
 #define PL_TIMER_INTERVAL_DEFAULT 10
 
 /** SL API structure */
-sl_api_t slb;
+static sl_api_t _pl_slb;
 
-enum
-{
+/* clang-format off */
+enum {
 	LOAD_SOURCE_CPU,
 	LOAD_SOURCE_EXTERNAL
 };
 
 str_map_t source_names[] = {
-		{str_init("cpu"), LOAD_SOURCE_CPU},
-		{str_init("external"), LOAD_SOURCE_EXTERNAL},
-		{{0, 0}, 0},
+	{str_init("cpu"), LOAD_SOURCE_CPU},
+	{str_init("external"), LOAD_SOURCE_EXTERNAL},
+	{{0, 0}, 0},
 };
 
-static int pl_drop_code = 503;
-static str pl_drop_reason = str_init("Server Unavailable");
-static int pl_hash_size = 6;
-
-typedef struct pl_queue
-{
+typedef struct pl_queue {
 	int *pipe;
 	int pipe_mp;
 	str *method;
 	str method_mp;
 } pl_queue_t;
+/* clang-format on */
+
+static int pl_drop_code = 503;
+static str pl_drop_reason = str_init("Server Unavailable");
+static int pl_hash_size = 6;
 
 static struct timer_ln *pl_timer = NULL;
 
@@ -133,50 +133,53 @@ static int w_pl_drop(struct sip_msg *, char *, char *);
 static void destroy(void);
 static int fixup_pl_check3(void **param, int param_no);
 
-static cmd_export_t cmds[] = {{"pl_check", (cmd_function)w_pl_check, 1,
-									  fixup_spve_null, 0, ANY_ROUTE},
-		{"pl_check", (cmd_function)w_pl_check3, 3, fixup_pl_check3, 0,
-				ANY_ROUTE},
-		{"pl_active", (cmd_function)w_pl_active, 1, fixup_spve_null, 0,
-				ANY_ROUTE},
-		{"pl_drop", (cmd_function)w_pl_drop_default, 0, 0, 0,
-				REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
-		{"pl_drop", (cmd_function)w_pl_drop_forced, 1, fixup_uint_null, 0,
-				REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
-		{"pl_drop", (cmd_function)w_pl_drop, 2, fixup_uint_uint, 0,
-				REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-static param_export_t params[] = {
-		{"timer_interval", INT_PARAM, &pl_timer_interval},
-		{"timer_mode", INT_PARAM, &pl_timer_mode},
-		{"reply_code", INT_PARAM, &pl_drop_code},
-		{"reply_reason", PARAM_STR, &pl_drop_reason},
-		{"db_url", PARAM_STR, &pl_db_url},
-		{"plp_table_name", PARAM_STR, &rlp_table_name},
-		{"plp_pipeid_column", PARAM_STR, &rlp_pipeid_col},
-		{"plp_limit_column", PARAM_STR, &rlp_limit_col},
-		{"plp_algorithm_column", PARAM_STR, &rlp_algorithm_col},
-		{"hash_size", INT_PARAM, &pl_hash_size},
-		{"load_fetch", INT_PARAM, &pl_load_fetch},
-		{"clean_unused", INT_PARAM, &pl_clean_unused},
+/* clang-format off */
+static cmd_export_t cmds[] = {
+	{"pl_check", (cmd_function)w_pl_check, 1, fixup_spve_null, 0, ANY_ROUTE},
+	{"pl_check", (cmd_function)w_pl_check3, 3, fixup_pl_check3, 0, ANY_ROUTE},
+	{"pl_active", (cmd_function)w_pl_active, 1, fixup_spve_null, 0, ANY_ROUTE},
+	{"pl_drop", (cmd_function)w_pl_drop_default, 0, 0, 0,
+		REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
+	{"pl_drop", (cmd_function)w_pl_drop_forced, 1, fixup_uint_null, 0,
+		REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
+	{"pl_drop", (cmd_function)w_pl_drop, 2, fixup_uint_uint, 0,
+		REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
-		{0, 0, 0}};
+static param_export_t params[] = {
+	{"timer_interval", INT_PARAM, &pl_timer_interval},
+	{"timer_mode", INT_PARAM, &pl_timer_mode},
+	{"reply_code", INT_PARAM, &pl_drop_code},
+	{"reply_reason", PARAM_STR, &pl_drop_reason},
+	{"db_url", PARAM_STR, &pl_db_url},
+	{"plp_table_name", PARAM_STR, &rlp_table_name},
+	{"plp_pipeid_column", PARAM_STR, &rlp_pipeid_col},
+	{"plp_limit_column", PARAM_STR, &rlp_limit_col},
+	{"plp_algorithm_column", PARAM_STR, &rlp_algorithm_col},
+	{"hash_size", INT_PARAM, &pl_hash_size},
+	{"load_fetch", INT_PARAM, &pl_load_fetch},
+	{"clean_unused", INT_PARAM, &pl_clean_unused},
+
+	{0, 0, 0}
+};
 
 static rpc_export_t rpc_methods[];
 
 /** module exports */
 struct module_exports exports = {
-		"pipelimit",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* cmd exports */
-		params,			 /* param exports */
-		0,				 /* RPC method exports */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		0,				 /* per-child init function */
-		destroy			 /* module exit function */
+	"pipelimit",	 /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			 /* cmd exports */
+	params,			 /* param exports */
+	0,				 /* RPC method exports */
+	0,				 /* exported pseudo-variables */
+	0,				 /* response handling function */
+	mod_init,		 /* module initialization function */
+	0,				 /* per-child init function */
+	destroy			 /* module exit function */
 };
+/* clang-format on */
 
 #ifdef __OS_darwin
 #include <sys/param.h>
@@ -214,13 +217,16 @@ int get_num_cpus()
 /* not using /proc/loadavg because it only works when our_timer_interval == theirs */
 static int get_cpuload(double *load)
 {
-	static long long o_user, o_nice, o_sys, o_idle, o_iow, o_irq, o_sirq, o_stl;
-	long long n_user, n_nice, n_sys, n_idle, n_iow, n_irq, n_sirq, n_stl;
+	static long long o_user = 0, o_nice = 0, o_sys = 0, o_idle = 0, o_iow = 0,
+					 o_irq = 0, o_sirq = 0, o_stl = 0;
+	long long n_user = 0, n_nice = 0, n_sys = 0, n_idle = 0, n_iow = 0,
+			  n_irq = 0, n_sirq = 0, n_stl = 0;
 	static int first_time = 1;
 	FILE *f = fopen("/proc/stat", "r");
-	double vload;
-	int ncpu;
+	double vload = 0.0;
+	int ncpu = 0;
 	static int errormsg = 0;
+	int n = 0;
 
 	if(!f) {
 		/* Only write this error message five times. Otherwise you will annoy
@@ -231,9 +237,9 @@ static int get_cpuload(double *load)
 		}
 		return -1;
 	}
-	if(fscanf(f, "cpu  %lld%lld%lld%lld%lld%lld%lld%lld", &n_user, &n_nice,
-			   &n_sys, &n_idle, &n_iow, &n_irq, &n_sirq, &n_stl)
-			< 0) {
+	n = fscanf(f, "cpu  %lld%lld%lld%lld%lld%lld%lld%lld", &n_user, &n_nice,
+			&n_sys, &n_idle, &n_iow, &n_irq, &n_sirq, &n_stl);
+	if(n < 8) {
 		LM_ERR("could not parse load information\n");
 		fclose(f);
 		return -1;
@@ -365,7 +371,7 @@ static int mod_init(void)
 	}
 
 	/* bind the SL API */
-	if(sl_load_api(&slb) != 0) {
+	if(sl_load_api(&_pl_slb) != 0) {
 		LM_ERR("cannot bind to SL API\n");
 		return -1;
 	}
@@ -476,7 +482,7 @@ static int pl_drop(struct sip_msg *msg, unsigned int low, unsigned int high)
 
 	LM_DBG("(%d, %d)\n", low, high);
 
-	if(slb.freply != 0) {
+	if(_pl_slb.freply != 0) {
 		if(low != 0 && high != 0) {
 			hdr.s = (char *)pkg_malloc(64);
 			if(hdr.s == 0) {
@@ -502,11 +508,11 @@ static int pl_drop(struct sip_msg *msg, unsigned int low, unsigned int high)
 				return 0;
 			}
 
-			ret = slb.freply(msg, pl_drop_code, &pl_drop_reason);
+			ret = _pl_slb.freply(msg, pl_drop_code, &pl_drop_reason);
 
 			pkg_free(hdr.s);
 		} else {
-			ret = slb.freply(msg, pl_drop_code, &pl_drop_reason);
+			ret = _pl_slb.freply(msg, pl_drop_code, &pl_drop_reason);
 		}
 	} else {
 		LM_ERR("Can't send reply\n");

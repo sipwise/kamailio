@@ -64,6 +64,7 @@
 #include "peerstatemachine.h"
 #include "peermanager.h"
 #include "config.h"
+#include "cdp_tls.h"
 
 #include "receiver.h"
 
@@ -72,6 +73,8 @@
 #include "../../core/cfg/cfg_struct.h"
 
 extern dp_config *config; /**< Configuration for this diameter peer 	*/
+extern int method;
+extern int enable_tls;
 
 int dp_add_pid(pid_t pid);
 void dp_del_pid(pid_t pid);
@@ -124,8 +127,8 @@ static int make_send_pipe(serviced_peer_t *sp)
 {
 	local_id++;
 	sp->send_pipe_name.s = shm_malloc(sizeof(PIPE_PREFIX) + 64);
-	sprintf(sp->send_pipe_name.s, "%s%d_%d_%d", PIPE_PREFIX, getpid(), local_id,
-			(unsigned int)time(0));
+	sprintf(sp->send_pipe_name.s, "%s%d_%d_%u", PIPE_PREFIX, getpid(), local_id,
+			(unsigned int)(unsigned long long)time(0));
 	sp->send_pipe_name.len = strlen(sp->send_pipe_name.s);
 
 	if(mkfifo(sp->send_pipe_name.s, 0666) < 0) {
@@ -161,8 +164,10 @@ static void close_send_pipe(serviced_peer_t *sp)
 {
 	int tmp;
 	if(sp->send_pipe_name.s) {
-		close(sp->send_pipe_fd);
-		close(sp->send_pipe_fd_out);
+		if(sp->send_pipe_fd >= 0)
+			close(sp->send_pipe_fd);
+		if(sp->send_pipe_fd_out >= 0)
+			close(sp->send_pipe_fd_out);
 		tmp = remove(sp->send_pipe_name.s);
 		if(tmp == -1) {
 			LM_ERR("could not remove send pipe\n");
@@ -526,13 +531,38 @@ done:
 	exit(0);
 }
 
+static inline int do_read(serviced_peer_t *sp, char *dst, int n)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	int cnt, ssl_err;
+	char *err_str;
+
+	if(sp->tls_conn) {
+		cdp_openssl_clear_errors();
+		cnt = SSL_read(sp->tls_conn, dst, n);
+		if(unlikely(cnt < 0)) {
+			ssl_err = SSL_get_error(sp->tls_conn, cnt);
+			err_str = ERR_error_string(ssl_err, NULL);
+			LM_ERR("TLS read error %s\n", err_str);
+		}
+	} else {
+		cnt = recv(sp->tcp_socket, dst, n, 0);
+	}
+#else
+	int cnt;
+
+	cnt = recv(sp->tcp_socket, dst, n, 0);
+#endif
+	return cnt;
+}
+
 /**
  * Does the actual receive operations on the Diameter TCP socket, for retrieving incoming messages.
  * The functions is to be called iteratively, each time there is something to be read from the TCP socket. It uses
  * a simple state machine to read first the version, then the header and then the rest of the message. When an
  * entire message is received, it is decoded and passed to the processing functions.
  * @param sp - the serviced peer to operate on
- * @return 1 on success, 0 on failure
+ * @return 2 on success, but SSL_read has not consumed all the data in the SSL read buffer, 1 on success and everything consumed in the buffer, 0 on failure
  */
 static inline int do_receive(serviced_peer_t *sp)
 {
@@ -565,7 +595,7 @@ static inline int do_receive(serviced_peer_t *sp)
 			goto error_and_reset;
 	}
 
-	cnt = recv(sp->tcp_socket, dst, n, 0);
+	cnt = do_read(sp, dst, n);
 
 	if(cnt <= 0)
 		goto error_and_reset;
@@ -633,6 +663,19 @@ static inline int do_receive(serviced_peer_t *sp)
 					sp->state);
 			goto error_and_reset;
 	}
+
+	if(sp->tls_conn) {
+		int pending_bytes = SSL_pending(sp->tls_conn);
+		if(pending_bytes > 0) {
+			// Read the pending data using SSL_read instead of waiting for select to reactivate
+			return 2;
+		} else if(pending_bytes == 0) {
+			return 1;
+		} else {
+			LM_ERR("Error in executing SSL_pending");
+			goto error_and_reset;
+		}
+	}
 	return 1;
 error_and_reset:
 	if(sp->msg) {
@@ -643,6 +686,31 @@ error_and_reset:
 		sp->state = Receiver_Waiting;
 	}
 	return 0;
+}
+
+static int do_write(serviced_peer_t *sp, const void *buf, int num)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	int cnt, ssl_err;
+	char *err_str;
+
+	if(sp->tls_conn) {
+		cdp_openssl_clear_errors();
+		cnt = SSL_write(sp->tls_conn, buf, num);
+		if(unlikely(cnt <= 0)) {
+			ssl_err = SSL_get_error(sp->tls_conn, cnt);
+			err_str = ERR_error_string(ssl_err, NULL);
+			LM_ERR("SSL write error %s\n", err_str);
+		}
+	} else {
+		cnt = write(sp->tcp_socket, buf, num);
+	}
+#else
+	int cnt;
+
+	cnt = write(sp->tcp_socket, buf, num);
+#endif
+	return cnt;
 }
 
 /**
@@ -758,6 +826,13 @@ int receive_loop(peer *original_peer)
 							} else {
 								p->R_sock = fd;
 							}
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+							if(enable_tls) {
+								to_ssl(&sp2->tls_ctx, &sp2->tls_conn,
+										sp->tcp_socket, method);
+							}
+#endif
 						} else {
 							sp2 = add_serviced_peer(NULL);
 							if(!sp2) {
@@ -765,6 +840,12 @@ int receive_loop(peer *original_peer)
 								continue;
 							}
 							sp2->tcp_socket = fd;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+							if(enable_tls) {
+								to_ssl(&sp2->tls_ctx, &sp2->tls_conn,
+										sp->tcp_socket, method);
+							}
+#endif
 						}
 					}
 				}
@@ -806,8 +887,7 @@ int receive_loop(peer *original_peer)
 								   "something, but the connection was not "
 								   "opened\n");
 						} else {
-							while((cnt = write(sp->tcp_socket, msg->buf.s,
-										   msg->buf.len))
+							while((cnt = do_write(sp, msg->buf.s, msg->buf.len))
 									== -1) {
 								if(errno == EINTR)
 									continue;
@@ -817,6 +897,9 @@ int receive_loop(peer *original_peer)
 										sp->p ? sp->p->fqdn.s : "",
 										sp->tcp_socket, strerror(errno));
 								AAAFreeMessage(&msg);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+								cleanup_ssl(sp->tls_ctx, sp->tls_conn);
+#endif
 								close(sp->tcp_socket);
 								goto drop_peer;
 							}
@@ -829,6 +912,9 @@ int receive_loop(peer *original_peer)
 										sp->p ? sp->p->fqdn.s : "",
 										sp->tcp_socket, cnt, msg->buf.len);
 								AAAFreeMessage(&msg);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+								cleanup_ssl(sp->tls_ctx, sp->tls_conn);
+#endif
 								close(sp->tcp_socket);
 								goto drop_peer;
 							}
@@ -840,7 +926,10 @@ int receive_loop(peer *original_peer)
 					/* receive */
 					if(sp->tcp_socket >= 0 && FD_ISSET(sp->tcp_socket, &rfds)) {
 						errno = 0;
-						cnt = do_receive(sp);
+
+						while((cnt = do_receive(sp)) == 2) {
+						};
+
 						if(cnt <= 0) {
 							LM_INFO("select_recv(): [%.*s] read on socket [%d] "
 									"returned %d > %s... dropping\n",
@@ -949,7 +1038,9 @@ int peer_connect(peer *p)
 		{ // Connect with timeout
 			int x;
 			x = fcntl(sock, F_GETFL, 0);
-			fcntl(sock, F_SETFL, x | O_NONBLOCK);
+			if(fcntl(sock, F_SETFL, x | O_NONBLOCK) < 0) {
+				LM_WARN("failed to set O_NONBLOCK on socket %d\n", sock);
+			}
 			int res = connect(sock, ainfo->ai_addr, ainfo->ai_addrlen);
 			if(res < 0) {
 				if(errno == EINPROGRESS) {

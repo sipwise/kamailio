@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.7.4
+%define ver 5.8.1
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -29,41 +29,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
-%endif
-
-%if 0%{?rhel} == 6
-%if 0%{?centos_ver}
-%define dist_name centos
-%define dist_version %{?centos}
-%endif
-%if 0%{?centos_ver} == 0
-%define dist_name rhel
-%define dist_version %{?rhel}
-%endif
-%bcond_with cnxcc
-%bcond_without dnssec
-%bcond_without evapi
-%bcond_without geoip
-%bcond_without http_async_client
-%bcond_without ims
-%bcond_without jansson
-%bcond_without json
-%bcond_without lua
-%bcond_with lwsc
-%bcond_without kazoo
-%bcond_without memcached
-%bcond_with mongodb
-%bcond_with nats
-%bcond_without perl
-%bcond_with phonenum
-%bcond_without python2
-%bcond_with python3
-%bcond_with rabbitmq
-%bcond_with redis
-%bcond_with ruby
-%bcond_without sctp
-%bcond_without websocket
-%bcond_without xmlrpc
+%bcond_without wolfssl
 %endif
 
 %if 0%{?rhel} == 7
@@ -100,6 +66,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without wolfssl
 %endif
 
 %if 0%{?rhel} == 8
@@ -146,6 +113,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without wolfssl
 %endif
 
 %if 0%{?rhel} == 9
@@ -192,6 +160,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without wolfssl
 %endif
 
 %if 0%{?suse_version}
@@ -221,11 +190,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
-%endif
-
-# Defining missing macros on RHEL/CentOS 6
-%if 0%{?rhel} == 6
-%define _rundir %{_localstatedir}/run
+%bcond_without wolfssl
 %endif
 
 # build with openssl 1.1.1 on RHEL 7 based dists
@@ -400,7 +365,7 @@ Group:      %{PKGGROUP}
 Requires:   kamailio = %ver
 
 %description    cfgt
-The unit test config file execution tracing module for Kamailio. 
+The unit test config file execution tracing module for Kamailio.
 
 
 %if %{with cnxcc}
@@ -452,14 +417,14 @@ BuildRequires:  libopenssl-devel
 %endif
 
 %description    crypto
-This module provides various cryptography tools for use in Kamailio configuration file.  It relies on OpenSSL libraries for cryptographic operations (libssl, libcrypto). 
+This module provides various cryptography tools for use in Kamailio configuration file.  It relies on OpenSSL libraries for cryptographic operations (libssl, libcrypto).
 
 
 %package    dialplan
 Summary:    String translations based on rules for Kamailio
 Group:      %{PKGGROUP}
-Requires:   pcre, kamailio = %ver
-BuildRequires:  pcre-devel
+Requires:   pcre2, kamailio = %ver
+BuildRequires:  pcre2-devel
 
 %description    dialplan
 String translations based on rules for Kamailio.
@@ -505,8 +470,8 @@ suspended when sending the event, to be resumed at a later point, maybe triggere
 %package    geoip
 Summary:    MaxMind GeoIP support for Kamailio
 Group:      %{PKGGROUP}
-Requires:   GeoIP, kamailio = %ver
-BuildRequires:  GeoIP-devel
+Requires:   GeoIP, libmaxminddb, kamailio = %ver
+BuildRequires:  GeoIP-devel, libmaxminddb-devel
 
 %description    geoip
 MaxMind GeoIP support for Kamailio.
@@ -560,7 +525,7 @@ BuildRequires:  libxml2-devel, libcurl-devel, zlib-devel
 %endif
 
 %description    http_client
-This module implements protocol functions that use the libcurl to communicate with HTTP servers. 
+This module implements protocol functions that use the libcurl to communicate with HTTP servers.
 
 
 %if %{with ims}
@@ -647,8 +612,8 @@ Kazoo module for Kamailio.
 %package    lcr
 Summary:    Least cost routing for Kamailio
 Group:      %{PKGGROUP}
-Requires:   pcre, kamailio = %ver
-BuildRequires:  pcre-devel
+Requires:   pcre2, kamailio = %ver
+BuildRequires:  pcre2-devel
 
 %description    lcr
 Least cost routing for Kamailio.
@@ -778,7 +743,7 @@ Protocol (SIP)" support for Kamailio.
 %if %{with perl}
 %package    perl
 Summary:    Perl extensions and database driver for Kamailio
-Group:      %{PKGGROUP} 
+Group:      %{PKGGROUP}
 Requires:   kamailio = %ver
 %if 0%{?suse_version}
 Requires:   perl
@@ -903,8 +868,8 @@ Redis configuration file support for Kamailio.
 %package    regex
 Summary:    PCRE mtaching operations for Kamailio
 Group:      %{PKGGROUP}
-Requires:   pcre, kamailio = %ver
-BuildRequires:  pcre-devel
+Requires:   pcre2, kamailio = %ver
+BuildRequires:  pcre2-devel
 
 %description    regex
 PCRE mtaching operations for Kamailio.
@@ -996,7 +961,7 @@ BuildRequires:  libcurl-devel
 %endif
 
 %description    slack
-This module provides integration with Slack over webhooks. 
+This module provides integration with Slack over webhooks.
 
 
 %package    smsops
@@ -1005,7 +970,7 @@ Group:      %{PKGGROUP}
 Requires:   kamailio = %ver
 
 %description    smsops
-This module collects the Transformations for 3GPP-SMS. 
+This module collects the Transformations for 3GPP-SMS.
 
 
 %package    snmpstats
@@ -1030,7 +995,7 @@ Group:      %{PKGGROUP}
 Requires:   kamailio = %ver
 
 %description    statsc
-This module provides a statistics collector engine. 
+This module provides a statistics collector engine.
 
 
 %package    statsd
@@ -1049,7 +1014,7 @@ Requires:       kamailio = %version
 BuildRequires:  gcc-c++
 
 %description    sqlang
-app_sqlang module for Kamailio.
+Squirrel Language (SQLang) for Kamailio
 
 
 %package    sqlite
@@ -1075,6 +1040,17 @@ BuildRequires:  openssl-devel
 
 %description    tls
 TLS transport for Kamailio.
+
+
+%if %{with wolfssl}
+%package    tls_wolfssl
+Summary:    TLS transport for Kamailio based on wolfSSL
+Group:      %{PKGGROUP}
+BuildRequires: pkgconfig(wolfssl)
+
+%description    tls_wolfssl
+TLS transport for Kamailio based on wolfSSL
+%endif
 
 
 %package    tcpops
@@ -1238,6 +1214,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if 0%{?rhel} >= 8
     PYTHON3=python3.9 \
 %endif
+    WOLFSSL_INTERNAL=no \
     group_include="kstandard kautheph kberkeley kcarrierroute \
 %if %{with cnxcc}
     kcnxcc \
@@ -1251,6 +1228,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %endif
 %if %{with geoip}
     kgeoip \
+    kgeoip2 \
 %endif
     kgzcompress \
 %if %{with http_async_client}
@@ -1320,7 +1298,11 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if "%{?_unitdir}" != ""
     ksystemd \
 %endif
-    ktls kunixodbc kutils \
+    ktls \
+%if %{with wolfssl}
+    ktls_wolfssl \
+%endif
+    kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
 %endif
@@ -1345,6 +1327,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if 0%{?rhel} >= 8
     PYTHON3=python3.9 \
 %endif
+    WOLFSSL_INTERNAL=no \
     group_include="kstandard kautheph kberkeley kcarrierroute \
 %if %{with cnxcc}
     kcnxcc \
@@ -1358,6 +1341,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %endif
 %if %{with geoip}
     kgeoip \
+    kgeoip2 \
 %endif
     kgzcompress \
 %if %{with http_async_client}
@@ -1427,7 +1411,11 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if "%{?_unitdir}" != ""
     ksystemd \
 %endif
-    ktls kunixodbc kutils \
+    ktls \
+%if %{with wolfssl}
+    ktls_wolfssl \
+%endif
+    kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
 %endif
@@ -1562,9 +1550,11 @@ fi
 %doc %{_docdir}/kamailio/modules/README.drouting
 %doc %{_docdir}/kamailio/modules/README.enum
 %doc %{_docdir}/kamailio/modules/README.exec
+%doc %{_docdir}/kamailio/modules/README.file_out
 %doc %{_docdir}/kamailio/modules/README.group
 %doc %{_docdir}/kamailio/modules/README.htable
 %doc %{_docdir}/kamailio/modules/README.imc
+%doc %{_docdir}/kamailio/modules/README.influxdbc
 %doc %{_docdir}/kamailio/modules/README.ipops
 %doc %{_docdir}/kamailio/modules/README.kemix
 %doc %{_docdir}/kamailio/modules/README.kex
@@ -1724,9 +1714,11 @@ fi
 %{_libdir}/kamailio/modules/drouting.so
 %{_libdir}/kamailio/modules/enum.so
 %{_libdir}/kamailio/modules/exec.so
+%{_libdir}/kamailio/modules/file_out.so
 %{_libdir}/kamailio/modules/group.so
 %{_libdir}/kamailio/modules/htable.so
 %{_libdir}/kamailio/modules/imc.so
+%{_libdir}/kamailio/modules/influxdbc.so
 %{_libdir}/kamailio/modules/ipops.so
 %{_libdir}/kamailio/modules/kemix.so
 %{_libdir}/kamailio/modules/kex.so
@@ -1945,7 +1937,9 @@ fi
 %files      geoip
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.geoip
+%doc %{_docdir}/kamailio/modules/README.geoip2
 %{_libdir}/kamailio/modules/geoip.so
+%{_libdir}/kamailio/modules/geoip2.so
 %endif
 
 
@@ -2342,12 +2336,6 @@ fi
 %{_libdir}/kamailio/modules/statsd.so
 
 
-%files          sqlang
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.app_sqlang
-%{_libdir}/kamailio/modules/app_sqlang.so
-
-
 %files      sqlite
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_sqlite
@@ -2360,12 +2348,16 @@ fi
 
 %files      tls
 %defattr(-,root,root)
-%dir %{_libdir}/kamailio/openssl_mutex_shared
-%doc %{_docdir}/kamailio/modules/README.auth_identity
 %doc %{_docdir}/kamailio/modules/README.tls
-%{_libdir}/kamailio/modules/auth_identity.so
 %{_libdir}/kamailio/modules/tls.so
-%{_libdir}/kamailio/openssl_mutex_shared/openssl_mutex_shared.so
+
+
+%if %{with wolfssl}
+%files      tls_wolfssl
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.tls_wolfssl
+%{_libdir}/kamailio/modules/tls_wolfssl.so
+%endif
 
 
 %files      tcpops
@@ -2461,7 +2453,7 @@ fi
   - fix http_client package
 * Fri Nov 04 2016 Marcel Weinberg <marcel@ng-voice.com>
   - Updated to Kamailio version 5.0 and CentOS / RHEL 7.2
-  - added new modules available with Kamailio 5.x 
+  - added new modules available with Kamailio 5.x
     - cfgt
     - crypto
     - http_client
@@ -2470,10 +2462,10 @@ fi
     - statsc
     - topos
   - removed dialog_ng references and added ims_dialog to replace dialog_ng
-  - removed java module which requires libgcj 
+  - removed java module which requires libgcj
     - libgcj is no longer supported by RHEL / CentOS (Version >= 7)
     - it's recommended to replace libgcj as dependency
-  - added the ims_registrar_pcscf module 
+  - added the ims_registrar_pcscf module
 * Tue Dec 3 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
   - Updated version to 4.2.0
 * Mon Oct 7 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
@@ -2538,4 +2530,3 @@ fi
 * Mon Jun 18 2012 Peter Dunkley <peter.dunkley@crocodilertc.net>
   - Consolidating changelog for 3.3.0 into a single entry...
   - See revision control for details this far back
-

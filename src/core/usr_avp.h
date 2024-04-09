@@ -123,7 +123,6 @@ typedef struct search_state
 	avp_id_t id;
 	avp_name_t name;
 	avp_t *avp; /* Current AVP */
-	//	regex_t* search_re;    /* Compiled regular expression */
 } avp_search_state_t;
 
 /* avp aliases structs*/

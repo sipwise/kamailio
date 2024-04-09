@@ -93,7 +93,10 @@
 		</para>
 		<para>
 		When installing tls module of kamailio, a sample 'tls.cfg' file is deployed in the same
-		folder with 'kamailio.cfg', along with freshly generated self signed certificates.
+		folder with 'kamailio.cfg'. For freshly generated self signed certificates make must be called from tls folder
+		<programlisting>
+make install-tls-cert
+		</programlisting>
 		</para>
 		<para>
 		HINT: be sure you have <emphasis>enable_tls=yes</emphasis> to your kamailio.cfg.
@@ -134,11 +137,6 @@ request_route {
 		<para>
 			To quickly check if your Kamailio version was compiled with these
 			options, run kamailio -V and look for USE_TLS and TLS_HOOKS among the flags.
-		</para>
-		<para>
-			For OpenSSL (libssl) v1.1.x, it is required to preload
-			'openssl_mutex_shared' library shipped by &kamailio;. For more details
-			see 'src/modules/tls/utils/openssl_mutex_shared/README.md'.
 		</para>
 		<para>
 			This module includes several workarounds for various Openssl bugs
@@ -290,10 +288,6 @@ make -C modules/tls extra_defs="-DTLS_WR_DEBUG -DTLS_RD_DEBUG"
 			connection establishment and not after).
 		</para>
 		<para>
-			TLS specific config reloading is not safe, so for now better don't use it,
-			especially under heavy traffic.
-		</para>
-		<para>
 			This documentation is incomplete.
 			The provided selects are not documented in this file. A list with all the
 			ones implemented by the TLS module can be found in the Cookbook
@@ -369,4 +363,3 @@ event_route[tls:connection-out] {
 	</section>
 	</chapter>
 </book>
-

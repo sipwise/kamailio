@@ -142,6 +142,8 @@ int terminate_dialog_on_rx_failure =
 		1; //this specifies whether a dialog is torn down when a media rx session fails - in some cases you might not want the dialog torn down
 int delete_contact_on_rx_failure =
 		1; //If this is set we delete the contact if the associated signalling bearer is removed
+int _ims_qos_suspend_transaction =
+		1; //If this is set we suspend the transaction and continue later
 
 
 str early_qosrelease_reason = {"QoS released", 12};
@@ -163,6 +165,9 @@ str flow_protocol = str_init("IP");
 int omit_flow_ports = 0;
 int rs_default_bandwidth = 0;
 int rr_default_bandwidth = 0;
+
+ims_qos_params_t _imsqos_params = {
+		.recv_mode = 0, .dlg_direction = DLG_MOBILE_REGISTER};
 
 /* commands wrappers and fixups */
 static int w_rx_aar(struct sip_msg *msg, char *route, char *dir, char *id,
@@ -249,7 +254,11 @@ static param_export_t params[] = {{"rx_dest_realm", PARAM_STR, &rx_dest_realm},
 				&delete_contact_on_rx_failure},
 		{"regex_sdp_ip_prefix_to_maintain_in_fd", PARAM_STR,
 				&regex_sdp_ip_prefix_to_maintain_in_fd},
-		{"include_rtcp_fd", INT_PARAM, &include_rtcp_fd}, {0, 0, 0}};
+		{"include_rtcp_fd", INT_PARAM, &include_rtcp_fd},
+		{"suspend_transaction", INT_PARAM, &_ims_qos_suspend_transaction},
+		{"recv_mode", PARAM_INT, &_imsqos_params.recv_mode},
+		{"dialog_direction", PARAM_INT, &_imsqos_params.dlg_direction},
+		{0, 0, 0}};
 
 
 /** module exports */
@@ -270,6 +279,10 @@ static int mod_init(void)
 
 	callback_singleton = shm_malloc(sizeof(int));
 	*callback_singleton = 0;
+
+	if(_imsqos_params.dlg_direction != DLG_MOBILE_ORIGINATING) {
+		_imsqos_params.dlg_direction = DLG_MOBILE_REGISTER;
+	}
 
 	/*register space for event processor*/
 	register_procs(1);
@@ -824,7 +837,7 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char *dir, char *c_id,
 	}
 
 	if(t->uas.status >= 200) {
-		LM_DBG("transaction sent out a final response already - %d\n",
+		LM_WARN("transaction sent out a final response already - %d\n",
 				t->uas.status);
 		return result;
 	}
@@ -887,13 +900,13 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char *dir, char *c_id,
 							|| memcmp(t->method.s, "UPDATE", 6) == 0))) {
 		if(cscf_get_content_length(msg) == 0
 				|| cscf_get_content_length(orig_sip_request_msg) == 0) {
-			LM_DBG("No SDP offer answer -> therefore we can not do Rx AAR");
+			LM_WARN("No SDP offer answer -> therefore we can not do Rx AAR");
 			//goto aarna; //AAR na if we don't have offer/answer pair
 			return result;
 		}
 	} else {
-		LM_DBG("Message is not response to INVITE, PRACK or UPDATE -> "
-			   "therefore we do not Rx AAR");
+		LM_WARN("Message is not response to INVITE, PRACK or UPDATE -> "
+				"therefore we do not Rx AAR");
 		return result;
 	}
 
@@ -1185,7 +1198,7 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char *dir, char *c_id,
 		int ret = create_new_callsessiondata(&callid, &ftag, &ttag, &identifier,
 				identifier_type, &ip, ip_version, &rx_authdata_p);
 		if(!ret) {
-			LM_DBG("Unable to create new media session data parcel\n");
+			LM_ERR("Unable to create new media session data parcel\n");
 			goto error;
 		}
 
@@ -1234,12 +1247,17 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char *dir, char *c_id,
 	}
 	saved_t_data->dlg = dlg;
 
-	LM_DBG("Suspending SIP TM transaction\n");
-	if(tmb.t_suspend(msg, &saved_t_data->tindex, &saved_t_data->tlabel) != 0) {
-		LM_ERR("failed to suspend the TM processing\n");
-		if(auth_session)
-			cdpb.AAASessionsUnlock(auth_session->hash);
-		goto error;
+	if(_ims_qos_suspend_transaction) {
+		LM_DBG("Suspending SIP TM transaction\n");
+		if(tmb.t_suspend(msg, &saved_t_data->tindex, &saved_t_data->tlabel)
+				!= 0) {
+			LM_ERR("failed to suspend the TM processing\n");
+			if(auth_session)
+				cdpb.AAASessionsUnlock(auth_session->hash);
+			goto error;
+		}
+	} else {
+		LM_DBG("Don't suspend SIP TM transaction\n");
 	}
 
 	LM_DBG("Sending Rx AAR");
@@ -1248,7 +1266,9 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char *dir, char *c_id,
 
 	if(!ret) {
 		LM_ERR("Failed to send AAR\n");
-		tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
+		if(_ims_qos_suspend_transaction) {
+			tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
+		}
 		goto error;
 
 
@@ -1431,11 +1451,16 @@ static int w_rx_aar_register(
 		return CSCF_RETURN_ERROR;
 	}
 
-	LM_DBG("Suspending SIP TM transaction\n");
-	if(tmb.t_suspend(msg, &saved_t_data->tindex, &saved_t_data->tlabel) != 0) {
-		LM_ERR("failed to suspend the TM processing\n");
-		free_saved_transaction_global_data(saved_t_data);
-		return CSCF_RETURN_ERROR;
+	if(_ims_qos_suspend_transaction) {
+		LM_DBG("Suspending SIP TM transaction\n");
+		if(tmb.t_suspend(msg, &saved_t_data->tindex, &saved_t_data->tlabel)
+				!= 0) {
+			LM_ERR("failed to suspend the TM processing\n");
+			free_saved_transaction_global_data(saved_t_data);
+			return CSCF_RETURN_ERROR;
+		}
+	} else {
+		LM_DBG("Don't suspend SIP TM transaction\n");
 	}
 
 	LM_DBG("Successfully suspended transaction\n");
@@ -1447,18 +1472,29 @@ static int w_rx_aar_register(
 		goto error;
 	}
 
-	//we use the received IP address for the framed_ip_address
-	recv_ip.s = ip_addr2a(&msg->rcv.src_ip);
-	recv_ip.len = strlen(ip_addr2a(&msg->rcv.src_ip));
+	char buff[IP_ADDR_MAX_STR_SIZE];
+	if(_imsqos_params.recv_mode == 0) {
+		//we use the received IP address for the framed_ip_address
+		recv_ip.s = ip_addr2a(&msg->rcv.src_ip);
+		recv_ip.len = strlen(ip_addr2a(&msg->rcv.src_ip));
 
+		recv_port = msg->rcv.src_port;
+		recv_proto = msg->rcv.proto;
+	} else {
+		memset(&recv_ip, 0, sizeof(str));
+		memcpy(&buff, vb->host.s, vb->host.len);
+		buff[vb->host.len] = 0;
+		recv_ip.s = buff;
+		recv_ip.len = strlen(buff);
+
+		recv_port = via_port;
+		recv_proto = via_proto;
+	}
 	ip_version = check_ip_version(recv_ip);
 	if(!ip_version) {
 		LM_ERR("check_ip_version returned 0 \n");
 		goto error;
 	}
-
-	recv_port = msg->rcv.src_port;
-	recv_proto = msg->rcv.proto;
 
 	LM_DBG("Message received IP address is: [%.*s]\n", recv_ip.len, recv_ip.s);
 	LM_DBG("Message via is [%d://%.*s:%d]\n", vb->proto, vb->host.len,
@@ -1662,7 +1698,9 @@ static int w_rx_aar_register(
 		return CSCF_RETURN_BREAK; //on success we break - because rest of cfg file will be executed by async process
 	} else {
 		create_return_code(CSCF_RETURN_TRUE);
-		tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
+		if(_ims_qos_suspend_transaction) {
+			tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
+		}
 		if(saved_t_data) {
 			free_saved_transaction_global_data(
 					saved_t_data); //no aar sent so we must free the global data
@@ -1673,7 +1711,9 @@ static int w_rx_aar_register(
 error:
 	LM_ERR("Error trying to send AAR\n");
 	if(!aar_sent) {
-		tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
+		if(_ims_qos_suspend_transaction) {
+			tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
+		}
 		if(saved_t_data) {
 
 			free_saved_transaction_global_data(

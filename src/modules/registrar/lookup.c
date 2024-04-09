@@ -321,17 +321,17 @@ int lookup_helper(struct sip_msg *_m, udomain_t *_d, str *_uri, int _mode)
 
 	if(puri.gr.s == NULL || puri.gr_val.len > 0) {
 		/* aor or pub-gruu lookup */
-		ul.lock_udomain(_d, &aor);
-		res = ul.get_urecord(_d, &aor, &r);
+		_reg_ul.lock_udomain(_d, &aor);
+		res = _reg_ul.get_urecord(_d, &aor, &r);
 		if(res > 0) {
 			LM_DBG("'%.*s' Not found in usrloc\n", aor.len, ZSW(aor.s));
-			ul.unlock_udomain(_d, &aor);
+			_reg_ul.unlock_udomain(_d, &aor);
 			return -1;
 		}
 
 		ptr = r->contacts;
 		ret = -1;
-		/* look first for an un-expired and suported contact */
+		/* look first for an un-expired and supported contact */
 		while(ptr) {
 			if(VALID_CONTACT(ptr, act_time)
 					|| cfg_get(
@@ -370,14 +370,14 @@ int lookup_helper(struct sip_msg *_m, udomain_t *_d, str *_uri, int _mode)
 		}
 	} else {
 		/* temp-gruu lookup */
-		res = ul.get_urecord_by_ruid(_d, ahash, &inst, &r, &ptr);
+		res = _reg_ul.get_urecord_by_ruid(_d, ahash, &inst, &r, &ptr);
 		if(res < 0) {
 			LM_DBG("temp gruu '%.*s' not found in usrloc\n", aor.len,
 					ZSW(aor.s));
 			return -1;
 		}
 		aor = *ptr->aor;
-		/* test if not expired and contact with suported method */
+		/* test if not expired and contact with supported method */
 		if(ptr) {
 			if(!(VALID_CONTACT(ptr, act_time)
 					   || cfg_get(registrar, registrar_cfg,
@@ -594,8 +594,8 @@ int lookup_helper(struct sip_msg *_m, udomain_t *_d, str *_uri, int _mode)
 	}
 
 done:
-	ul.release_urecord(r);
-	ul.unlock_udomain(_d, &aor);
+	_reg_ul.release_urecord(r);
+	_reg_ul.unlock_udomain(_d, &aor);
 	return ret;
 }
 
@@ -842,11 +842,11 @@ int registered4(struct sip_msg *_m, udomain_t *_d, str *_uri, int match_flag,
 		return -1;
 	}
 
-	ul.lock_udomain(_d, &aor);
-	res = ul.get_urecord(_d, &aor, &r);
+	_reg_ul.lock_udomain(_d, &aor);
+	res = _reg_ul.get_urecord(_d, &aor, &r);
 
 	if(res < 0) {
-		ul.unlock_udomain(_d, &aor);
+		_reg_ul.unlock_udomain(_d, &aor);
 		LM_ERR("failed to query usrloc\n");
 		return -1;
 	}
@@ -935,15 +935,15 @@ int registered4(struct sip_msg *_m, udomain_t *_d, str *_uri, int match_flag,
 				}
 			}
 
-			ul.release_urecord(r);
-			ul.unlock_udomain(_d, &aor);
+			_reg_ul.release_urecord(r);
+			_reg_ul.unlock_udomain(_d, &aor);
 			LM_DBG("'%.*s' found in usrloc\n", aor.len, ZSW(aor.s));
 
 			return 1;
 		}
 	}
 
-	ul.unlock_udomain(_d, &aor);
+	_reg_ul.unlock_udomain(_d, &aor);
 	LM_DBG("'%.*s' not found in usrloc\n", aor.len, ZSW(aor.s));
 	return -1;
 }

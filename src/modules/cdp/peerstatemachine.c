@@ -132,8 +132,10 @@ int sm_process(
 		case Wait_Conn_Ack:
 			switch(event) {
 				case I_Rcv_Conn_Ack:
-					I_Snd_CER(p);
 					p->state = Wait_I_CEA;
+					I_Snd_CER(p);
+					if (p->state == Closed)
+						sm_process(p, Start, 0, 1, 0);
 					break;
 				case I_Rcv_Conn_NAck:
 					Cleanup(p, p->I_sock);
@@ -157,6 +159,9 @@ int sm_process(
 				case Timeout:
 					Error(p, p->I_sock);
 					p->state = Closed;
+					LM_ERR("in state %s timeout event %s\n",
+							dp_states[p->state], dp_events[event - 101]);
+					goto error;
 				default:
 					LM_ERR("sm_process(): In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
@@ -344,6 +349,9 @@ int sm_process(
 					if(p->R_sock >= 0)
 						Error(p, p->R_sock);
 					p->state = Closed;
+					LM_ERR("in state %s timeout event %s\n",
+							dp_states[p->state], dp_events[event - 101]);
+					goto error;
 				default:
 					LM_ERR("sm_process(): In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
@@ -650,6 +658,7 @@ void I_Snd_CER(peer *p)
 	} addr_u;
 	socklen_t addrlen;
 	char x[18];
+	int ret = 0;
 
 	cer = AAANewMessage(Code_CE, 0, 0, 0);
 	if(!cer)
@@ -657,10 +666,16 @@ void I_Snd_CER(peer *p)
 	cer->hopbyhopId = next_hopbyhop();
 	cer->endtoendId = next_endtoend();
 	addrlen = sizeof(addr_u);
-	if(getsockname(p->I_sock, &(addr_u.addr), &addrlen) == -1) {
+	if((ret = getsockname(p->I_sock, &(addr_u.addr), &addrlen)) == -1) {
 		LM_ERR("I_Snd_CER(): Error on finding local host address > %s\n",
 				strerror(errno));
-	} else {
+		Cleanup(p,p->I_sock);
+		p->state = Closed;
+		AAAFreeMessage(&cer);
+		return;
+	}
+
+	if (ret != -1) {
 		switch(addr_u.addr.sa_family) {
 			case AF_INET:
 				set_2bytes(x, 1);
@@ -929,10 +944,10 @@ void Snd_DWR(peer *p)
 		return;
 	dwr->hopbyhopId = next_hopbyhop();
 	dwr->endtoendId = next_endtoend();
-	if(p->state == I_Open)
-		peer_send_msg(p, dwr);
-	else
-		peer_send_msg(p, dwr);
+	if(p->state == I_Open) {
+		LM_DBG("sending in state I_Open\n");
+	}
+	peer_send_msg(p, dwr);
 }
 
 /**
@@ -981,10 +996,10 @@ void Snd_DPR(peer *p)
 	AAACreateAndAddAVPToMessage(
 			dpr, AVP_Disconnect_Cause, AAA_AVP_FLAG_MANDATORY, 0, x, 4);
 
-	if(p->state == I_Open)
-		peer_send_msg(p, dpr);
-	else
-		peer_send_msg(p, dpr);
+	if(p->state == I_Open) {
+		LM_DBG("sending in state I_Open\n");
+	}
+	peer_send_msg(p, dpr);
 }
 
 /**
@@ -1332,6 +1347,11 @@ void Rcv_Process(peer *p, AAAMessage *msg)
 {
 	AAASession *session = 0;
 	int nput = 0;
+
+	if(!msg) {
+		return;
+	}
+
 	if(msg->sessionId)
 		session = cdp_get_session(msg->sessionId->data);
 
@@ -1339,11 +1359,9 @@ void Rcv_Process(peer *p, AAAMessage *msg)
 		switch(session->type) {
 			case ACCT_CC_CLIENT:
 				if(is_req(msg)) {
-					LM_WARN("unhandled receive request on Credit Control Acct "
-							"session\n");
-					AAASessionsUnlock(
-							session->hash); //must be called because we don't call state machine here
-					session = 0; //we don't call SM here so we must not set to 0
+					cc_acc_client_stateful_sm_process(
+							session, ACC_CC_EV_SESSION_MODIFIED, msg);
+					session = 0;
 				} else {
 					cc_acc_client_stateful_sm_process(
 							session, ACC_CC_EV_RECV_ANS, msg);
@@ -1402,8 +1420,7 @@ void Rcv_Process(peer *p, AAAMessage *msg)
 	}
 	if(!nput && !put_task(p, msg)) {
 		LM_ERR("Rcv_Process(): Queue refused task\n");
-		if(msg)
-			AAAFreeMessage(&msg);
+		AAAFreeMessage(&msg);
 	}
 	//if (msg) LM_ERR("Rcv_Process(): task added to queue command %d, flags %#1x endtoend %u hopbyhop %u\n",msg->commandCode,msg->flags,msg->endtoendId,msg->hopbyhopId);
 

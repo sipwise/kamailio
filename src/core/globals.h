@@ -56,38 +56,39 @@ extern int uid;
 extern int gid;
 extern char *pid_file;
 extern char *pgid_file;
-extern int
-		own_pgid; /* whether or not we have our own pgid (and it's ok to use kill(0, sig) */
+/* whether or not we have our own pgid (and it's ok to use kill(0, sig) */
+extern int own_pgid;
 
 extern int server_id; /* A unique ID of the SIP server */
 
 extern struct socket_info *bind_address; /* pointer to the crt. proc.
 											listening address */
-extern struct socket_info *sendipv4;	 /* ipv4 socket to use when msg.
-										comes from ipv6*/
+extern struct socket_info *sendipv4;	 /* ipv4 socket to use when msg
+											comes from ipv6 */
 extern struct socket_info *sendipv6;	 /* same as above for ipv6 */
 #ifdef USE_RAW_SOCKS
 extern int raw_udp4_send_sock;
 #endif /* USE_RAW_SOCKS */
 
 #ifdef USE_TCP
-extern struct socket_info *sendipv4_tcp; /* ipv4 socket to use when msg.
-										comes from ipv6*/
+extern struct socket_info *sendipv4_tcp; /* ipv4 socket to use when msg
+											comes from ipv6 */
 extern struct socket_info *sendipv6_tcp; /* same as above for ipv6 */
-extern int unix_tcp_sock; /* socket used for communication with tcp main*/
+extern int unix_tcp_sock; /* socket used for communication with tcp main */
 #endif
 #ifdef USE_TLS
-extern struct socket_info *sendipv4_tls; /* ipv4 socket to use when msg.
-										comes from ipv6*/
+extern struct socket_info *sendipv4_tls; /* ipv4 socket to use when msg
+											comes from ipv6 */
 extern struct socket_info *sendipv6_tls; /* same as above for ipv6 */
 #endif
 #ifdef USE_SCTP
-extern struct socket_info *sendipv4_sctp; /* ipv4 socket to use when msg.
-										comes from ipv6*/
+extern struct socket_info *sendipv4_sctp; /* ipv4 socket to use when msg
+											 comes from ipv6 */
 extern struct socket_info *sendipv6_sctp; /* same as above for ipv6 */
 #endif
 
 extern unsigned int maxbuffer;
+extern unsigned int maxsndbuffer;
 extern unsigned int sql_buffer_size;
 extern int children_no;
 extern int socket_workers;
@@ -108,6 +109,7 @@ extern int ksr_tcp_script_mode;
 #ifdef USE_TLS
 extern int tls_disable;
 extern unsigned short tls_port_no;
+extern int ksr_tls_threads_mode;
 #endif
 #ifdef USE_SCTP
 extern int sctp_disable;
@@ -164,6 +166,8 @@ extern int reply_to_via;
 extern int _ksr_is_main;
 extern int fixup_complete;
 
+extern int ksr_mem_add_size;
+
 /* debugging level for dumping memory status */
 extern int memlog;
 /* debugging level for malloc debugging messages */
@@ -218,6 +222,7 @@ extern int ksr_all_errors;
 extern int ksr_route_locks_size;
 extern str _ksr_xavp_via_params;
 extern str _ksr_xavp_via_fields;
+extern str _ksr_xavp_via_reply_params;
 extern int ksr_sip_parser_mode;
 extern int ksr_cfg_print_mode;
 extern int ksr_return_mode;

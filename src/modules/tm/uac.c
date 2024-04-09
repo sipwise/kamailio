@@ -326,7 +326,7 @@ static inline int t_run_local_req(char **buf, int *buf_len, uac_req_t *uac_r,
 					& (FL_ADD_LOCAL_RPORT | FL_ADD_SRVID
 							| FL_ADD_XAVP_VIA_PARAMS
 							| FL_USE_XAVP_VIA_FIELDS))) {
-		LM_DBG("local Via update - new socket: [%.*s] - msg-flags: %u",
+		LM_DBG("local Via update - new socket: [%.*s] - msg-flags: %llu",
 				(lreq.force_send_socket)
 						? lreq.force_send_socket->address_str.len
 						: 4,
@@ -829,8 +829,8 @@ struct retr_buf *local_ack_rb(sip_msg_t *rpl_2xx, struct cell *trans,
 	}
 	/* 'buffer' now points into a contiguous chunk of memory with enough
 	 * room to hold both the retr. buffer and the string raw buffer: it
-	 * points to the begining of the string buffer; we iterate back to get
-	 * the begining of the space for the retr. buffer. */
+	 * points to the beginning of the string buffer; we iterate back to get
+	 * the beginning of the space for the retr. buffer. */
 	lack = &((struct retr_buf *)buffer)[-1];
 	lack->buffer = buffer;
 	lack->buffer_len = buf_len;
@@ -936,8 +936,7 @@ int ack_local_uac(struct cell *trans, str *hdrs, str *body)
 
 	ret = 0;
 fin:
-	/* TODO: ugly! */
-	/* FIXME: the T had been obtain by t_lookup_ident()'ing for it, so, it is
+	/* note: the T had been obtain by t_lookup_ident()'ing for it, so, it is
 	 * ref-counted. The t_unref() can not be used, as it requests a valid SIP
 	 * message (all available might be the reply, but if AS goes wrong and
 	 * tries to ACK before the final reply is received, we still have to

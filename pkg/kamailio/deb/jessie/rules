@@ -19,6 +19,7 @@ endif
 
 export JAVA_HOME=/usr/lib/jvm/java-gcj
 export FREERADIUS=1
+export WOLFSSL_INTERNAL=no
 # tlsa
 export KTLS_INCLUDE_TLSA=yes
 export LIBSSL_STATIC_SRCLIB=yes
@@ -41,6 +42,7 @@ EXTRA_EXCLUDED_MODULES += mongodb
 EXTRA_EXCLUDED_MODULES += secsipid
 EXTRA_EXCLUDED_MODULES += lwsc
 EXTRA_EXCLUDED_MODULES += nats
+EXTRA_EXCLUDED_MODULES += tls_wolfssl
 ## --EXCLUDED--
 
 
@@ -86,6 +88,7 @@ PACKAGE_GROUPS += systemd
 PACKAGE_GROUPS += rabbitmq
 PACKAGE_GROUPS += python3
 PACKAGE_GROUPS += mqtt
+PACKAGE_GROUPS += microhttpd
 
 # Module groups to be packaged onto kamailio-extra-modules.
 EXTRA_GROUPS += ev
@@ -93,6 +96,10 @@ EXTRA_GROUPS += gzcompress
 EXTRA_GROUPS += jansson
 EXTRA_GROUPS += uuid
 EXTRA_GROUPS += http_async
+
+.PHONY: skip-modules
+skip-modules:
+	@echo "$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)"
 
 D = $(CURDIR)/debian/$(DEB_SOURCE)
 

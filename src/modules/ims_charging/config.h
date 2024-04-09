@@ -8,6 +8,9 @@ typedef struct
 	str destination_host;
 	str destination_realm;
 	str *service_context_id;
+	int strip_plus_from_e164;
+	int use_pani_from_term_invite;
+	int node_func;
 } client_ro_cfg;
 
 #endif

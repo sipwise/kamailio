@@ -43,6 +43,7 @@
 #include "../../core/hashes.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
+#include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
 
 #include "../../modules/tm/tm_load.h"
@@ -89,6 +90,8 @@ static int mod_init(void);
 static int child_init(int);
 
 static int w_imc_manager(struct sip_msg *, char *, char *);
+static int w_imc_room_active(sip_msg_t *, char *, char *);
+static int w_imc_room_member(sip_msg_t *, char *, char *);
 
 static int imc_rpc_init(void);
 
@@ -100,45 +103,57 @@ struct tm_binds tmb;
 /** TM callback function */
 void inv_callback(struct cell *t, int type, struct tmcb_params *ps);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"imc_manager", (cmd_function)w_imc_manager, 0, 0, 0, REQUEST_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"imc_manager", (cmd_function)w_imc_manager, 0, 0, 0, REQUEST_ROUTE},
+	{"imc_room_active", (cmd_function)w_imc_room_active, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"imc_room_member", (cmd_function)w_imc_room_member, 2,
+		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
-
-static param_export_t params[] = {{"db_url", PARAM_STR, &db_url},
-		{"db_mode", INT_PARAM, &db_mode},
-		{"hash_size", INT_PARAM, &imc_hash_size},
-		{"imc_cmd_start_char", PARAM_STR, &imc_cmd_start_str},
-		{"rooms_table", PARAM_STR, &rooms_table},
-		{"members_table", PARAM_STR, &members_table},
-		{"outbound_proxy", PARAM_STR, &outbound_proxy},
-		{"extra_hdrs", PARAM_STR, &extra_hdrs},
-		{"create_on_join", INT_PARAM, &imc_create_on_join},
-		{"check_on_create", INT_PARAM, &imc_check_on_create}, {0, 0, 0}};
+static param_export_t params[] = {
+	{"db_url", PARAM_STR, &db_url},
+	{"db_mode", INT_PARAM, &db_mode},
+	{"hash_size", INT_PARAM, &imc_hash_size},
+	{"imc_cmd_start_char", PARAM_STR, &imc_cmd_start_str},
+	{"rooms_table", PARAM_STR, &rooms_table},
+	{"members_table", PARAM_STR, &members_table},
+	{"outbound_proxy", PARAM_STR, &outbound_proxy},
+	{"extra_hdrs", PARAM_STR, &extra_hdrs},
+	{"create_on_join", INT_PARAM, &imc_create_on_join},
+	{"check_on_create", INT_PARAM, &imc_check_on_create},
+	{0, 0, 0}
+};
 
 #ifdef STATISTICS
 #include "../../core/counters.h"
 
 stat_var *imc_active_rooms;
 
-stat_export_t imc_stats[] = {{"active_rooms", 0, &imc_active_rooms}, {0, 0, 0}};
+stat_export_t imc_stats[] = {
+	{"active_rooms", 0, &imc_active_rooms},
+	{0, 0, 0}
+};
 
 #endif
 
 
 /** module exports */
 struct module_exports exports = {
-		"imc",			 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported commands */
-		params,			 /* exported parameters */
-		0,				 /* exported rpc functions */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* child init function */
-		destroy			 /* module destroy function */
+	"imc",			 /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			 /* exported commands */
+	params,			 /* exported parameters */
+	0,				 /* exported rpc functions */
+	0,				 /* exported pseudo-variables */
+	0,				 /* response handling function */
+	mod_init,		 /* module init function */
+	child_init,		 /* child init function */
+	destroy			 /* module destroy function */
 };
+/* clang-format on */
 
 static int mod_init(void)
 {
@@ -422,9 +437,100 @@ error:
 	return ret;
 }
 
+/**
+ *
+ */
 static int w_imc_manager(struct sip_msg *msg, char *str1, char *str2)
 {
 	return ki_imc_manager(msg);
+}
+
+/**
+ *
+ */
+static int ki_imc_room_active(sip_msg_t *msg, str *room)
+{
+	sip_uri_t puri;
+	imc_room_t *rm;
+
+	if(parse_uri(room->s, room->len, &puri) != 0) {
+		LM_ERR("failed to parse room uri [%.*s]\n", room->len, room->s);
+		return -1;
+	}
+
+	rm = imc_get_room(&puri.user, &puri.host);
+
+	if(rm != NULL) {
+		imc_release_room(rm);
+		return 1;
+	}
+	return -1;
+}
+
+/**
+ *
+ */
+static int w_imc_room_active(sip_msg_t *msg, char *proom, char *str2)
+{
+	str room = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t *)proom, &room) != 0) {
+		LM_ERR("invalid room parameter");
+		return -1;
+	}
+
+	return ki_imc_room_active(msg, &room);
+}
+
+/**
+ *
+ */
+static int ki_imc_room_member(sip_msg_t *msg, str *room, str *member)
+{
+	sip_uri_t puri;
+	imc_room_t *rm;
+	imc_member_t *mb;
+
+	if(parse_uri(room->s, room->len, &puri) != 0) {
+		LM_ERR("failed to parse room uri [%.*s]\n", room->len, room->s);
+		return -1;
+	}
+
+	rm = imc_get_room(&puri.user, &puri.host);
+
+	if(rm == NULL) {
+		return -1;
+	}
+
+	if(parse_uri(member->s, member->len, &puri) != 0) {
+		imc_release_room(rm);
+		LM_ERR("failed to parse member uri [%.*s]\n", member->len, member->s);
+		return -1;
+	}
+	mb = imc_get_member(rm, &puri.user, &puri.host);
+	imc_release_room(rm);
+
+	return (mb != NULL) ? 1 : -1;
+}
+
+/**
+ *
+ */
+static int w_imc_room_member(sip_msg_t *msg, char *proom, char *pmember)
+{
+	str room = STR_NULL;
+	str member = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t *)proom, &room) != 0) {
+		LM_ERR("invalid room parameter");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)pmember, &member) != 0) {
+		LM_ERR("invalid member parameter");
+		return -1;
+	}
+
+	return ki_imc_room_member(msg, &room, &member);
 }
 
 /**
@@ -601,10 +707,13 @@ static const char *imc_rpc_list_rooms_doc[2] = {"List imc rooms.", 0};
 static const char *imc_rpc_list_members_doc[2] = {
 		"List members in an imc room.", 0};
 
-rpc_export_t imc_rpc[] = {{"imc.list_rooms", imc_rpc_list_rooms,
-								  imc_rpc_list_rooms_doc, RET_ARRAY},
-		{"imc.list_members", imc_rpc_list_members, imc_rpc_list_members_doc, 0},
-		{0, 0, 0, 0}};
+/* clang-format off */
+rpc_export_t imc_rpc[] = {
+	{"imc.list_rooms", imc_rpc_list_rooms, imc_rpc_list_rooms_doc, RET_ARRAY},
+	{"imc.list_members", imc_rpc_list_members, imc_rpc_list_members_doc, 0},
+	{0, 0, 0, 0}
+};
+/* clang-format on */
 
 static int imc_rpc_init(void)
 {
@@ -623,6 +732,16 @@ static sr_kemi_t sr_kemi_imc_exports[] = {
 	{ str_init("imc"), str_init("imc_manager"),
 		SR_KEMIP_INT, ki_imc_manager,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("imc"), str_init("imc_room_active"),
+		SR_KEMIP_INT, ki_imc_room_active,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("imc"), str_init("imc_room_member"),
+		SR_KEMIP_INT, ki_imc_room_member,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

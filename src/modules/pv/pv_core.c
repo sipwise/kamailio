@@ -1100,7 +1100,7 @@ int pv_get_diversion(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 	}
 
 	if(param->pvn.u.isname.name.n == 1) { /* uri */
-		return pv_get_strval(msg, param, res, &(get_diversion(msg)->uri));
+		return pv_get_strval(msg, param, res, &(get_diversion(msg)->id->uri));
 	}
 
 	if(param->pvn.u.isname.name.n == 2) { /* reason param */
@@ -2090,9 +2090,15 @@ int pv_get_hfl(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 	via_body_t *vb = NULL;
 	rr_t *rrb = NULL;
 	contact_t *cb = NULL;
+	diversion_body_t *db = NULL;
+	p_id_body_t *ppib = NULL;
+	p_id_body_t *paib = NULL;
 	hdr_field_t *hf = NULL;
 	hdr_field_t thdr = {0};
 	int n = 0;
+	int ppi_header_count = 0;
+	int pai_header_count = 0;
+	int innerIndex = 0;
 	str sval = STR_NULL;
 
 	if(msg == NULL || res == NULL || param == NULL)
@@ -2143,7 +2149,7 @@ int pv_get_hfl(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			return pv_get_null(msg, param, res);
 		}
 		if(idx < 0) {
-			n = 1;
+			n = 0;
 			/* count Via header bodies */
 			for(hf = msg->h_via1; hf != NULL; hf = hf->next) {
 				if(hf->type == HDR_VIA_T) {
@@ -2201,7 +2207,7 @@ int pv_get_hfl(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		}
 
 		if(idx < 0) {
-			n = 1;
+			n = 0;
 			/* count Record-Route/Route header bodies */
 			for(; hf != NULL; hf = hf->next) {
 				if(hf->type == tv.ri) {
@@ -2284,7 +2290,7 @@ int pv_get_hfl(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			return pv_get_null(msg, param, res);
 		}
 		if(idx < 0) {
-			n = 1;
+			n = 0;
 			/* count Contact header bodies */
 			for(hf = msg->contact; hf != NULL; hf = hf->next) {
 				if(hf->type == HDR_CONTACT_T) {
@@ -2335,6 +2341,162 @@ int pv_get_hfl(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		return pv_get_null(msg, param, res);
 	}
 
+	if((tv.flags == 0) && (tv.ri == HDR_DIVERSION_T)) {
+		if(msg->diversion == NULL) {
+			LM_WARN("no Diversion header\n");
+			return pv_get_null(msg, param, res);
+		}
+
+		if(parse_diversion_header(msg) < 0) {
+			LM_WARN("failed to parse Diversion headers\n");
+			return pv_get_null(msg, param, res);
+		}
+
+		db = (diversion_body_t *)msg->diversion->parsed;
+		n = 0;
+
+		while(db != NULL) {
+			n += db->num_ids;
+			db = db->next;
+		}
+
+		if(idx < 0) {
+			idx = -idx;
+			if(idx > n) {
+				LM_WARN("index out of range\n");
+				return pv_get_null(msg, param, res);
+			}
+			idx = n - idx;
+		}
+
+		n = 0;
+		db = (diversion_body_t *)msg->diversion->parsed;
+		/* loop through all parsed Diversion headers lists */
+		while(db != NULL) {
+			if(n + db->num_ids > idx) {
+				/* Calculate the index within this specific list */
+				innerIndex = idx - n;
+
+				/* Access the desired element within this list */
+				sval.s = db->id[innerIndex].body.s;
+				sval.len = db->id[innerIndex].body.len;
+				trim(&sval);
+				res->rs = sval;
+				return 0;
+			}
+
+			/* Move to the next Diversion header list */
+			n += db->num_ids;
+			db = db->next;
+		}
+		LM_DBG("unexpected diversion index out of range\n");
+		return pv_get_null(msg, param, res);
+	}
+
+	if((tv.flags == 0) && (tv.ri == HDR_PPI_T)) {
+		if(msg->ppi == NULL) {
+			LM_DBG("no PPI header\n");
+			return pv_get_null(msg, param, res);
+		}
+
+		if(parse_ppi_header(msg) < 0) {
+			LM_DBG("failed to parse PPI headers\n");
+			return pv_get_null(msg, param, res);
+		}
+
+		ppib = (p_id_body_t *)msg->ppi->parsed;
+		ppi_header_count = 0;
+
+		while(ppib != NULL) {
+			ppi_header_count += ppib->num_ids;
+			ppib = ppib->next;
+		}
+
+		if(idx < 0) {
+			idx = -idx;
+			if(idx > ppi_header_count) {
+				LM_DBG("index out of range\n");
+				return pv_get_null(msg, param, res);
+			}
+			idx = ppi_header_count - idx;
+		}
+
+		n = 0;
+		ppib = (p_id_body_t *)msg->ppi->parsed;
+		/* loop through all parsed ppi headers lists */
+		while(ppib != NULL) {
+			if(n + ppib->num_ids > idx) {
+				/* Calculate the index within this specific list */
+				innerIndex = idx - n;
+
+				/* Access the desired element within this list */
+				sval.s = ppib->id[innerIndex].body.s;
+				sval.len = ppib->id[innerIndex].body.len;
+				trim(&sval);
+				res->rs = sval;
+				return 0;
+			}
+
+			/* Move to the next ppi header list */
+			n += ppib->num_ids;
+			ppib = ppib->next;
+		}
+		LM_DBG("unexpected PPI index out of range\n");
+		return pv_get_null(msg, param, res);
+	}
+
+	if((tv.flags == 0) && (tv.ri == HDR_PAI_T)) {
+		if(msg->pai == NULL) {
+			LM_DBG("no PAI header\n");
+			return pv_get_null(msg, param, res);
+		}
+
+		if(parse_pai_header(msg) < 0) {
+			LM_DBG("failed to parse PAI headers\n");
+			return pv_get_null(msg, param, res);
+		}
+
+		paib = (p_id_body_t *)msg->pai->parsed;
+		pai_header_count = 0;
+
+		while(paib != NULL) {
+			pai_header_count += paib->num_ids;
+			paib = paib->next;
+		}
+
+		if(idx < 0) {
+			idx = -idx;
+			if(idx > pai_header_count) {
+				LM_DBG("index out of range\n");
+				return pv_get_null(msg, param, res);
+			}
+			idx = pai_header_count - idx;
+		}
+
+		n = 0;
+		paib = (p_id_body_t *)msg->pai->parsed;
+		/* loop through all parsed PAI headers lists */
+		while(paib != NULL) {
+			if(n + paib->num_ids > idx) {
+				/* Calculate the index within this specific list */
+				innerIndex = idx - n;
+
+				/* Access the desired element within this list */
+				sval.s = paib->id[innerIndex].body.s;
+				sval.len = paib->id[innerIndex].body.len;
+				trim(&sval);
+				res->rs = sval;
+				return 0;
+			}
+
+			/* Move to the next PAI header list */
+			n += paib->num_ids;
+			paib = paib->next;
+		}
+		LM_DBG("unexpected PAI index out of range\n");
+		return pv_get_null(msg, param, res);
+	}
+
 	return pv_get_hdr_helper(msg, param, res, &tv, idx, idxf);
 }
 
@@ -2347,6 +2509,8 @@ int pv_get_hflc(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 	via_body_t *vb = NULL;
 	rr_t *rrb = NULL;
 	contact_t *cb = NULL;
+	p_id_body_t *ppib = NULL;
+	p_id_body_t *paib = NULL;
 	hdr_field_t *hf = NULL;
 	hdr_field_t thdr = {0};
 	int n = 0;
@@ -2452,6 +2616,64 @@ int pv_get_hflc(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		return pv_get_sintval(msg, param, res, n);
 	}
 
+	if((tv.flags == 0) && (tv.ri == HDR_DIVERSION_T)) {
+		if(msg->diversion == NULL) {
+			LM_DBG("no Diversion header\n");
+			return pv_get_sintval(msg, param, res, 0);
+		}
+		if(parse_diversion_header(msg) < 0) {
+			LM_DBG("failed to parse Diversion headers\n");
+			return pv_get_sintval(msg, param, res, 0);
+		}
+
+		diversion_body_t *db = (diversion_body_t *)msg->diversion->parsed;
+		int diversion_body_count = 0;
+		while(db != NULL) {
+			diversion_body_count += db->num_ids;
+			db = db->next;
+		}
+		return pv_get_sintval(msg, param, res, diversion_body_count);
+	}
+
+	if((tv.flags == 0) && (tv.ri == HDR_PPI_T)) {
+		if(msg->ppi == NULL) {
+			LM_DBG("no PPI header\n");
+			return pv_get_sintval(msg, param, res, 0);
+		}
+
+		if(parse_ppi_header(msg) < 0) {
+			LM_DBG("failed to parse PPI headers\n");
+			return pv_get_sintval(msg, param, res, 0);
+		}
+
+		ppib = (p_id_body_t *)msg->ppi->parsed;
+		n = 0;
+		while(ppib != NULL) {
+			n += ppib->num_ids;
+			ppib = ppib->next;
+		}
+		return pv_get_sintval(msg, param, res, n);
+	}
+
+	if((tv.flags == 0) && (tv.ri == HDR_PAI_T)) {
+		if(msg->pai == NULL) {
+			LM_DBG("no PAI header\n");
+			return pv_get_sintval(msg, param, res, 0);
+		}
+		if(parse_pai_header(msg) < 0) {
+			LM_DBG("failed to parse PAI headers\n");
+			return pv_get_sintval(msg, param, res, 0);
+		}
+
+		paib = (p_id_body_t *)msg->pai->parsed;
+		n = 0;
+		while(paib != NULL) {
+			n += paib->num_ids;
+			paib = paib->next;
+		}
+		return pv_get_sintval(msg, param, res, n);
+	}
+
 	for(hf = msg->headers; hf; hf = hf->next) {
 		if(tv.flags == 0) {
 			if(tv.ri == hf->type) {
@@ -2551,7 +2773,7 @@ int pv_get_cnt(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 			 * But this would be less intuitive in our case for counting.
 			 */
 			pv_xavp_name_t *xname, *xname_sub;
-			sr_xavp_t *ravp, *sub_avp;
+			sr_xavp_t *ravp = NULL, *sub_avp = NULL;
 			int root_idxf, root_idx_spec, root_idx;
 			int sub_idxf, sub_idx_spec, sub_idx;
 			int count;
@@ -4488,6 +4710,12 @@ int pv_parse_via_name(pv_spec_p sp, str *in)
 			else
 				goto error;
 			break;
+		case 2:
+			if(strncmp(in->s, "oc", 2) == 0)
+				sp->pvp.pvn.u.isname.name.n = 9;
+			else
+				goto error;
+			break;
 		case 4:
 			if(strncmp(in->s, "host", 4) == 0)
 				sp->pvp.pvn.u.isname.name.n = 0;
@@ -4501,18 +4729,32 @@ int pv_parse_via_name(pv_spec_p sp, str *in)
 				sp->pvp.pvn.u.isname.name.n = 2;
 			else if(strncmp(in->s, "rport", 5) == 0)
 				sp->pvp.pvn.u.isname.name.n = 5;
+			else if(strncmp(in->s, "ocseq", 5) == 0)
+				sp->pvp.pvn.u.isname.name.n = 12;
+			else if(strncmp(in->s, "ocval", 5) == 0)
+				sp->pvp.pvn.u.isname.name.n = 14;
 			else
 				goto error;
 			break;
 		case 6:
 			if(strncmp(in->s, "branch", 6) == 0)
 				sp->pvp.pvn.u.isname.name.n = 4;
+			else if(strncmp(in->s, "params", 6) == 0)
+				sp->pvp.pvn.u.isname.name.n = 8;
+			else if(strncmp(in->s, "ocalgo", 6) == 0)
+				sp->pvp.pvn.u.isname.name.n = 10;
+			else if(strncmp(in->s, "oc-seq", 6) == 0)
+				sp->pvp.pvn.u.isname.name.n = 12;
+			else if(strncmp(in->s, "oc-val", 6) == 0)
+				sp->pvp.pvn.u.isname.name.n = 14;
 			else
 				goto error;
 			break;
 		case 7:
 			if(strncmp(in->s, "protoid", 7) == 0)
 				sp->pvp.pvn.u.isname.name.n = 3;
+			else if(strncmp(in->s, "oc-algo", 7) == 0)
+				sp->pvp.pvn.u.isname.name.n = 10;
 			else
 				goto error;
 			break;
@@ -4522,7 +4764,18 @@ int pv_parse_via_name(pv_spec_p sp, str *in)
 			else
 				goto error;
 			break;
-
+		case 10:
+			if(strncmp(in->s, "ocvalidity", 10) == 0)
+				sp->pvp.pvn.u.isname.name.n = 11;
+			else
+				goto error;
+			break;
+		case 11:
+			if(strncmp(in->s, "oc-validity", 11) == 0)
+				sp->pvp.pvn.u.isname.name.n = 11;
+			else
+				goto error;
+			break;
 		default:
 			goto error;
 	}
@@ -4542,6 +4795,8 @@ error:
 int pv_get_via_attr(
 		sip_msg_t *msg, via_body_t *vb, pv_param_t *param, pv_value_t *res)
 {
+	via_oc_t ocv;
+
 	if(vb == NULL) {
 		LM_DBG("null via header\n");
 		return pv_get_null(msg, param, res);
@@ -4580,6 +4835,41 @@ int pv_get_via_attr(
 				return pv_get_strval(msg, param, res, &vb->i->value);
 			}
 			break;
+		case 8: /* params */
+			if(vb->params.s != NULL && vb->params.len > 0) {
+				return pv_get_strval(msg, param, res, &vb->params);
+			}
+			break;
+		case 9: /* oc */
+			if(parse_via_oc(msg, vb, &ocv) < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_sintval(msg, param, res, ocv.oc);
+		case 10: /* oc-algo */
+			if(parse_via_oc(msg, vb, &ocv) < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			if(ocv.algo.s != NULL && ocv.algo.len > 0) {
+				return pv_get_strval(msg, param, res, &ocv.algo);
+			}
+			return pv_get_null(msg, param, res);
+		case 11: /* oc-validity */
+			if(parse_via_oc(msg, vb, &ocv) < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_uintval(msg, param, res, ocv.validity);
+		case 12: /* oc-seq */
+			if(parse_via_oc(msg, vb, &ocv) < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_uintval(msg, param, res, (unsigned long)ocv.seq);
+		case 14: /* oc-val */
+			if(parse_via_oc(msg, vb, &ocv) < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			if(ocv.ocval.s != NULL && ocv.ocval.len > 0) {
+				return pv_get_strval(msg, param, res, &ocv.ocval);
+			}
 
 		default:
 			return pv_get_null(msg, param, res);

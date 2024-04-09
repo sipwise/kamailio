@@ -246,9 +246,9 @@ end:
 		port = str2s(port_str, strlen(port_str), &err);
 		if(err) {
 			/* try getservbyname */
-			se = getservbyname(port_str, (proto == TCP_SOCK)   ? "tcp"
-										 : (proto == UDP_SOCK) ? "udp"
-															   : 0);
+			se = getservbyname(port_str,
+					(proto == TCP_SOCK) ? "tcp"
+										: (proto == UDP_SOCK) ? "udp" : 0);
 			if(se)
 				port = ntohs(se->s_port);
 			else

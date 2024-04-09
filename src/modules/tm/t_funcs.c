@@ -40,7 +40,7 @@
 #include "t_stats.h"
 
 /* if defined t_relay* error reply generation will be delayed till script
- * end (this allows the script writter to send its own error reply) */
+ * end (this allows the script writer to send its own error reply) */
 #define TM_DELAYED_REPLY
 
 #ifdef USE_DNS_FAILOVER
@@ -177,6 +177,11 @@ int kill_transaction(struct cell *trans, int error)
 	int reply_ret;
 	int ret;
 
+	if((trans->uas.request != NULL)
+			&& (trans->uas.request->msg_flags & FL_FINAL_REPLY)) {
+		return t_release_transaction(trans);
+	}
+
 	/*  we reply statefully and enter WAIT state since error might
 		have occurred in middle of forking and we do not
 		want to put the forking burden on upstream client;
@@ -204,6 +209,11 @@ int kill_transaction_unsafe(struct cell *trans, int error)
 	int sip_err;
 	int reply_ret;
 	int ret;
+
+	if((trans->uas.request != NULL)
+			&& (trans->uas.request->msg_flags & FL_FINAL_REPLY)) {
+		return t_release_transaction(trans);
+	}
 
 	/*  we reply statefully and enter WAIT state since error might
 		have occurred in middle of forking and we do not
@@ -272,7 +282,7 @@ int t_relay_to(
 		/* transaction previously found (E_SCRIPT) and msg==ACK
 			    => ack to neg. reply  or ack to local trans.
 			    => process it and exit */
-		/* FIXME: there's no way to distinguish here between acks to
+		/* - there's no way to distinguish here between acks to
 			   local trans. and neg. acks */
 		/* in normal operation we should never reach this point, if we
 			   do WARN(), it might hide some real bug (apart from possibly

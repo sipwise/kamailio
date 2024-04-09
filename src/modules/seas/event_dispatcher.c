@@ -312,9 +312,7 @@ int dispatcher_main_loop(void)
 						poll_fds[3 + as_nr].revents = 0;
 						as_nr++; /*not very sure if this is thread-safe*/
 						unc_as_nr--;
-					} else if(
-							fd
-							<= 0) { /* pull the upper set of incomplete AS down and take this one out*/
+					} else { /* pull the upper set of incomplete AS down and take this one out*/
 						poll_tmp->revents = 0;
 						for(k = i; k < (unc_as_nr - 1); k++) {
 							j = 3 + as_nr + k;
@@ -353,7 +351,7 @@ int dispatcher_main_loop(void)
  * address:
  * 	address to which to listen
  * port:
- * 	base port to which to listen. then port+1 will be the socket
+ * 	base port to which to listen. Then port+1 will be the socket
  * 	for action's delivery.
  * fds:
  * 	in fd[0] the action socket will be put.

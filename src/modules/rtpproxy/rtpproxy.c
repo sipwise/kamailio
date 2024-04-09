@@ -1,6 +1,6 @@
 /**
  *
- * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
+ * Copyright (C) 2003-2023 Sippy Software, Inc., http://www.sippysoft.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -187,6 +187,8 @@ static struct tm_binds tmb;
 unsigned int *natping_state = 0;
 
 static str timeout_socket_str = {0, 0};
+static str timeout_tag_pv_str = {0, 0};
+static pv_elem_t *timeout_tag_pv = NULL;
 static pv_elem_t *extra_id_pv = NULL;
 
 static cmd_export_t cmds[] = {
@@ -243,6 +245,7 @@ static param_export_t params[] = {
 		{"rtpproxy_retr", INT_PARAM, &rtpproxy_retr},
 		{"rtpproxy_tout", INT_PARAM, &rtpproxy_tout},
 		{"timeout_socket", PARAM_STR, &timeout_socket_str},
+		{"timeout_tag_pv", PARAM_STR, &timeout_tag_pv_str},
 		{"ice_candidate_priority_avp", PARAM_STRING,
 				&ice_candidate_priority_avp_param},
 		{"extra_id_pv", PARAM_STR, &extra_id_pv_param},
@@ -434,8 +437,8 @@ static int add_rtpproxy_socks(struct rtpp_set *rtpp_list, char *rtpproxy)
 }
 
 
-/*	0-succes
- *  -1 - erorr
+/*	0-success
+ *  -1 - error
  * */
 static int rtpproxy_add_rtpproxy_set(char *rtp_proxies)
 {
@@ -734,6 +737,20 @@ static int mod_init(void)
 		}
 	} else {
 		extra_id_pv = NULL;
+	}
+	if(timeout_socket_str.s != NULL && timeout_tag_pv_str.s == NULL) {
+		LM_ERR("The timeout_tag_pv has to be set along with timeout_socket\n");
+		return -1;
+	}
+	if(timeout_tag_pv_str.s != NULL) {
+		if(timeout_tag_pv_str.len == 0) {
+			LM_ERR("Empty timeout_tag_pv is not allowed\n");
+			return -1;
+		}
+		if(pv_parse_format(&timeout_tag_pv_str, &timeout_tag_pv) < 0) {
+			LM_ERR("malformed PV string: %s\n", timeout_tag_pv_str.s);
+			return -1;
+		}
 	}
 
 	if(rtpp_strings)
@@ -1488,6 +1505,21 @@ static int get_extra_id(struct sip_msg *msg, str *id_str)
 }
 
 
+static int get_timeout_tag(struct sip_msg *msg, str *ntag_str)
+{
+	if(msg == NULL || timeout_tag_pv == NULL || ntag_str == NULL) {
+		LM_ERR("bad parameters\n");
+		return 0;
+	}
+	if(pv_printf_s(msg, timeout_tag_pv, ntag_str) < 0) {
+		LM_ERR("cannot print the notify tag\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+
 static int unforce_rtp_proxy1_f(struct sip_msg *msg, char *str1, char *str2)
 {
 	str flags;
@@ -1667,7 +1699,7 @@ static int set_rtp_proxy_set_f(struct sip_msg *msg, char *str1, char *str2)
 
 static int rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 {
-	char *cp = NULL;
+	str cp = STR_NULL;
 	char newip[IP_ADDR_MAX_STR_SIZE];
 	int method;
 	int nosdp;
@@ -1696,8 +1728,10 @@ static int rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 		return unforce_rtp_proxy(msg, flags);
 
 	if(ip == NULL) {
-		cp = ip_addr2a(&msg->rcv.dst_ip);
-		strcpy(newip, cp);
+		cp.s = ip_addr2a(&msg->rcv.dst_ip);
+		cp.len = strlen(cp.s);
+		/* Copy, including teminating \0 */
+		memcpy(newip, cp.s, cp.len + 1);
 	}
 
 	if(msg->msg_flags & FL_SDP_BODY)
@@ -1707,13 +1741,13 @@ static int rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 
 	if(msg->first_line.type == SIP_REQUEST) {
 		if(method == METHOD_ACK && nosdp == 0)
-			return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 0,
+			return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip, 0,
 					(ip != NULL) ? 1 : 0);
 		if(method == METHOD_PRACK && nosdp == 0)
-			return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 1,
+			return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip, 1,
 					(ip != NULL) ? 1 : 0);
 		if(method == METHOD_UPDATE && nosdp == 0)
-			return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 1,
+			return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip, 1,
 					(ip != NULL) ? 1 : 0);
 		if(method == METHOD_INVITE && nosdp == 0) {
 			msg->msg_flags |= FL_SDP_BODY;
@@ -1722,7 +1756,7 @@ static int rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 				tmb.t_gett()->uas.request->msg_flags |= FL_SDP_BODY;
 			if(route_type == FAILURE_ROUTE)
 				return unforce_rtp_proxy(msg, flags);
-			return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 1,
+			return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip, 1,
 					(ip != NULL) ? 1 : 0);
 		}
 	} else if(msg->first_line.type == SIP_REPLY) {
@@ -1730,19 +1764,19 @@ static int rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 			return unforce_rtp_proxy(msg, flags);
 		if(nosdp == 0) {
 			if(method == METHOD_PRACK)
-				return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 0,
-						(ip != NULL) ? 1 : 0);
+				return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip,
+						0, (ip != NULL) ? 1 : 0);
 			if(method == METHOD_UPDATE)
-				return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 0,
-						(ip != NULL) ? 1 : 0);
+				return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip,
+						0, (ip != NULL) ? 1 : 0);
 			if(tmb.t_gett == NULL || tmb.t_gett() == NULL
 					|| tmb.t_gett() == T_UNDEFINED)
-				return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 0,
-						(ip != NULL) ? 1 : 0);
+				return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip,
+						0, (ip != NULL) ? 1 : 0);
 			if(tmb.t_gett()->uas.request->msg_flags & FL_SDP_BODY)
-				return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 0,
-						(ip != NULL) ? 1 : 0);
-			return force_rtp_proxy(msg, flags, (cp != NULL) ? newip : ip, 1,
+				return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip,
+						0, (ip != NULL) ? 1 : 0);
+			return force_rtp_proxy(msg, flags, (cp.s != NULL) ? newip : ip, 1,
 					(ip != NULL) ? 1 : 0);
 		}
 	}
@@ -1781,11 +1815,11 @@ static int rtpproxy_manage2(struct sip_msg *msg, char *flags, char *ip)
 
 static int rtpproxy_offer1_helper_f(struct sip_msg *msg, char *flags)
 {
-	char *cp;
 	char newip[IP_ADDR_MAX_STR_SIZE];
+	int len;
 
-	cp = ip_addr2a(&msg->rcv.dst_ip);
-	strcpy(newip, cp);
+	len = ip_addr2sbuf(&msg->rcv.dst_ip, newip, IP_ADDR_MAX_STR_SIZE - 1);
+	newip[len] = 0;
 
 	return force_rtp_proxy(msg, flags, newip, 1, 0);
 }
@@ -1823,15 +1857,17 @@ static int rtpproxy_offer2_f(struct sip_msg *msg, char *param1, char *param2)
 
 static int rtpproxy_answer1_helper_f(struct sip_msg *msg, char *flags)
 {
-	char *cp;
+	str cp = STR_NULL;
 	char newip[IP_ADDR_MAX_STR_SIZE];
 
 	if(msg->first_line.type == SIP_REQUEST)
 		if(msg->first_line.u.request.method_value != METHOD_ACK)
 			return -1;
 
-	cp = ip_addr2a(&msg->rcv.dst_ip);
-	strcpy(newip, cp);
+	cp.s = ip_addr2a(&msg->rcv.dst_ip);
+	cp.len = strlen(cp.s);
+	/* Copy, including teminating \0 */
+	memcpy(newip, cp.s, cp.len + 1);
 
 	return force_rtp_proxy(msg, flags, newip, 0, 0);
 }
@@ -1965,6 +2001,8 @@ static int force_rtp_proxy(
 			{NULL, 0}, /* medianum */
 			{" ", 1},  /* separator */
 			{NULL, 0}, /* Timeout-Socket */
+			{" ", 1},  /* separator */
+			{NULL, 0}, /* Timeout-Tag */
 	};
 	int iovec_param_count;
 	int autobridge_ipv4v6;
@@ -2406,14 +2444,21 @@ static int force_rtp_proxy(
 				}
 				if(to_tag.len > 0) {
 					iovec_param_count = 20;
-					if(opts.s.s[0] == 'U' && timeout_socket_str.len > 0) {
-						iovec_param_count = 22;
-						STR2IOVEC(timeout_socket_str, v[21]);
-					}
 				} else {
 					iovec_param_count = 16;
 				}
-
+				if(opts.s.s[0] == 'U' && timeout_socket_str.len > 0) {
+					str ntag = {0, 0};
+					if(get_timeout_tag(msg, &ntag) == 0 || ntag.s == NULL
+							|| ntag.len == 0) {
+						LM_ERR("can't get timeout notification tag\n");
+						FORCE_RTP_PROXY_RET(-1);
+					}
+					STR2IOVEC(timeout_socket_str, v[iovec_param_count + 1]);
+					iovec_param_count += 2;
+					STR2IOVEC(ntag, v[iovec_param_count + 1]);
+					iovec_param_count += 2;
+				}
 				cp = send_rtpp_command(node, v, iovec_param_count);
 			} while(cp == NULL);
 			LM_DBG("proxy reply: %s\n", cp);

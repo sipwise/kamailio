@@ -121,7 +121,7 @@ extern int tm_reply_relay_mode;
  * Values:
  * - 0 - all branches are kept (default, and default ser 2.1.x behaviour)
  * - 1 - all branches are discarded
- * - 2 - braches of last step of serial forking are discarded
+ * - 2 - branches of last step of serial forking are discarded
  * - 3 - all branches are discarded if a new leg of serial forking
  *       is started (default kamailio 1.5.x behaviour)
  */
@@ -224,17 +224,17 @@ void t_on_reply(unsigned int go_to)
 }
 
 
-unsigned int get_on_failure()
+int get_on_failure()
 {
 	return goto_on_failure;
 }
 
-unsigned int get_on_branch_failure()
+int get_on_branch_failure()
 {
 	return goto_on_branch_failure;
 }
 
-unsigned int get_on_reply()
+int get_on_reply()
 {
 	return goto_on_reply;
 }
@@ -640,6 +640,11 @@ static int _reply_light(struct cell *trans, char *buf, unsigned int len,
 		 * (timer_allow_del()) (there's no chance of having the wait handler
 		 *  executed while we still need t) --andrei */
 		put_on_wait(trans);
+
+		/* mark the request with final reply flag */
+		if(trans->uas.request != NULL) {
+			trans->uas.request->msg_flags |= FL_FINAL_REPLY;
+		}
 	}
 	pkg_free(buf);
 	LM_DBG("finished\n");
@@ -736,7 +741,7 @@ static int _tm_faked_env_idx = -1;
 /** create or restore a "fake environment" for running a failure_route,
  * OR an "async environment" depending on is_async_value (0=std failure-faked, 1=async)
  * if msg is set -> it will fake the env. vars conforming with the msg; if NULL
- * the env. will be restore to original.
+ * the env. will be restored to original.
  * Side-effect: mark_ruri_consumed() for faked env only.
  */
 int faked_env(struct cell *t, struct sip_msg *msg, int is_async_env)
@@ -967,7 +972,7 @@ void free_faked_req(struct sip_msg *faked_req, int len)
 		if(hdr->parsed && hdr_allocs_parse(hdr)
 				&& (hdr->parsed < mstart || hdr->parsed >= mend)) {
 			/* header parsed filed doesn't point inside fake memory
-			 * chunck -> it was added by failure funcs.-> free it as pkg */
+			 * chunk -> it was added by failure funcs.-> free it as pkg */
 			LM_DBG("removing hdr->parsed %d\n", hdr->type);
 			clean_hdr_field(hdr);
 			hdr->parsed = 0;
@@ -1531,7 +1536,7 @@ static enum rps t_should_relay_response(struct cell *Trans, int new_code,
 			Trans->uac[branch].reply = 0;
 
 		/* look if the callback perhaps replied transaction; it also
-		 * covers the case in which a transaction is replied localy
+		 * covers the case in which a transaction is replied locally
 		 * on CANCEL -- then it would make no sense to proceed to
 		 * new branches below
 		*/
@@ -1598,7 +1603,7 @@ static enum rps t_should_relay_response(struct cell *Trans, int new_code,
 		/* really no more pending branches -- return lowest code */
 		*should_store = 0;
 		*should_relay = picked_branch;
-		/* we dont need 'prepare_to_cancel' here -- all branches
+		/* we don't need 'prepare_to_cancel' here -- all branches
 		 * known to have completed */
 		/* prepare_to_cancel( Trans, cancel_bitmap, 0 ); */
 		LM_DBG("rps completed - uas status: %d branch: %d\n", Trans->uas.status,
@@ -1827,7 +1832,7 @@ inline static int auth_reply_count(struct cell *t, struct sip_msg *crt_reply)
 }
 
 
-/* must be called with the REPY_LOCK held */
+/* must be called with the REPLY_LOCK held */
 inline static char *reply_aggregate_auth(int code, char *txt, str *new_tag,
 		struct cell *t, unsigned int *res_len, struct bookmark *bm)
 {
@@ -2183,7 +2188,7 @@ enum rps relay_reply(struct cell *t, struct sip_msg *p_msg, int branch,
 		* failure_route  or from a callback and the timer has been already
 		* started. (Miklos)
 		*
-		* put_on_wait() should always be called after we finished dealling
+		* put_on_wait() should always be called after we finished dealing
 		* with t, because otherwise the wait timer might fire before we
 		*  finish with t, and by the time we want to use t it could
 		*  be already deleted. This could happen only if this function is
@@ -2580,7 +2585,7 @@ int reply_received(struct sip_msg *p_msg)
 			sr_event_exec(SREV_SIP_REPLY_OUT, &evp);
 		}
 
-		/* restore brach last_received as before executing onreply_route */
+		/* restore branch last_received as before executing onreply_route */
 		uac->last_received = last_uac_status;
 		/* transfer current message context back to t */
 		if(t->uas.request) {
@@ -2602,7 +2607,7 @@ int reply_received(struct sip_msg *p_msg)
 		xavi_set_list(backup_xavis);
 		/* handle a possible DROP in the script, but only if this
 		 * is not a final reply (final replies already stop the timers
-		 * and droping them might leave a transaction living forever) */
+		 * and dropping them might leave a transaction living forever) */
 #ifdef TM_ONREPLY_FINAL_DROP_OK
 		if(unlikely(ctx.run_flags & DROP_R_F))
 #else
@@ -2614,7 +2619,7 @@ int reply_received(struct sip_msg *p_msg)
 #ifdef TM_ONREPLY_FINAL_DROP_OK
 		if(msg_status >= 200) {
 			/* stop final reply timers, now that we executed the onreply route
-			 * and the reply was not DROPed */
+			 * and the reply was not DROPped */
 			stop_rb_timers(&uac->request);
 		}
 #endif	/* TM_ONREPLY_FINAL_DROP_OK */
@@ -2770,7 +2775,7 @@ done:
 	/* don't try to relay statelessly neither on success
 	 * (we forwarded statefully) nor on error; on troubles,
 	 * simply do nothing; that will make the other party to
-	 * retransmit; hopefuly, we'll then be better off */
+	 * retransmit; hopefully, we'll then be better off */
 	return 0;
 
 trans_not_found:
@@ -2782,7 +2787,7 @@ trans_not_found:
 				/* The script writer has a chance to decide whether to
 				 * forward the reply or not.
 				 * Pre- and post-script callbacks have already
-				 * been execueted by the core. (Miklos)
+				 * been executed by the core. (Miklos)
 			 */
 				return run_top_route(
 						onreply_rt.rlist[goto_on_sl_reply], p_msg, 0);

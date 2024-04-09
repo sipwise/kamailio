@@ -40,6 +40,7 @@
 #include "../../lib/srdb1/db.h"
 
 extern unsigned int default_connection_timeout;
+extern unsigned int timeout_mode;
 extern char *
 		default_tls_cacert; /*!< File name: Default CA cert to use for curl TLS connection */
 extern str

@@ -89,101 +89,105 @@ static int w_is_known_dlg(struct sip_msg *);
 static int pv_get_dlg_count(
 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"set_dlg_profile", (cmd_function)w_set_dlg_profile, 1, fixup_profile,
-				0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"set_dlg_profile", (cmd_function)w_set_dlg_profile, 2, fixup_profile,
-				0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"unset_dlg_profile", (cmd_function)w_unset_dlg_profile, 1,
-				fixup_profile, 0, FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"unset_dlg_profile", (cmd_function)w_unset_dlg_profile, 2,
-				fixup_profile, 0, FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"is_in_profile", (cmd_function)w_is_in_profile, 1, fixup_profile, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"is_in_profile", (cmd_function)w_is_in_profile, 2, fixup_profile, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"get_profile_size", (cmd_function)w_get_profile_size2, 2,
-				fixup_get_profile2, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"get_profile_size", (cmd_function)w_get_profile_size3, 3,
-				fixup_get_profile3, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"dlg_setflag", (cmd_function)w_dlg_setflag, 1, fixup_igp_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"dlg_resetflag", (cmd_function)w_dlg_resetflag, 1, fixup_igp_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"dlg_isflagset", (cmd_function)w_dlg_isflagset, 1, fixup_igp_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"dlg_terminate", (cmd_function)w_dlg_terminate, 1, fixup_dlg_terminate,
-				0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"dlg_terminate", (cmd_function)w_dlg_terminate, 2, fixup_dlg_terminate,
-				0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"dlg_get", (cmd_function)w_dlg_get, 3, fixup_dlg_bridge, 0, ANY_ROUTE},
-		{"is_known_dlg", (cmd_function)w_is_known_dlg, 0, NULL, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
-		{"load_ims_dlg", (cmd_function)load_ims_dlg, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0}};
+	{"set_dlg_profile", (cmd_function)w_set_dlg_profile, 1, fixup_profile, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"set_dlg_profile", (cmd_function)w_set_dlg_profile, 2, fixup_profile, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"unset_dlg_profile", (cmd_function)w_unset_dlg_profile, 1,
+		fixup_profile, 0, FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"unset_dlg_profile", (cmd_function)w_unset_dlg_profile, 2,
+		fixup_profile, 0, FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"is_in_profile", (cmd_function)w_is_in_profile, 1, fixup_profile, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"is_in_profile", (cmd_function)w_is_in_profile, 2, fixup_profile, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"get_profile_size", (cmd_function)w_get_profile_size2, 2,
+		fixup_get_profile2, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"get_profile_size", (cmd_function)w_get_profile_size3, 3,
+		fixup_get_profile3, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"dlg_setflag", (cmd_function)w_dlg_setflag, 1, fixup_igp_null, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"dlg_resetflag", (cmd_function)w_dlg_resetflag, 1, fixup_igp_null, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"dlg_isflagset", (cmd_function)w_dlg_isflagset, 1, fixup_igp_null, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"dlg_terminate", (cmd_function)w_dlg_terminate, 1, fixup_dlg_terminate, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"dlg_terminate", (cmd_function)w_dlg_terminate, 2, fixup_dlg_terminate, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"dlg_get", (cmd_function)w_dlg_get, 3, fixup_dlg_bridge, 0, ANY_ROUTE},
+	{"is_known_dlg", (cmd_function)w_is_known_dlg, 0, NULL, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+	{"load_ims_dlg", (cmd_function)load_ims_dlg, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t mod_params[] = {{"hash_size", INT_PARAM, &dlg_hash_size},
-		{"rr_param", PARAM_STRING, &rr_param},
-		{"dlg_flag", INT_PARAM, &dlg_flag},
-		{"timeout_avp", PARAM_STR, &timeout_spec},
-		{"default_timeout", INT_PARAM, &default_timeout},
-		{"dlg_extra_hdrs", PARAM_STR, &dlg_extra_hdrs},
-		//In this new dialog module we always match using DID
-		{"dlg_match_mode", INT_PARAM, &seq_match_mode},
+static param_export_t mod_params[] = {
+	{"hash_size", INT_PARAM, &dlg_hash_size},
+	{"rr_param", PARAM_STRING, &rr_param},
+	{"dlg_flag", INT_PARAM, &dlg_flag},
+	{"timeout_avp", PARAM_STR, &timeout_spec},
+	{"default_timeout", INT_PARAM, &default_timeout},
+	{"dlg_extra_hdrs", PARAM_STR, &dlg_extra_hdrs},
+	//In this new dialog module we always match using DID
+	{"dlg_match_mode", INT_PARAM, &seq_match_mode},
 
-		{"db_url", PARAM_STR, &db_url},
-		{"db_mode", INT_PARAM, &dlg_db_mode_param},
-		{"db_update_period", INT_PARAM, &db_update_period},
-		{"db_fetch_rows", INT_PARAM, &db_fetch_rows},
-		{"detect_spirals", INT_PARAM, &detect_spirals},
-		{"profiles_with_value", PARAM_STRING, &profiles_wv_s},
-		{"profiles_no_value", PARAM_STRING, &profiles_nv_s},
-		{"bridge_controller", PARAM_STR, &dlg_bridge_controller},
-		{"ruri_pvar", PARAM_STR, &ruri_pvar_param},
+	{"db_url", PARAM_STR, &db_url},
+	{"db_mode", INT_PARAM, &dlg_db_mode_param},
+	{"db_update_period", INT_PARAM, &db_update_period},
+	{"db_fetch_rows", INT_PARAM, &db_fetch_rows},
+	{"detect_spirals", INT_PARAM, &detect_spirals},
+	{"profiles_with_value", PARAM_STRING, &profiles_wv_s},
+	{"profiles_no_value", PARAM_STRING, &profiles_nv_s},
+	{"bridge_controller", PARAM_STR, &dlg_bridge_controller},
+	{"ruri_pvar", PARAM_STR, &ruri_pvar_param},
 
-		{0, 0, 0}};
+	{0, 0, 0}
+};
 
 #ifdef MI_REMOVED
 static mi_export_t mi_cmds[] = {
-		{"dlg_list", mi_print_dlgs, 0, 0, 0},
-		{"dlg_terminate_dlg", mi_terminate_dlg, 0, 0, 0}, {0, 0, 0, 0, 0}
-		/* TODO: restore old dialog functionality later - also expose dialog_out cmds, possibly*/
+	{"dlg_list", mi_print_dlgs, 0, 0, 0},
+	{"dlg_terminate_dlg", mi_terminate_dlg, 0, 0, 0},
+	{0, 0, 0, 0, 0}
 };
 #endif
 
 static rpc_export_t rpc_methods[];
 
 static pv_export_t mod_items[] = {
-		{{"DLG_count", sizeof("DLG_count") - 1}, PVT_OTHER, pv_get_dlg_count, 0,
-				0, 0, 0, 0},
-		{{"DLG_lifetime", sizeof("DLG_lifetime") - 1}, PVT_OTHER,
-				pv_get_dlg_lifetime, 0, 0, 0, 0, 0},
-		{{"DLG_status", sizeof("DLG_status") - 1}, PVT_OTHER, pv_get_dlg_status,
-				0, 0, 0, 0, 0},
-		{{"dlg_ctx", sizeof("dlg_ctx") - 1}, PVT_OTHER, pv_get_dlg_ctx,
-				pv_set_dlg_ctx, pv_parse_dlg_ctx_name, 0, 0, 0},
-		{{"dlg", sizeof("dlg") - 1}, PVT_OTHER, pv_get_dlg, 0,
-				pv_parse_dlg_name, 0, 0, 0},
-		{{"dlg_var", sizeof("dlg_var") - 1}, PVT_OTHER, pv_get_dlg_variable,
-				pv_set_dlg_variable, pv_parse_dialog_var_name, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
+	{{"DLG_count", sizeof("DLG_count") - 1}, PVT_OTHER, pv_get_dlg_count, 0,
+			0, 0, 0, 0},
+	{{"DLG_lifetime", sizeof("DLG_lifetime") - 1}, PVT_OTHER,
+			pv_get_dlg_lifetime, 0, 0, 0, 0, 0},
+	{{"DLG_status", sizeof("DLG_status") - 1}, PVT_OTHER, pv_get_dlg_status,
+			0, 0, 0, 0, 0},
+	{{"dlg_ctx", sizeof("dlg_ctx") - 1}, PVT_OTHER, pv_get_dlg_ctx,
+			pv_set_dlg_ctx, pv_parse_dlg_ctx_name, 0, 0, 0},
+	{{"dlg", sizeof("dlg") - 1}, PVT_OTHER, pv_get_dlg, 0,
+			pv_parse_dlg_name, 0, 0, 0},
+	{{"dlg_var", sizeof("dlg_var") - 1}, PVT_OTHER, pv_get_dlg_variable,
+			pv_set_dlg_variable, pv_parse_dialog_var_name, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
 
-struct module_exports exports = {"ims_dialog", /* module's name */
-		DEFAULT_DLFLAGS,					   /* dlopen flags */
-		cmds,								   /* exported functions */
-		mod_params,							   /* param exports */
-		0,									   /* exported RPC methods */
-		mod_items,							   /* exported pseudo-variables */
-		0,									   /* reply processing function */
-		mod_init,	/* module initialization function */
-		child_init, /* per-child init function */
-		mod_destroy};
+struct module_exports exports = {
+	"ims_dialog",		/* module's name */
+	DEFAULT_DLFLAGS,	/* dlopen flags */
+	cmds,				/* exported functions */
+	mod_params,			/* param exports */
+	0,					/* exported RPC methods */
+	mod_items,			/* exported pseudo-variables */
+	0,					/* reply processing function */
+	mod_init,			/* module initialization function */
+	child_init,			/* per-child init function */
+	mod_destroy			/* destroy function */
+};
+/* clang-format on */
 
 static int fixup_profile(void **param, int param_no)
 {
@@ -355,6 +359,7 @@ int load_ims_dlg(ims_dlg_api_t *dlgb)
 	dlgb->lookup_terminate_dlg = w_api_lookup_terminate_dlg;
 	dlgb->get_dlg_expires = api_get_dlg_expires;
 	dlgb->get_dlg = dlg_get_msg_dialog;
+	dlgb->get_dlg_hash = dlg_get_hash_dialog;
 	dlgb->release_dlg = dlg_release;
 
 	return 1;
@@ -1044,12 +1049,15 @@ static void rpc_end_all_active_dlg(rpc_t *rpc, void *c)
 	LM_DBG("Terminated %d active dialogs from rpc call", i_count);
 }
 
+/* clang-format off */
 static rpc_export_t rpc_methods[] = {
-		{"dlg2.list", rpc_print_dlgs, rpc_print_dlgs_doc, 0},
-		{"dlg2.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
-		{"dlg2.end_all_active_dlg", rpc_end_all_active_dlg,
+	{"dlg2.list", rpc_print_dlgs, rpc_print_dlgs_doc, 0},
+	{"dlg2.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
+	{"dlg2.end_all_active_dlg", rpc_end_all_active_dlg,
 				rpc_end_all_active_dlg_doc, 0},
-		{0, 0, 0, 0}};
+	{0, 0, 0, 0}
+};
+/* clang-format on */
 
 
 static int ki_is_known_dlg(sip_msg_t *msg)
@@ -1060,7 +1068,6 @@ static int ki_is_known_dlg(sip_msg_t *msg)
 static int ki_set_dlg_profile(sip_msg_t *msg, str *sprofile, str *svalue)
 {
 	struct dlg_profile_table *profile = NULL;
-	pv_elem_t *pvvalue = NULL;
 
 	if(sprofile == NULL || sprofile->s == NULL || sprofile->len <= 0) {
 		LM_ERR("invalid profile identifier\n");
@@ -1072,14 +1079,18 @@ static int ki_set_dlg_profile(sip_msg_t *msg, str *sprofile, str *svalue)
 		LM_CRIT("profile <%.*s> not defined\n", sprofile->len, sprofile->s);
 		return -1;
 	}
-
-	if(pv_parse_format(svalue, &pvvalue) || pvvalue == NULL) {
-		LM_ERR("wrong format [%.*s] for value param!\n", svalue->len,
-				svalue->s);
-		return -1;
+	if(svalue != NULL && svalue->len > 0) {
+		if(set_dlg_profile(msg, svalue, profile) < 0) {
+			LM_ERR("failed to set profile with value\n");
+			return -1;
+		}
+	} else {
+		if(set_dlg_profile(msg, NULL, profile) < 0) {
+			LM_ERR("failed to set profile\n");
+			return -1;
+		}
 	}
-
-	return w_set_dlg_profile(msg, (char *)profile, (char *)pvvalue);
+	return 1;
 }
 
 static int ki_get_profile_size(
@@ -1087,8 +1098,9 @@ static int ki_get_profile_size(
 
 {
 	struct dlg_profile_table *profile = NULL;
-	pv_elem_t *pvvalue = NULL;
 	pv_spec_t *pvs = NULL;
+	unsigned int size;
+	pv_value_t val;
 
 	if(sprofile == NULL || sprofile->s == NULL || sprofile->len <= 0) {
 		LM_ERR("invalid profile identifier\n");
@@ -1103,11 +1115,6 @@ static int ki_get_profile_size(
 		LM_CRIT("profile <%.*s> not defined\n", sprofile->len, sprofile->s);
 		return -1;
 	}
-	if(pv_parse_format(svalue, &pvvalue) || pvvalue == NULL) {
-		LM_ERR("wrong format [%.*s] for value param!\n", svalue->len,
-				svalue->s);
-		return -1;
-	}
 	pvs = pv_cache_get(spv);
 	if(pvs == NULL) {
 		LM_ERR("cannot get pv spec for [%.*s]\n", spv->len, spv->s);
@@ -1117,9 +1124,22 @@ static int ki_get_profile_size(
 		LM_ERR("return must be an AVP or SCRIPT VAR!\n");
 		return -1;
 	}
+	if(svalue != NULL && svalue->len > 0 && profile->has_value != 0) {
+		size = get_profile_size(profile, svalue);
+	} else {
+		size = get_profile_size(profile, NULL);
+	}
 
-	return w_get_profile_size3(
-			msg, (char *)profile, (char *)pvvalue, (char *)pvs);
+	memset(&val, 0, sizeof(pv_value_t));
+	val.flags = PV_VAL_INT | PV_TYPE_INT;
+	val.ri = (long)size;
+
+	if(pvs->setf(msg, &pvs->pvp, (int)EQ_T, &val) < 0) {
+		LM_ERR("setting profile PV failed\n");
+		return -1;
+	}
+
+	return 1;
 }
 
 /* clang-format off */

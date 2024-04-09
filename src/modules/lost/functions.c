@@ -1,7 +1,7 @@
 /*
  * lost module functions
  *
- * Copyright (C) 2022 Wolfgang Kampichler
+ * Copyright (C) 2023 Wolfgang Kampichler
  * DEC112, FREQUENTIS AG
  *
  * This file is part of Kamailio, a free SIP server.
@@ -67,6 +67,7 @@ extern httpc_api_t httpapi;
 
 extern int lost_geoloc_type;
 extern int lost_geoloc_order;
+extern int lost_geoloc_3d;
 extern int lost_verbose;
 extern int held_resp_time;
 extern int held_exact_type;
@@ -296,7 +297,7 @@ int lost_held_function(struct sip_msg *_m, char *_con, char *_pidf, char *_url,
 		/* we have no connection ... do a NAPTR lookup */
 		if(lost_parse_host(did.s, &host, &flag) > 0) {
 
-			LM_DBG("no conn. trying NATPR lookup [%.*s]\n", host.len, host.s);
+			LM_DBG("no conn. trying NAPTR lookup [%.*s]\n", host.len, host.s);
 
 			/* remove '[' and ']' from string (IPv6) */
 			if(flag == AF_INET6) {
@@ -338,7 +339,7 @@ int lost_held_function(struct sip_msg *_m, char *_con, char *_pidf, char *_url,
 			goto err;
 		}
 
-		LM_DBG("NATPR lookup returned [%.*s]\n", url.len, url.s);
+		LM_DBG("NAPTR lookup returned [%.*s]\n", url.len, url.s);
 
 		/* curl doesn't like str */
 		len = 0;
@@ -380,7 +381,9 @@ int lost_held_function(struct sip_msg *_m, char *_con, char *_pidf, char *_url,
 			XML_PARSE_NOBLANKS | XML_PARSE_NONET | XML_PARSE_NOCDATA);
 	if(doc == NULL) {
 		LM_WARN("invalid xml document: [%.*s]\n", res.len, res.s);
-		doc = xmlRecoverMemory(res.s, res.len);
+		doc = xmlReadMemory(res.s, res.len, 0, NULL,
+				XML_PARSE_NOBLANKS | XML_PARSE_NONET |
+				XML_PARSE_NOCDATA | XML_PARSE_RECOVER);
 		if(doc == NULL) {
 			LM_ERR("xml document recovery failed on: [%.*s]\n", res.len, res.s);
 			goto err;
@@ -701,7 +704,9 @@ int lost_held_dereference(struct sip_msg *_m, char *_url, char *_pidf,
 			XML_PARSE_NOBLANKS | XML_PARSE_NONET | XML_PARSE_NOCDATA);
 	if(doc == NULL) {
 		LM_WARN("invalid xml document: [%.*s]\n", res.len, res.s);
-		doc = xmlRecoverMemory(res.s, res.len);
+		doc = xmlReadMemory(res.s, res.len, 0, NULL,
+				XML_PARSE_NOBLANKS | XML_PARSE_NONET |
+				XML_PARSE_NOCDATA | XML_PARSE_RECOVER);
 		if(doc == NULL) {
 			LM_ERR("xml document recovery failed on: [%.*s]\n", res.len, res.s);
 			goto err;

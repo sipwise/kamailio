@@ -1169,6 +1169,10 @@ int tcp_connection_limit_srcip(union sockaddr_union *srcaddr, int limit)
 	int n;
 	int i;
 
+	if(limit <= 0) {
+		return 0;
+	}
+
 	n = 0;
 	su2ip_addr(&src_ip, srcaddr);
 	TCPCONN_LOCK;
@@ -2064,15 +2068,15 @@ int tcp_send(struct dest_info *dst, union sockaddr_union *from, const char *buf,
 	struct tcp_connection *c;
 	struct ip_addr ip;
 	int port;
-	int fd;
+	int fd = -1;
 	long response[2];
 	int n;
 	ticks_t con_lifetime;
 	int try_local_port;
 #ifdef USE_TLS
-	const char *rest_buf;
-	const char *t_buf;
-	unsigned rest_len, t_len;
+	const char *rest_buf = NULL;
+	const char *t_buf = NULL;
+	unsigned rest_len = 0, t_len = 0;
 	long resp;
 	snd_flags_t t_send_flags;
 #endif /* USE_TLS */
@@ -3256,6 +3260,18 @@ int tcp_init(struct socket_info *sock_info)
 	}
 #endif
 	init_sock_keepalive(sock_info->socket);
+#ifdef HAVE_TCP_USER_TIMEOUT
+	if((optval = TICKS_TO_S(cfg_get(tcp, tcp_cfg, send_timeout)))) {
+		optval *= 1000;
+		if(setsockopt(sock_info->socket, IPPROTO_TCP, TCP_USER_TIMEOUT, &optval,
+				   sizeof(optval))
+				< 0) {
+			LM_WARN("failed to set TCP_USER_TIMEOUT: %s\n", strerror(errno));
+		} else {
+			LM_INFO("Set TCP_USER_TIMEOUT=%d ms\n", optval);
+		}
+	}
+#endif
 	if(bind(sock_info->socket, &addr->s, sockaddru_len(*addr)) == -1) {
 		LM_ERR("bind(%x, %p, %d) on %s:%d : %s\n", sock_info->socket, &addr->s,
 				(unsigned)sockaddru_len(*addr), sock_info->address_str.s,
@@ -3536,6 +3552,7 @@ static void destroy_send_fd_queues(void)
 }
 
 
+#ifdef SEND_FD_QUEUE
 inline static int send_fd_queue_add(
 		struct tcp_send_fd_q *q, int unix_sock, struct tcp_connection *t)
 {
@@ -3573,7 +3590,7 @@ inline static int send_fd_queue_add(
 error:
 	return -1;
 }
-
+#endif
 
 inline static void send_fd_queue_run(struct tcp_send_fd_q *q)
 {
@@ -4361,7 +4378,6 @@ inline static int send2child(struct tcp_connection *tcpconn)
 						tcpconn->s)
 				<= 0)) {
 		if((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-			/* FIXME: remove after debugging */
 			LM_CRIT("tcp child %d, socket %d: queue full, %d requests queued "
 					"(total handled %d)\n",
 					idx, tcp_children[idx].unix_sock, min_busy,
@@ -4544,23 +4560,7 @@ inline static int handle_tcpconn_ev(
 	int empty_q;
 	int bytes;
 #endif /* TCP_ASYNC */
-	/*  is refcnt!=0 really necessary?
-	 *  No, in fact it's a bug: I can have the following situation: a send only
-	 *   tcp connection used by n processes simultaneously => refcnt = n. In
-	 *   the same time I can have a read event and this situation is perfectly
-	 *   valid. -- andrei
-	 */
-#if 0
-	if ((tcpconn->refcnt!=0)){
-		/* FIXME: might be valid for sigio_rt iff fd flags are not cleared
-		 *        (there is a short window in which it could generate a sig
-		 *         that would be catched by tcp_main) */
-		LM_CRIT("handle_tcpconn_ev: io event on referenced"
-					" tcpconn (%p), refcnt=%d, fd=%d\n",
-					tcpconn, tcpconn->refcnt, tcpconn->s);
-		return -1;
-	}
-#endif
+
 	/* pass it to child, so remove it from the io watch list  and the local
 	 *  timer */
 #ifdef TCP_ASYNC
@@ -4615,7 +4615,7 @@ inline static int handle_tcpconn_ev(
 					(void)dst_blocklist_su(BLST_ERR_SEND, tcpconn->rcv.proto,
 							&tcpconn->rcv.src_su, &tcpconn->send_flags, 0);
 #endif									   /* USE_DST_BLOCKLIST */
-					TCP_STATS_CON_RESET(); /* FIXME: it could != RST */
+					TCP_STATS_CON_RESET(); /* note: it could != RST */
 				}
 			}
 			if(unlikely(!tcpconn_try_unhash(tcpconn))) {
@@ -5493,11 +5493,11 @@ void tcp_timer_check_connections(unsigned int ticks, void *param)
 				cidset = 0;
 				if(con->state == S_CONN_OK) {
 					if(con->req.tvrstart.tv_sec > 0) {
-						tvdiff = 1000000
+						tvdiff = 1000000LL
 										 * (tvnow.tv_sec
 												 - con->req.tvrstart.tv_sec)
 								 + (tvnow.tv_usec - con->req.tvrstart.tv_usec);
-						if(tvdiff >= ksr_tcp_msg_read_timeout * 1000000) {
+						if(tvdiff >= 1000000LL * ksr_tcp_msg_read_timeout) {
 							LM_DBG("n: %d - connection id: %d - message "
 								   "reading timeout: %lld\n",
 									n, con->id, tvdiff);

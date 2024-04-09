@@ -255,7 +255,7 @@ ht_t *ht_get_table(str *name)
 
 int ht_add_table(str *name, int autoexp, str *dbtable, str *dbcols, int size,
 		int dbmode, int itype, int_str *ival, int updateexpire,
-		int dmqreplicate)
+		int dmqreplicate, char coldelim, char colnull)
 {
 	unsigned int htid;
 	ht_t *ht;
@@ -342,8 +342,8 @@ int ht_add_table(str *name, int autoexp, str *dbtable, str *dbcols, int size,
 		}
 		ht->ncols = c + 1;
 		ht->pack[0] = 'l';
-		ht->pack[1] = ',';
-		ht->pack[2] = '*';
+		ht->pack[1] = coldelim;
+		ht->pack[2] = colnull;
 	}
 
 	ht->next = _ht_root;
@@ -931,8 +931,9 @@ int ht_dbg(void)
 			it = ht->entries[i].first;
 			while(it) {
 				LM_ERR("\tcell: %.*s\n", it->name.len, it->name.s);
-				LM_ERR("\thid: %u msize: %u flags: %d expire: %u\n", it->cellid,
-						it->msize, it->flags, (unsigned int)it->expire);
+				LM_ERR("\thid: %u msize: %u flags: %d expire: %llu\n",
+						it->cellid, it->msize, it->flags,
+						(unsigned long long)it->expire);
 				if(it->flags & AVP_VAL_STR)
 					LM_ERR("\tv-s:%.*s\n", it->value.s.len, it->value.s.s);
 				else
@@ -957,6 +958,8 @@ int ht_table_spec(char *spec)
 	unsigned int dbmode = 0;
 	unsigned int updateexpire = 1;
 	unsigned int dmqreplicate = 0;
+	char coldelim = ',';
+	char colnull = '*';
 	str in;
 	str tok;
 	param_t *pit = NULL;
@@ -1023,13 +1026,34 @@ int ht_table_spec(char *spec)
 
 			LM_DBG("htable [%.*s] - dmqreplicate [%u]\n", name.len, name.s,
 					dmqreplicate);
+		} else if(pit->name.len == 8
+				  && strncmp(pit->name.s, "coldelim", 8) == 0) {
+			if(tok.len > 1)
+				goto error;
+
+			coldelim = tok.s[0];
+			LM_DBG("htable [%.*s] - coldelim [%c]\n", name.len, name.s,
+				   coldelim);
+		} else if(pit->name.len == 7
+				  && strncmp(pit->name.s, "colnull", 7) == 0) {
+			if(tok.len > 1)
+				goto error;
+
+			if(tok.len == 0) {
+				colnull = '\0';
+			} else {
+				colnull = tok.s[0];
+			}
+
+			LM_DBG("htable [%.*s] - colnull [%c]\n", name.len, name.s,
+			   		colnull);
 		} else {
 			goto error;
 		}
 	}
 
 	return ht_add_table(&name, autoexpire, &dbtable, &dbcols, size, dbmode,
-			itype, &ival, updateexpire, dmqreplicate);
+			itype, &ival, updateexpire, dmqreplicate, coldelim, colnull);
 
 error:
 	LM_ERR("invalid htable parameter [%.*s]\n", in.len, in.s);
@@ -1224,7 +1248,7 @@ int ht_set_cell_expire(ht_t *ht, str *name, int type, int_str *val)
 	now = 0;
 	if(val->n > 0)
 		now = time(NULL) + val->n;
-	LM_DBG("set auto-expire to %u (%ld)\n", (unsigned int)now, val->n);
+	LM_DBG("set auto-expire to %llu (%ld)\n", (unsigned long long)now, val->n);
 
 	ht_slot_lock(ht, idx);
 	it = ht->entries[idx].first;

@@ -63,7 +63,7 @@
 /* number of via's encountered */
 int via_cnt;
 /* global request flags */
-unsigned int global_req_flags = 0;
+msg_flags_t global_req_flags = 0;
 
 int ksr_sip_parser_mode = KSR_SIP_PARSER_MODE_STRICT;
 
@@ -1341,31 +1341,33 @@ int get_rcv_socket_uri(sip_msg_t *m, int tmode, str *uri, int atype)
 	char *p;
 	str ip, port;
 	int len;
-	str proto;
+	int af;
+	str proto = STR_NULL;
 
 	if(!uri || !m || !m->rcv.bind_address) {
 		ERR("invalid parameter value\n");
 		return -1;
 	}
 
-	if(tmode == 0) {
-		switch(m->rcv.proto) {
-			case PROTO_NONE:
-			case PROTO_UDP:
-				proto.s =
-						0; /* Do not add transport parameter, UDP is default */
-				proto.len = 0;
-				break;
-			default:
-				if(get_valid_proto_string(m->rcv.proto, 1, 0, &proto) < 0) {
-					ERR("unknown transport protocol\n");
-					return -1;
-				}
-		}
+	if((tmode == 0)
+			&& (m->rcv.proto == PROTO_NONE || m->rcv.proto == PROTO_UDP)) {
+		/* do not add transport parameter, UDP is default */
+		proto.s = NULL;
+		proto.len = 0;
 	} else {
-		if(get_valid_proto_string(m->rcv.proto, 1, 0, &proto) < 0) {
-			ERR("unknown transport protocol\n");
-			return -1;
+		if(atype == 0 || m->rcv.bind_address->useinfo.address_str.len <= 0
+				|| m->rcv.bind_address->useinfo.proto == PROTO_NONE) {
+			if(get_valid_proto_string(m->rcv.proto, 1, 0, &proto) < 0) {
+				ERR("unknown transport protocol\n");
+				return -1;
+			}
+		} else {
+			if(get_valid_proto_string(
+					   m->rcv.bind_address->useinfo.proto, 1, 0, &proto)
+					< 0) {
+				ERR("unknown transport protocol\n");
+				return -1;
+			}
 		}
 	}
 
@@ -1384,8 +1386,13 @@ int get_rcv_socket_uri(sip_msg_t *m, int tmode, str *uri, int atype)
 		port.s = m->rcv.bind_address->useinfo.port_no_str.s;
 		port.len = m->rcv.bind_address->useinfo.port_no_str.len;
 	}
+	if(atype == 1 && m->rcv.bind_address->useinfo.address_str.len > 0) {
+		af = m->rcv.bind_address->useinfo.af;
+	} else {
+		af = m->rcv.src_ip.af;
+	}
 
-	len = 4 + ip.len + 2 * (m->rcv.src_ip.af == AF_INET6) + 1 + port.len;
+	len = 4 + ip.len + 2 * (af == AF_INET6) + 1 + port.len;
 	if(proto.s) {
 		len += TRANSPORT_PARAM_LEN;
 		len += proto.len;
@@ -1400,11 +1407,11 @@ int get_rcv_socket_uri(sip_msg_t *m, int tmode, str *uri, int atype)
 	memcpy(p, "sip:", 4);
 	p += 4;
 
-	if(m->rcv.src_ip.af == AF_INET6)
+	if(af == AF_INET6)
 		*p++ = '[';
 	memcpy(p, ip.s, ip.len);
 	p += ip.len;
-	if(m->rcv.src_ip.af == AF_INET6)
+	if(af == AF_INET6)
 		*p++ = ']';
 
 	*p++ = ':';

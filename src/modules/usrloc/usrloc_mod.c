@@ -127,6 +127,8 @@ str ul_ka_domain = str_init("kamailio.org");
 str ul_ka_method = str_init("OPTIONS");
 int ul_ka_mode = 0;
 int ul_ka_filter = 0;
+int ul_ka_interval = 40;
+int ul_ka_randomize = 20;
 int ul_ka_loglevel = 255;
 str ul_ka_logmsg = str_init(" to-uri: [$tu] remote-addr: [$sas]");
 pv_elem_t *ul_ka_logfmt = NULL;
@@ -220,6 +222,8 @@ int ul_hash_size = 10;
 int ul_db_insert_null = 0;
 int ul_db_timer_clean = 0;
 
+char *ul_ka_reply_codes_str = "0";
+
 /* flags */
 unsigned int ul_nat_bflag = (unsigned int)-1;
 unsigned int ul_init_flag = 0;
@@ -298,9 +302,12 @@ static param_export_t params[] = {
 	{"ka_domain", PARAM_STR, &ul_ka_domain},
 	{"ka_method", PARAM_STR, &ul_ka_method},
 	{"ka_filter", PARAM_INT, &ul_ka_filter},
+	{"ka_interval", PARAM_INT, &ul_ka_interval},
+	{"ka_randomize", PARAM_INT, &ul_ka_randomize},
 	{"ka_timeout", PARAM_INT, &ul_keepalive_timeout},
 	{"ka_loglevel", PARAM_INT, &ul_ka_loglevel},
 	{"ka_logmsg", PARAM_STR, &ul_ka_logmsg},
+	{"ka_reply_codes", PARAM_STRING, &ul_ka_reply_codes_str},
 	{"load_rank", PARAM_INT, &ul_load_rank},
 	{"db_clean_tcp", PARAM_INT, &ul_db_clean_tcp},
 	{0, 0, 0}
@@ -335,6 +342,9 @@ static int mod_init(void)
 	int i;
 	udomain_t *d;
 
+	if(ul_ka_parse_reply_codes(ul_ka_reply_codes_str)) {
+		return -1;
+	}
 	if(ul_rm_expired_delay != 0) {
 		if(ul_db_mode != DB_ONLY) {
 			LM_ERR("rm expired delay feature is available for db only mode\n");

@@ -112,10 +112,10 @@ static int mod_init(void)
 	}
 
 	while(mh != NULL) {
-		if(mh->dbmode == 1 || mh->dbmode == 2) {
+		if (mh->dbmode == 1 || mh->dbmode == 2) {
 			if(mqueue_db_load_queue(&(mh->name)) < 0) {
-				LM_ERR("error loading mqueue: %.*s from DB\n", mh->name.len,
-						mh->name.s);
+				LM_ERR("error loading mqueue: %.*s from DB\n",
+					mh->name.len, mh->name.s);
 				return 1;
 			}
 		}

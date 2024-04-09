@@ -42,6 +42,10 @@
 #include "../../core/dprint.h"
 #include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
+
+#define KSR_RTHREAD_SKIP_P
+#define KSR_RTHREAD_NEED_4PP
+#include "../../core/rthreads.h"
 #include "tls_init.h"
 #include "tls_server.h"
 #include "tls_domain.h"
@@ -87,9 +91,22 @@ int ksr_rand_engine_param(modparam_t type, void *val);
 
 MODULE_VERSION
 
-#if OPENSSL_VERSION_NUMBER >= 0x030000000L
-#define OPENSSL_NO_ENGINE
+/* Engine is deprecated in OpenSSL 3 */
+#if !defined(OPENSSL_NO_ENGINE) && OPENSSL_VERSION_NUMBER < 0x030000000L
+#define KSR_SSL_COMMON
+#define KSR_SSL_ENGINE
+#define KEY_PREFIX "/engine:"
+#define KEY_PREFIX_LEN (strlen(KEY_PREFIX))
 #endif
+
+#if !defined(OPENSSL_NO_PROVIDER) && OPENSSL_VERSION_NUMBER >= 0x030000000L
+#define KSR_SSL_COMMON
+#define KSR_SSL_PROVIDER
+#include <openssl/store.h>
+#define KEY_PREFIX "/uri:"
+#define KEY_PREFIX_LEN (strlen(KEY_PREFIX))
+#endif
+
 
 extern str sr_tls_event_callback;
 str sr_tls_xavp_cfg = {0, 0};
@@ -145,24 +162,29 @@ tls_domain_t srv_defaults = {
 };
 
 
-#ifndef OPENSSL_NO_ENGINE
-
+#ifdef KSR_SSL_ENGINE
 typedef struct tls_engine
 {
 	str engine;
 	str engine_config;
 	str engine_algorithms;
 } tls_engine_t;
-#include <openssl/conf.h>
-#include <openssl/engine.h>
-
-static ENGINE *ksr_tls_engine;
 static tls_engine_t tls_engine_settings = {
 		STR_STATIC_INIT("NONE"),
 		STR_STATIC_INIT("NONE"),
 		STR_STATIC_INIT("ALL"),
 };
-#endif /* OPENSSL_NO_ENGINE */
+
+#include <openssl/conf.h>
+#include <openssl/engine.h>
+
+static ENGINE *ksr_tls_engine;
+#endif
+
+#ifdef KSR_SSL_PROVIDER
+static int tls_provider_quirks;
+#endif
+
 /*
  * Default settings for client domains when using external config file
  */
@@ -227,12 +249,16 @@ static param_export_t params[] = {
 		{"crl", PARAM_STR, &default_tls_cfg.crl},
 		{"cipher_list", PARAM_STR, &default_tls_cfg.cipher_list},
 		{"connection_timeout", PARAM_INT, &default_tls_cfg.con_lifetime},
-#ifndef OPENSSL_NO_ENGINE
+#ifdef KSR_SSL_ENGINE
 		{"engine", PARAM_STR, &tls_engine_settings.engine},
 		{"engine_config", PARAM_STR, &tls_engine_settings.engine_config},
 		{"engine_algorithms", PARAM_STR,
 				&tls_engine_settings.engine_algorithms},
-#endif /* OPENSSL_NO_ENGINE */
+#endif /* KSR_SSL_ENGINE */
+#ifdef KSR_SSL_PROVIDER
+		{"provider_quirks", PARAM_INT,
+				&tls_provider_quirks}, /* OpenSSL 3 provider that needs new OSSL_LIB_CTX in child */
+#endif								   /* KSR_SSL_PROVIDER */
 		{"tls_log", PARAM_INT, &default_tls_cfg.log},
 		{"tls_debug", PARAM_INT, &default_tls_cfg.debug},
 		{"session_cache", PARAM_INT, &default_tls_cfg.session_cache},
@@ -311,6 +337,20 @@ static tls_domains_cfg_t* tls_use_modparams(void)
 }
 #endif
 
+/* global config tls_threads_mode = 2
+ *  - force all thread-locals to be 0x0 after fork()
+ *  - with OpenSSL loaded the largest value observed
+ *     is < 10
+ *
+ */
+static void fork_child(void)
+{
+	int k = 0;
+	for(k = 0; k < 16; k++) {
+		if(pthread_getspecific(k) != 0)
+			pthread_setspecific(k, 0x0);
+	}
+}
 
 static int mod_init(void)
 {
@@ -421,6 +461,9 @@ static int mod_init(void)
 		ksr_module_set_flag(KSRMOD_FLAG_POSTCHILDINIT);
 	}
 #endif
+	if(ksr_tls_threads_mode == 2) {
+		pthread_atfork(NULL, NULL, &fork_child);
+	}
 	return 0;
 error:
 	tls_h_mod_destroy_f();
@@ -428,10 +471,10 @@ error:
 }
 
 
-#ifndef OPENSSL_NO_ENGINE
+#ifdef KSR_SSL_COMMON
 static int tls_engine_init();
 int tls_fix_engine_keys(tls_domains_cfg_t *, tls_domain_t *, tls_domain_t *);
-#endif
+#endif /* KSR_SSL_COMMON */
 
 /*
  * OpenSSL 1.1.1+: SSL_CTX is repeated in each worker
@@ -443,50 +486,66 @@ int tls_fix_engine_keys(tls_domains_cfg_t *, tls_domain_t *, tls_domain_t *);
  *
  * EC operations do not use pthread_self(), so could use shared SSL_CTX
  */
+static int mod_child_hook(int *rank, void *dummy)
+{
+	LM_INFO("Loading SSL_CTX in process_no=%d rank=%d "
+			"ksr_tls_threads_mode=%d\n",
+			process_no, *rank, ksr_tls_threads_mode);
+
+	if(cfg_get(tls, tls_cfg, config_file).s) {
+		if(tls_fix_domains_cfg(*tls_domains_cfg, &srv_defaults, &cli_defaults)
+				< 0)
+			return -1;
+	} else {
+		if(tls_fix_domains_cfg(*tls_domains_cfg, &mod_params, &mod_params) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+#ifdef KSR_SSL_PROVIDER
+static OSSL_LIB_CTX *orig_ctx;
+static OSSL_LIB_CTX *new_ctx;
+#endif
 static int mod_child(int rank)
 {
 	if(tls_disable || (tls_domains_cfg == 0))
 		return 0;
 
-#if OPENSSL_VERSION_NUMBER >= 0x010101000L
-        /*
-         * OpenSSL 3.x/1.1.1: create shared SSL_CTX* in worker to avoid init of
-         * libssl in rank 0(thread#1)
+	/*
+         * OpenSSL 3.x/1.1.1: create shared SSL_CTX* in thread executor
+         * to avoid init of libssl in thread#1: ksr_tls_threads_mode = 1
          */
-        if(rank == PROC_SIPINIT) {
-#else
-        if(rank == PROC_INIT) {
-#endif
-		if(cfg_get(tls, tls_cfg, config_file).s) {
-			if(tls_fix_domains_cfg(
-					   *tls_domains_cfg, &srv_defaults, &cli_defaults)
-					< 0)
-				return -1;
-		} else {
-			if(tls_fix_domains_cfg(*tls_domains_cfg, &mod_params, &mod_params)
-					< 0)
-				return -1;
-		}
-		return 0;
+	if(rank == PROC_INIT) {
+		return run_thread4PP((_thread_proto4PP)mod_child_hook, &rank, NULL);
 	}
 
-#ifndef OPENSSL_NO_ENGINE
+#ifdef KSR_SSL_COMMON
 	/*
 	 * after the child is fork()ed we go through the TLS domains
 	 * and fix up private keys from engine
 	 */
+#ifdef KSR_SSL_ENGINE
 	if(!strncmp(tls_engine_settings.engine.s, "NONE", 4))
 		return 0;
+#endif /* KSR_SSL_ENGINE */
 
 	if(rank > 0) {
+#ifdef KSR_SSL_PROVIDER
+		if(tls_provider_quirks & 1) {
+			new_ctx = OSSL_LIB_CTX_new();
+			orig_ctx = OSSL_LIB_CTX_set0_default(new_ctx);
+			CONF_modules_load_file(CONF_get1_default_config_file(), NULL, 0L);
+		}
+#endif /* KSR_SSL_PROVIDER */
 		if(tls_engine_init() < 0)
 			return -1;
 		if(tls_fix_engine_keys(*tls_domains_cfg, &srv_defaults, &cli_defaults)
 				< 0)
 			return -1;
-		LM_INFO("OpenSSL Engine loaded private keys in child: %d\n", rank);
+		LM_INFO("OpenSSL loaded private keys in child: %d\n", rank);
 	}
-#endif
+#endif /* KSR_SSL_PROVIDER */
 	return 0;
 }
 
@@ -678,17 +737,25 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 
 	register_tls_hooks(&tls_h);
 
-        /*
+	/*
          * GH #3695: OpenSSL 1.1.1 historical note: it is no longer
          * needed to replace RAND with cryptorand
          */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L \
+		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+	if(ksr_tls_threads_mode == 0) {
+		LM_WARN("OpenSSL 1.1.1 setting cryptorand random engine\n");
+		RAND_set_rand_method(RAND_ksr_cryptorand_method());
+	}
+#endif
+
 	sr_kemi_modules_add(sr_kemi_tls_exports);
 
 	return 0;
 }
 
 
-#ifndef OPENSSL_NO_ENGINE
+#ifdef KSR_SSL_ENGINE
 /*
  * initialize OpenSSL engine in child process
  * PKCS#11 libraries are not guaranteed to be fork() safe
@@ -714,6 +781,7 @@ static int tls_engine_init()
 	 * We are in the child process and the global engine linked-list
 	 * is initialized in the parent.
 	 */
+	ENGINE_load_builtin_engines();
 	e = ENGINE_by_id("dynamic");
 	if(!e) {
 		err = "Error loading dynamic engine";
@@ -780,5 +848,54 @@ error:
 EVP_PKEY *tls_engine_private_key(const char *key_id)
 {
 	return ENGINE_load_private_key(ksr_tls_engine, key_id, NULL, NULL);
+}
+#endif /* KSR_SSL_ENGINE */
+
+#ifdef KSR_SSL_PROVIDER
+#include <openssl/store.h>
+static int tls_engine_init()
+{
+	return 0;
+}
+EVP_PKEY *tls_engine_private_key(const char *key_id)
+{
+	OSSL_STORE_CTX *ctx;
+	EVP_PKEY *pkey = NULL;
+
+	ctx = OSSL_STORE_open_ex(key_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+	if(!ctx) {
+		LM_ERR("[ERR] could not load URI %s\n", key_id);
+		goto error;
+	}
+
+	OSSL_STORE_expect(ctx, OSSL_STORE_INFO_PKEY);
+
+	while(!(OSSL_STORE_eof(ctx))) {
+		OSSL_STORE_INFO *info = OSSL_STORE_load(ctx);
+		if(info == NULL)
+			continue;
+
+		int type;
+		type = OSSL_STORE_INFO_get_type(info);
+
+		switch(type) {
+			case OSSL_STORE_INFO_PKEY:
+				pkey = OSSL_STORE_INFO_get1_PKEY(info);
+				break;
+			default:
+				continue;
+				break;
+		}
+		OSSL_STORE_INFO_free(info);
+		if(pkey)
+			break;
+	}
+
+	LM_INFO("Loaded private key = %p\n", pkey);
+
+error:
+	OSSL_STORE_close(ctx);
+
+	return pkey;
 }
 #endif

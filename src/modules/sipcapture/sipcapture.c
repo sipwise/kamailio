@@ -176,7 +176,7 @@ static int hep_version(struct sip_msg *msg);
 
 
 static str db_url = str_init(DEFAULT_DB_URL);
-static str table_name = str_init("sip_capture");
+static str _sipcap_table_name = str_init("sip_capture");
 static str hash_source = str_init("call_id");
 static str mt_mode = str_init("rand");
 static str date_column = str_init("date");
@@ -298,8 +298,6 @@ static struct sock_filter BPF_code[] = {
 
 //str* table_names = NULL;
 
-unsigned int no_tables = 0;
-
 enum e_mt_mode mtmode = mode_random;
 enum hash_source source = hs_error;
 
@@ -340,7 +338,7 @@ int capture_mode_param(modparam_t type, void *val);
  * Exported parameters
  */
 static param_export_t params[] = {{"db_url", PARAM_STR, &db_url},
-		{"table_name", PARAM_STR, &table_name},
+		{"table_name", PARAM_STR, &_sipcap_table_name},
 		{"hash_source", PARAM_STR, &hash_source},
 		{"mt_mode", PARAM_STR, &mt_mode},
 		{"date_column", PARAM_STR, &date_column},
@@ -481,12 +479,12 @@ int parse_table_names(str table_name, str **table_names)
 {
 
 	char *p = NULL;
-	unsigned int no_tables;
+	unsigned int l_no_tables;
 	char *table_name_cpy;
-	unsigned int i;
+	int i;
 
 	/*parse and save table names*/
-	no_tables = 1;
+	l_no_tables = 1;
 	i = 0;
 
 	str *names;
@@ -503,12 +501,12 @@ int parse_table_names(str table_name, str **table_names)
 
 	while(*p) {
 		if(*p == '|') {
-			no_tables++;
+			l_no_tables++;
 		}
 		p++;
 	}
 
-	names = (str *)pkg_malloc(sizeof(str) * no_tables);
+	names = (str *)pkg_malloc(sizeof(str) * l_no_tables);
 	if(names == NULL) {
 		PKG_MEM_ERROR;
 		pkg_free(table_name_cpy);
@@ -539,7 +537,7 @@ int parse_table_names(str table_name, str **table_names)
 
 	*table_names = names;
 
-	return no_tables;
+	return l_no_tables;
 }
 
 /* checks for some missing fields*/
@@ -820,9 +818,9 @@ static int mod_init(void)
 		}
 	}
 
-	/* Check the table name - if table_name is empty and no capture modes
+	/* Check the table name - if _sipcap_table_name is empty and no capture modes
 	 * are defined, then error*/
-	if(!table_name.len && capture_modes_root == NULL) {
+	if(!_sipcap_table_name.len && capture_modes_root == NULL) {
 		LM_ERR("ERROR: sipcapture: mod_init: table_name is not defined or "
 			   "empty\n");
 		return -1;
@@ -833,14 +831,14 @@ static int mod_init(void)
 	def_params = (char *)pkg_malloc(
 			snprintf(NULL, 0,
 					"db_url=%s;table_name=%s;mt_mode=%s;hash_source=%s",
-					db_url.s, table_name.s, mt_mode.s, hash_source.s)
+					db_url.s, _sipcap_table_name.s, mt_mode.s, hash_source.s)
 			+ 1);
 	if(!def_params) {
 		PKG_MEM_ERROR;
 		return -1;
 	}
 	sprintf(def_params, "db_url=%s;table_name=%s;mt_mode=%s;hash_source=%s",
-			db_url.s, table_name.s, mt_mode.s, hash_source.s);
+			db_url.s, _sipcap_table_name.s, mt_mode.s, hash_source.s);
 
 	str def_name, def_par;
 	def_name.s = strdup("default");
@@ -1779,7 +1777,7 @@ static int sip_capture_store(struct _sipcapture_object *sco, str *dtable,
 		}
 		table = &c->table_names[ii];
 	} else {
-		table = &table_name;
+		table = &_sipcap_table_name;
 	}
 
 	tvsec_ = (time_t)(sco->tmstamp / 1000000);
@@ -1849,6 +1847,7 @@ static int sip_capture(
 	struct timeval tvb;
 	struct timezone tz;
 	char tmp_node[100];
+	str ip;
 
 	LM_DBG("CAPTURE DEBUG...\n");
 
@@ -2249,9 +2248,12 @@ static int sip_capture(
 
 	/* IP source and destination */
 
-	strcpy(buf_ip, ip_addr2a(&msg->rcv.src_ip));
+	ip.s = ip_addr2a(&msg->rcv.src_ip);
+	ip.len = strlen(ip.s);
+	/* Copy, including teminating \0 */
+	memcpy(buf_ip, ip.s, ip.len + 1);
 	sco.source_ip.s = buf_ip;
-	sco.source_ip.len = strlen(buf_ip);
+	sco.source_ip.len = ip.len;
 	sco.source_port = msg->rcv.src_port;
 
 	/*source ip*/
@@ -2794,7 +2796,7 @@ static int report_capture(sip_msg_t *msg, str *_table, str *_corr, str *_data)
 	struct timezone tz;
 	char tmp_node[100];
 	time_t epoch_time_as_time_t;
-	str corrtmp = STR_NULL, tmp;
+	str corrtmp = STR_NULL, tmp, ip;
 
 
 	_capture_mode_data_t *c = NULL;
@@ -2834,10 +2836,12 @@ static int report_capture(sip_msg_t *msg, str *_table, str *_corr, str *_data)
 	//EMPTY_STR(sco.msg);
 
 	/* IP source and destination */
-
-	strcpy(buf_ip, ip_addr2a(&msg->rcv.src_ip));
+	ip.s = ip_addr2a(&msg->rcv.src_ip);
+	ip.len = strlen(ip.s);
+	/* Copy, including teminating \0 */
+	memcpy(buf_ip, ip.s, ip.len + 1);
 	sco.source_ip.s = buf_ip;
-	sco.source_ip.len = strlen(buf_ip);
+	sco.source_ip.len = ip.len;
 	sco.source_port = msg->rcv.src_port;
 
 	/*source ip*/
