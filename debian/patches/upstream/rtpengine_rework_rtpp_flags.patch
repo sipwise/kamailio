@@ -1,44 +1,43 @@
 From: Donat Zenichev <dzenichev@sipwise.com>
-Date: Mon, 25 Mar 2024 12:06:43 +0100
-Subject: MT#58535 rtpp_flags: add flags processing on the daemon side
+Date: Sat, 16 Mar 2024 19:23:21 +0100
+Subject: [PATCH] rtpengine: add flags processing on the daemon side
 
 Introduce a versatile behavior of the rtpengine module
-in terms of ability to parse flags on the daemon side,
+in terms of ability to parse flags on rtpengine side,
 instead of module. Previous behavior is also kept.
 
 General points:
-- rtpengine daemon supports rtpp flags processing from now on
-- module still provides in the bencode (when calling daemon):
-  call-id, to/from tags, viabranch (so identification call data)
-- even though the module's interface is updated,
-  a backwards compatibility is given, so no obligatory changes
-  from kamailio script users required
-- each rtpengine module's function which takes rtpp flags
-  as a parameter, now is able to get a third parameter `viabranch`,
-  which is used to detect, which approach to use (older/newer):
-  - without the viabranch - older one used
-  - with the viabrnach - new one used, so rtpp flags parsing on
-    the daemoin side
+ - rtpengine daemon supports rtpp flags processing from now on
+ - module still provides in the bencode (when calling daemon):
+   call-id, to/from tags, viabranch (so identification call data)
+ - even though the module's interface is updated,
+   a backwards compatibility is given, so no obligatory changes
+   from kamailio script users required
+ - each rtpengine module's function which takes rtpp flags
+   as a parameter, now is able to get a third parameter `viabranch`,
+   which is used to detect, which approach to use (older/newer):
+   - without the viabranch - older one used
+   - with the viabrnach - new one used, so rtpp flags parsing on
+     rtpengine side
 
-The goal is to deprecate processing of option flags on the module
-side and only parse them on the daemon side.
+The goal (for the future) is to deprecate processing of option flags
+on the module side and only parse them using rtpengine.
 This brings a list of benifits, such as:
-- no need to keep in sync daemon and module (for specific flags)
-- support of different rtpp flag string formats (raw), so that,
-  for example, kamailio script users can use plain text or
-  bencode dictionary like format
-
-Change-Id: I3cd337236ed5aa07490ad4f038f4a9be957decb3
+ - no need to keep in sync rtpengine and module (for specific flags)
+ - support of different rtpp flag string formats (raw), so that,
+   for example, kamailio script users can use plain text or
+   bencode dictionary like format, when providing flags from
+   the kamailio script
 ---
- src/modules/rtpengine/rtpengine.c | 837 +++++++++++++++++++++++++++-----------
- 1 file changed, 603 insertions(+), 234 deletions(-)
+ src/modules/rtpengine/rtpengine.c | 834 +++++++++++++++++++++++++++-----------
+ 1 file changed, 600 insertions(+), 234 deletions(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 1c7da31..a0ae7f9 100644
+index c0727ed..b116c05 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -148,6 +148,11 @@ static const char *command_strings[] = {
- 		[OP_PLAY_DTMF] = "play DTMF",
+@@ -152,6 +152,11 @@ static const char *command_strings[] = {
+ 	[OP_PLAY_DTMF] = "play DTMF",
  };
  
 +static const char *sip_type_strings[] = {
@@ -46,10 +45,10 @@ index 1c7da31..a0ae7f9 100644
 +		[SIP_REPLY] = "sip_reply",
 +};
 +
- struct minmax_mos_stats
- {
+ struct minmax_mos_stats {
  	str mos_param;
-@@ -226,8 +231,14 @@ static int fixup_free_rtpengine_query_v(void **param, int param_no);
+ 	str at_param;
+@@ -228,8 +233,14 @@ static int fixup_free_rtpengine_query_v(void **param, int param_no);
  
  static int parse_flags(struct ng_flags_parse *, struct sip_msg *,
  		enum rtpe_operation *, const char *);
@@ -66,54 +65,54 @@ index 1c7da31..a0ae7f9 100644
  		enum rtpe_operation op, int more);
  static int fixup_set_id(void **param, int param_no);
  static int set_rtpengine_set_f(struct sip_msg *msg, char *str1, char *str2);
-@@ -385,6 +396,8 @@ static cmd_export_t cmds[] = {
- 				0, ANY_ROUTE},
- 		{"play_media", (cmd_function)play_media_f, 1, fixup_spve_null, 0,
- 				ANY_ROUTE},
-+		{"play_media", (cmd_function)play_media_f, 2, fixup_spve_spve, 0,
-+				ANY_ROUTE},
- 		{"stop_media", (cmd_function)stop_media_f, 1, fixup_spve_null, 0,
- 				ANY_ROUTE},
- 		{"stop_media", (cmd_function)stop_media_f, 0, 0, 0, ANY_ROUTE},
-@@ -394,25 +407,37 @@ static cmd_export_t cmds[] = {
- 				ANY_ROUTE},
- 		{"rtpengine_offer", (cmd_function)rtpengine_offer1_f, 1,
- 				fixup_spve_null, 0, ANY_ROUTE},
-+		{"rtpengine_offer", (cmd_function)rtpengine_offer1_f, 2,
-+				fixup_spve_spve, 0, ANY_ROUTE},
- 		{"rtpengine_answer", (cmd_function)rtpengine_answer1_f, 0, 0, 0,
- 				ANY_ROUTE},
- 		{"rtpengine_answer", (cmd_function)rtpengine_answer1_f, 1,
- 				fixup_spve_null, 0, ANY_ROUTE},
-+		{"rtpengine_answer", (cmd_function)rtpengine_answer1_f, 2,
-+				fixup_spve_spve, 0, ANY_ROUTE},
- 		{"rtpengine_info", (cmd_function)rtpengine_info1_f, 0, 0, 0, ANY_ROUTE},
- 		{"rtpengine_info", (cmd_function)rtpengine_info1_f, 1, fixup_spve_null,
- 				0, ANY_ROUTE},
-+		{"rtpengine_info", (cmd_function)rtpengine_info1_f, 2, fixup_spve_spve,
-+				0, ANY_ROUTE},
- 		{"rtpengine_manage", (cmd_function)rtpengine_manage1_f, 0, 0, 0,
- 				ANY_ROUTE},
- 		{"rtpengine_manage", (cmd_function)rtpengine_manage1_f, 1,
- 				fixup_spve_null, 0, ANY_ROUTE},
-+		{"rtpengine_manage", (cmd_function)rtpengine_manage1_f, 2,
-+				fixup_spve_spve, 0, ANY_ROUTE},
- 		{"rtpengine_delete", (cmd_function)rtpengine_delete1_f, 0, 0, 0,
- 				ANY_ROUTE},
- 		{"rtpengine_delete", (cmd_function)rtpengine_delete1_f, 1,
- 				fixup_spve_null, 0, ANY_ROUTE},
-+		{"rtpengine_delete", (cmd_function)rtpengine_delete1_f, 2,
-+				fixup_spve_spve, 0, ANY_ROUTE},
- 		{"rtpengine_query", (cmd_function)rtpengine_query1_f, 0, 0, 0,
- 				ANY_ROUTE},
- 		{"rtpengine_query", (cmd_function)rtpengine_query1_f, 1,
- 				fixup_spve_null, 0, ANY_ROUTE},
-+		{"rtpengine_query", (cmd_function)rtpengine_query1_f, 2,
-+				fixup_spve_spve, 0, ANY_ROUTE},
- 		{"rtpengine_query_v", (cmd_function)w_rtpengine_query_v, 2,
- 				fixup_rtpengine_query_v, fixup_free_rtpengine_query_v,
- 				ANY_ROUTE},
-@@ -2277,6 +2302,127 @@ static int parse_codec_flag(struct ng_flags_parse *ng_flags, const str *key,
+@@ -410,6 +421,8 @@ static cmd_export_t cmds[] = {
+ 			0, ANY_ROUTE},
+ 	{"play_media", (cmd_function)play_media_f, 1, fixup_spve_null, 0,
+ 			ANY_ROUTE},
++	{"play_media", (cmd_function)play_media_f, 2, fixup_spve_spve, 0,
++			ANY_ROUTE},
+ 	{"stop_media", (cmd_function)stop_media_f, 1, fixup_spve_null, 0,
+ 			ANY_ROUTE},
+ 	{"stop_media", (cmd_function)stop_media_f, 0, 0, 0, ANY_ROUTE},
+@@ -419,25 +432,37 @@ static cmd_export_t cmds[] = {
+ 			ANY_ROUTE},
+ 	{"rtpengine_offer", (cmd_function)rtpengine_offer1_f, 1,
+ 			fixup_spve_null, 0, ANY_ROUTE},
++	{"rtpengine_offer", (cmd_function)rtpengine_offer1_f, 2,
++			fixup_spve_spve, 0, ANY_ROUTE},
+ 	{"rtpengine_answer", (cmd_function)rtpengine_answer1_f, 0, 0, 0,
+ 			ANY_ROUTE},
+ 	{"rtpengine_answer", (cmd_function)rtpengine_answer1_f, 1,
+ 			fixup_spve_null, 0, ANY_ROUTE},
++	{"rtpengine_answer", (cmd_function)rtpengine_answer1_f, 2,
++			fixup_spve_spve, 0, ANY_ROUTE},
+ 	{"rtpengine_info", (cmd_function)rtpengine_info1_f, 0, 0, 0, ANY_ROUTE},
+ 	{"rtpengine_info", (cmd_function)rtpengine_info1_f, 1, fixup_spve_null,
+ 			0, ANY_ROUTE},
++	{"rtpengine_info", (cmd_function)rtpengine_info1_f, 2, fixup_spve_spve,
++			0, ANY_ROUTE},
+ 	{"rtpengine_manage", (cmd_function)rtpengine_manage1_f, 0, 0, 0,
+ 			ANY_ROUTE},
+ 	{"rtpengine_manage", (cmd_function)rtpengine_manage1_f, 1,
+ 			fixup_spve_null, 0, ANY_ROUTE},
++	{"rtpengine_manage", (cmd_function)rtpengine_manage1_f, 2,
++			fixup_spve_spve, 0, ANY_ROUTE},
+ 	{"rtpengine_delete", (cmd_function)rtpengine_delete1_f, 0, 0, 0,
+ 			ANY_ROUTE},
+ 	{"rtpengine_delete", (cmd_function)rtpengine_delete1_f, 1,
+ 			fixup_spve_null, 0, ANY_ROUTE},
++	{"rtpengine_delete", (cmd_function)rtpengine_delete1_f, 2,
++			fixup_spve_spve, 0, ANY_ROUTE},
+ 	{"rtpengine_query", (cmd_function)rtpengine_query1_f, 0, 0, 0,
+ 			ANY_ROUTE},
+ 	{"rtpengine_query", (cmd_function)rtpengine_query1_f, 1,
+ 			fixup_spve_null, 0, ANY_ROUTE},
++	{"rtpengine_query", (cmd_function)rtpengine_query1_f, 2,
++			fixup_spve_spve, 0, ANY_ROUTE},
+ 	{"rtpengine_query_v", (cmd_function)w_rtpengine_query_v, 2,
+ 			fixup_rtpengine_query_v, fixup_free_rtpengine_query_v,
+ 			ANY_ROUTE},
+@@ -2654,6 +2679,124 @@ static int parse_codec_flag(struct ng_flags_parse *ng_flags, const str *key,
  	return 1;
  }
  
@@ -235,13 +234,10 @@ index 1c7da31..a0ae7f9 100644
 +	return 0;
 +}
 +
-+/**
-+ * parse rtpp flags by module
-+ */
- static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg,
- 		enum rtpe_operation *op, const char *flags_str)
- {
-@@ -2548,28 +2694,34 @@ error:
+ /**
+  * Parse the flags string
+  */
+@@ -2934,28 +3077,33 @@ error:
  	return -1;
  }
  
@@ -263,7 +259,6 @@ index 1c7da31..a0ae7f9 100644
  	str viabranch = STR_NULL;
  	str body = STR_NULL, error = STR_NULL;
  	int ret, queried_nodes = 0, cont_type = 0;
-+	unsigned int branch_idx;
 +	unsigned int parse_by_module = (p_viabranch) ? 0 : 1;
  	struct rtpp_node *node;
  	char *cp;
@@ -283,7 +278,7 @@ index 1c7da31..a0ae7f9 100644
  	if(IS_SIP(msg) || IS_SIP_REPLY(msg)) {
  		if(get_callid(msg, &ng_flags.call_id) == -1
  				|| ng_flags.call_id.len == 0) {
-@@ -2586,54 +2738,70 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
+@@ -2972,54 +3120,70 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
  			return NULL;
  		}
  	}
@@ -382,7 +377,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!IS_SIP(msg) && !IS_SIP_REPLY(msg)) {
  		/* check required values */
  		if(ng_flags.call_id.len == 0) {
-@@ -2646,130 +2814,95 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
+@@ -3032,130 +3196,95 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
  		}
  	}
  
@@ -592,7 +587,7 @@ index 1c7da31..a0ae7f9 100644
  
  	if(bencbuf->error) {
  		LM_ERR("out of memory - bencode failed\n");
-@@ -2948,12 +3081,19 @@ error:
+@@ -3334,12 +3463,19 @@ error:
  }
  
  static int rtpp_function_call_simple(
@@ -614,7 +609,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!ret)
  		return -1;
  
-@@ -2975,12 +3115,12 @@ static int rtpengine_simple_wrap(
+@@ -3361,12 +3497,12 @@ static int rtpengine_simple_wrap(
  
  
  static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf,
@@ -629,7 +624,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!ret)
  		return NULL;
  
-@@ -3800,11 +3940,19 @@ static void parse_call_stats(bencode_item_t *dict, struct sip_msg *msg)
+@@ -4188,11 +4324,19 @@ static void parse_call_stats(bencode_item_t *dict, struct sip_msg *msg)
  	parse_call_stats_1(&side_B_mos_stats, dict, msg);
  }
  
@@ -651,7 +646,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!ret)
  		return -1;
  	parse_call_stats(ret, msg);
-@@ -3812,11 +3960,19 @@ static int rtpengine_delete(struct sip_msg *msg, const char *flags)
+@@ -4200,11 +4344,19 @@ static int rtpengine_delete(struct sip_msg *msg, const char *flags)
  	return 1;
  }
  
@@ -673,7 +668,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!ret)
  		return -1;
  	parse_call_stats(ret, msg);
-@@ -3863,9 +4019,15 @@ static int rtpengine_delete_wrap(
+@@ -4251,9 +4403,15 @@ static int rtpengine_delete_wrap(
  
  static int rtpengine_rtpp_set_wrap_fparam(struct sip_msg *msg,
  		int (*func)(struct sip_msg *msg, void *, int, enum rtpe_operation),
@@ -690,13 +685,14 @@ index 1c7da31..a0ae7f9 100644
  
  	flags.s = NULL;
  	if(str1) {
-@@ -3873,15 +4035,25 @@ static int rtpengine_rtpp_set_wrap_fparam(struct sip_msg *msg,
+@@ -4261,15 +4419,25 @@ static int rtpengine_rtpp_set_wrap_fparam(struct sip_msg *msg,
  			LM_ERR("Error getting string parameter\n");
  			return -1;
  		}
 +		parms[0] = &flags;
-+	}
-+
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, func, flags.s, direction, op);
 +	viabranch.s = NULL;
 +	if (str2) {
 +		if(get_str_fparam(&viabranch, msg, (fparam_t *)str2)) {
@@ -704,9 +700,8 @@ index 1c7da31..a0ae7f9 100644
 +			return -1;
 +		}
 +		parms[1] = &viabranch;
- 	}
- 
--	return rtpengine_rtpp_set_wrap(msg, func, flags.s, direction, op);
++	}
++
 +	return rtpengine_rtpp_set_wrap(msg, func, parms, direction, op);
  }
  
@@ -718,7 +713,7 @@ index 1c7da31..a0ae7f9 100644
  }
  
  static int rtpengine_query_wrap(
-@@ -3893,7 +4065,7 @@ static int rtpengine_query_wrap(
+@@ -4281,7 +4449,7 @@ static int rtpengine_query_wrap(
  static int rtpengine_query1_f(struct sip_msg *msg, char *str1, char *str2)
  {
  	return rtpengine_rtpp_set_wrap_fparam(
@@ -727,7 +722,7 @@ index 1c7da31..a0ae7f9 100644
  }
  
  
-@@ -3973,7 +4145,7 @@ static int set_rtpengine_set_f(struct sip_msg *msg, char *str1, char *str2)
+@@ -4361,7 +4529,7 @@ static int set_rtpengine_set_f(struct sip_msg *msg, char *str1, char *str2)
  	return 1;
  }
  
@@ -736,7 +731,7 @@ index 1c7da31..a0ae7f9 100644
  {
  	int method;
  	int nosdp;
-@@ -4000,7 +4172,7 @@ static int rtpengine_manage(struct sip_msg *msg, const char *flags)
+@@ -4388,7 +4556,7 @@ static int rtpengine_manage(struct sip_msg *msg, const char *flags)
  		return -1;
  
  	if(method & (METHOD_CANCEL | METHOD_BYE))
@@ -745,7 +740,7 @@ index 1c7da31..a0ae7f9 100644
  
  	if(msg->msg_flags & FL_SDP_BODY)
  		nosdp = 0;
-@@ -4009,9 +4181,9 @@ static int rtpengine_manage(struct sip_msg *msg, const char *flags)
+@@ -4397,9 +4565,9 @@ static int rtpengine_manage(struct sip_msg *msg, const char *flags)
  
  	if(msg->first_line.type == SIP_REQUEST) {
  		if((method & (METHOD_ACK | METHOD_PRACK)) && nosdp == 0)
@@ -757,7 +752,7 @@ index 1c7da31..a0ae7f9 100644
  		if(method == METHOD_INVITE && nosdp == 0) {
  			msg->msg_flags |= FL_SDP_BODY;
  			if(tmb.t_gett != NULL) {
-@@ -4021,21 +4193,21 @@ static int rtpengine_manage(struct sip_msg *msg, const char *flags)
+@@ -4409,21 +4577,21 @@ static int rtpengine_manage(struct sip_msg *msg, const char *flags)
  				}
  			}
  			if(route_type == FAILURE_ROUTE)
@@ -786,7 +781,7 @@ index 1c7da31..a0ae7f9 100644
  		}
  	}
  	return -1;
-@@ -4050,13 +4222,13 @@ static int rtpengine_manage_wrap(
+@@ -4438,13 +4606,13 @@ static int rtpengine_manage_wrap(
  static int rtpengine_manage1_f(struct sip_msg *msg, char *str1, char *str2)
  {
  	return rtpengine_rtpp_set_wrap_fparam(
@@ -802,7 +797,7 @@ index 1c7da31..a0ae7f9 100644
  }
  
  static int rtpengine_offer_wrap(
-@@ -4068,7 +4240,7 @@ static int rtpengine_offer_wrap(
+@@ -4456,7 +4624,7 @@ static int rtpengine_offer_wrap(
  static int rtpengine_offer1_f(struct sip_msg *msg, char *str1, char *str2)
  {
  	return rtpengine_rtpp_set_wrap_fparam(
@@ -811,7 +806,7 @@ index 1c7da31..a0ae7f9 100644
  }
  
  static int rtpengine_answer_wrap(
-@@ -4079,19 +4251,21 @@ static int rtpengine_answer_wrap(
+@@ -4467,19 +4635,21 @@ static int rtpengine_answer_wrap(
  
  static int rtpengine_answer1_f(struct sip_msg *msg, char *str1, char *str2)
  {
@@ -836,7 +831,7 @@ index 1c7da31..a0ae7f9 100644
  	bencode_buffer_t bencbuf;
  	bencode_item_t *dict;
  	str body, newbody;
-@@ -4101,7 +4275,11 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
+@@ -4489,7 +4659,11 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  	str cl_field = STR_NULL;
  	str cl_repl = STR_NULL;
  
@@ -849,7 +844,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!dict)
  		return -1;
  
-@@ -4185,7 +4363,7 @@ static int rtpengine_generic_f(
+@@ -4573,7 +4747,7 @@ static int rtpengine_generic_f(
  		struct sip_msg *msg, char *str1, enum rtpe_operation op)
  {
  	return rtpengine_rtpp_set_wrap_fparam(
@@ -858,7 +853,7 @@ index 1c7da31..a0ae7f9 100644
  }
  
  static int start_recording_f(struct sip_msg *msg, char *str1, char *str2)
-@@ -4231,6 +4409,9 @@ static int unsilence_media_f(struct sip_msg *msg, char *str1, char *str2)
+@@ -4619,6 +4793,9 @@ static int unsilence_media_f(struct sip_msg *msg, char *str1, char *str2)
  static int rtpengine_play_media(
  		struct sip_msg *msg, void *d, int more, enum rtpe_operation op)
  {
@@ -868,7 +863,7 @@ index 1c7da31..a0ae7f9 100644
  	bencode_buffer_t bencbuf;
  	long long duration;
  	bencode_item_t *ret;
-@@ -4238,7 +4419,11 @@ static int rtpengine_play_media(
+@@ -4626,7 +4803,11 @@ static int rtpengine_play_media(
  	pv_value_t val;
  	int retval = 1;
  
@@ -881,7 +876,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!ret)
  		return -1;
  	if(media_duration_pvar) {
-@@ -4264,7 +4449,7 @@ static int rtpengine_play_media(
+@@ -4652,7 +4833,7 @@ static int rtpengine_play_media(
  static int play_media_f(struct sip_msg *msg, char *str1, char *str2)
  {
  	return rtpengine_rtpp_set_wrap_fparam(
@@ -890,7 +885,7 @@ index 1c7da31..a0ae7f9 100644
  }
  
  static int stop_media_f(struct sip_msg *msg, char *str1, char *str2)
-@@ -4302,7 +4487,7 @@ static int rtpengine_rtpstat_wrap(
+@@ -4690,7 +4871,7 @@ static int rtpengine_rtpstat_wrap(
  	param = parms[0];
  	res = parms[1];
  
@@ -899,7 +894,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!dict)
  		return -1;
  
-@@ -4471,7 +4656,7 @@ static int rtpengine_query_v_wrap(
+@@ -4859,7 +5040,7 @@ static int rtpengine_query_v_wrap(
  	fmt = parms[0];
  	dst = parms[1];
  
@@ -908,7 +903,7 @@ index 1c7da31..a0ae7f9 100644
  	if(!dict) {
  		return -1;
  	}
-@@ -4603,158 +4788,267 @@ static int set_rtp_inst_pvar(struct sip_msg *msg, const str *const uri)
+@@ -4991,158 +5172,267 @@ static int set_rtp_inst_pvar(struct sip_msg *msg, const str *const uri)
  }
  
  /**
@@ -951,14 +946,14 @@ index 1c7da31..a0ae7f9 100644
  static int ki_rtpengine_offer(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_offer_wrap, flags->s, 1, OP_ANY);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_offer_wrap, parms, 1, OP_ANY);
 +}
 +static int ki_rtpengine_offer2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_offer_wrap, flags->s, 1, OP_ANY);
 +			msg, rtpengine_offer_wrap, parms, 1, OP_ANY);
  }
  
@@ -1100,16 +1095,16 @@ index 1c7da31..a0ae7f9 100644
  static int ki_silence_media(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
++	return rtpengine_rtpp_set_wrap(
++			msg, rtpengine_simple_wrap, parms, 1, OP_SILENCE_MEDIA);
++}
++static int ki_silence_media2(sip_msg_t *msg, str *flags, str *viabranch)
++{
++	void *parms[2] = {flags, viabranch};
  	return rtpengine_rtpp_set_wrap(
 -			msg, rtpengine_simple_wrap, flags->s, 1, OP_SILENCE_MEDIA);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_SILENCE_MEDIA);
  }
-+static int ki_silence_media2(sip_msg_t *msg, str *flags, str *viabranch)
-+{
-+	void *parms[2] = {flags, viabranch};
-+	return rtpengine_rtpp_set_wrap(
-+			msg, rtpengine_simple_wrap, parms, 1, OP_SILENCE_MEDIA);
-+}
 +
 +/* KI - unsilence media */
  static int ki_unsilence_media0(sip_msg_t *msg)
@@ -1122,14 +1117,14 @@ index 1c7da31..a0ae7f9 100644
  static int ki_unsilence_media(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNSILENCE_MEDIA);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNSILENCE_MEDIA);
 +}
 +static int ki_unsilence_media2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNSILENCE_MEDIA);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNSILENCE_MEDIA);
  }
  
@@ -1144,16 +1139,16 @@ index 1c7da31..a0ae7f9 100644
  static int ki_block_dtmf(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
++	return rtpengine_rtpp_set_wrap(
++			msg, rtpengine_simple_wrap, parms, 1, OP_BLOCK_DTMF);
++}
++static int ki_block_dtmf2(sip_msg_t *msg, str *flags, str *viabranch)
++{
++	void *parms[2] = {flags, viabranch};
  	return rtpengine_rtpp_set_wrap(
 -			msg, rtpengine_simple_wrap, flags->s, 1, OP_BLOCK_DTMF);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_BLOCK_DTMF);
  }
-+static int ki_block_dtmf2(sip_msg_t *msg, str *flags, str *viabranch)
-+{
-+	void *parms[2] = {flags, viabranch};
-+	return rtpengine_rtpp_set_wrap(
-+			msg, rtpengine_simple_wrap, parms, 1, OP_BLOCK_DTMF);
-+}
 +
 +/* KI - unblock dtmf */
  static int ki_unblock_dtmf0(sip_msg_t *msg)
@@ -1181,16 +1176,16 @@ index 1c7da31..a0ae7f9 100644
  static int ki_play_media(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
-+			msg, rtpengine_simple_wrap, parms, 1, OP_PLAY_MEDIA);
-+}
-+static int ki_play_media2(sip_msg_t *msg, str *flags, str *viabranch)
-+{
-+	void *parms[2] = {flags, viabranch};
  	return rtpengine_rtpp_set_wrap(
 -			msg, rtpengine_simple_wrap, flags->s, 1, OP_PLAY_MEDIA);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_PLAY_MEDIA);
  }
++static int ki_play_media2(sip_msg_t *msg, str *flags, str *viabranch)
++{
++	void *parms[2] = {flags, viabranch};
++	return rtpengine_rtpp_set_wrap(
++			msg, rtpengine_simple_wrap, parms, 1, OP_PLAY_MEDIA);
++}
 +
 +/* KI - stop media */
  static int ki_stop_media0(sip_msg_t *msg)
@@ -1217,7 +1212,7 @@ index 1c7da31..a0ae7f9 100644
  
  static int ki_set_rtpengine_set(sip_msg_t *msg, int r1)
  {
-@@ -4831,6 +5125,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5219,6 +5509,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1230,7 +1225,7 @@ index 1c7da31..a0ae7f9 100644
      { str_init("rtpengine"), str_init("rtpengine_offer0"),
          SR_KEMIP_INT, ki_rtpengine_offer0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-@@ -4841,6 +5141,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5229,6 +5525,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1243,7 +1238,7 @@ index 1c7da31..a0ae7f9 100644
      { str_init("rtpengine"), str_init("rtpengine_answer0"),
          SR_KEMIP_INT, ki_rtpengine_answer0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-@@ -4851,6 +5157,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5239,6 +5541,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1256,7 +1251,7 @@ index 1c7da31..a0ae7f9 100644
      { str_init("rtpengine"), str_init("rtpengine_delete0"),
          SR_KEMIP_INT, ki_rtpengine_delete0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-@@ -4861,6 +5173,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5249,6 +5557,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1269,7 +1264,7 @@ index 1c7da31..a0ae7f9 100644
      { str_init("rtpengine"), str_init("start_recording"),
          SR_KEMIP_INT, ki_start_recording,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-@@ -4872,7 +5190,7 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5260,7 +5574,7 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
  
@@ -1278,7 +1273,7 @@ index 1c7da31..a0ae7f9 100644
          SR_KEMIP_INT, ki_block_media0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-@@ -4882,6 +5200,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5270,6 +5584,12 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1291,7 +1286,7 @@ index 1c7da31..a0ae7f9 100644
  	{ str_init("rtpengine"), str_init("unblock_media0"),
          SR_KEMIP_INT, ki_unblock_media0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-@@ -4892,8 +5216,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5280,8 +5600,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1306,7 +1301,7 @@ index 1c7da31..a0ae7f9 100644
          SR_KEMIP_INT, ki_silence_media0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-@@ -4903,7 +5232,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5291,7 +5616,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1321,7 +1316,7 @@ index 1c7da31..a0ae7f9 100644
          SR_KEMIP_INT, ki_unsilence_media0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-@@ -4913,8 +5248,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5301,8 +5632,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1336,7 +1331,7 @@ index 1c7da31..a0ae7f9 100644
          SR_KEMIP_INT, ki_block_dtmf0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-@@ -4924,7 +5264,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5312,7 +5648,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1351,7 +1346,7 @@ index 1c7da31..a0ae7f9 100644
          SR_KEMIP_INT, ki_unblock_dtmf0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-@@ -4934,13 +5280,24 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5322,13 +5664,24 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1377,7 +1372,7 @@ index 1c7da31..a0ae7f9 100644
          SR_KEMIP_INT, ki_stop_media0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-@@ -4950,6 +5307,11 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5338,6 +5691,11 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1389,7 +1384,7 @@ index 1c7da31..a0ae7f9 100644
  
      { str_init("rtpengine"), str_init("set_rtpengine_set"),
          SR_KEMIP_INT, ki_set_rtpengine_set,
-@@ -4961,6 +5323,7 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5349,6 +5707,7 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_INT, SR_KEMIP_INT, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
@@ -1397,11 +1392,12 @@ index 1c7da31..a0ae7f9 100644
      { str_init("rtpengine"), str_init("rtpengine_query0"),
          SR_KEMIP_INT, ki_rtpengine_query0,
          { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-@@ -4971,7 +5334,13 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
+@@ -5359,7 +5718,14 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
          { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
              SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
      },
 -   { str_init("rtpengine"), str_init("rtpengine_query_v"),
++
 +    { str_init("rtpengine"), str_init("rtpengine_query2"),
 +        SR_KEMIP_INT, ki_rtpengine_query2,
 +        { SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,

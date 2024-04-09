@@ -34,29 +34,16 @@ sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
 #
 ## upstream master
-sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
-upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
-sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
-upstream/http_client-Add-parameter-timeout_mode-timeout-in-se.patch
-upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
+upstream/rtpengine_rework_rtpp_flags.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
-sipwise/cfgt-skip_unknown.patch
-sipwise/cfgt-skip_duplicate_dump.patch
-sipwise/cfgt-route-log.patch
-sipwise/db_redis_skip_empty_keys.patch
-sipwise/db_redis_graceful_scan.patch
-sipwise/db_redis_sscan.patch
-sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/lcr-stats.patch
 sipwise/lcr_read_id.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
-sipwise/rtpengine-set-mime-content-length.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
-sipwise/rtpengine_rework_rtpp_flags.patch
 ### active development
 #
 ### Don't just put stuff in any order

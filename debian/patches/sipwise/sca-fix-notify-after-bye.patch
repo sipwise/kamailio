@@ -7,10 +7,10 @@ Subject: sca-fix-notify-after-bye
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 6b02041..e4c9b11 100644
+index ef481a5..dde6e1b 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -714,7 +714,7 @@ static int sca_call_info_uri_update(str *aor, sca_call_info *call_info,
+@@ -720,7 +720,7 @@ static int sca_call_info_uri_update(str *aor, sca_call_info *call_info,
  
  	dialog.id.s = dlg_buf;
  	if(sca_dialog_build_from_tags(

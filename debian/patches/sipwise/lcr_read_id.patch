@@ -3,14 +3,14 @@ Date: Thu, 2 Nov 2023 11:45:00 +0100
 Subject: lcr_read_id
 
 ---
- src/modules/lcr/lcr_mod.c | 93 +++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 73 insertions(+), 20 deletions(-)
+ src/modules/lcr/lcr_mod.c | 91 +++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 72 insertions(+), 19 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 834612c..3f4cb86 100644
+index 67b071d..6b53dc6 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
-@@ -172,6 +172,7 @@ static char *gw_uri_avp_param = NULL;
+@@ -173,6 +173,7 @@ static char *gw_uri_avp_param = NULL;
  static char *ruri_user_avp_param = NULL;
  static char *tag_avp_param = NULL;
  static char *flags_avp_param = NULL;
@@ -18,7 +18,7 @@ index 834612c..3f4cb86 100644
  static char *rule_id_avp_param = NULL;
  static char *defunct_gw_avp_param = NULL;
  static char *lcr_id_avp_param = NULL;
-@@ -224,6 +225,8 @@ static int     tag_avp_type;
+@@ -228,6 +229,8 @@ static int     tag_avp_type;
  static int_str tag_avp;
  static int     flags_avp_type;
  static int_str flags_avp;
@@ -27,7 +27,7 @@ index 834612c..3f4cb86 100644
  static int     rule_id_avp_type;
  static int_str rule_id_avp;
  static int     defunct_gw_avp_type;
-@@ -355,6 +358,7 @@ static param_export_t params[] = {
+@@ -359,6 +362,7 @@ static param_export_t params[] = {
      {"ruri_user_avp",            PARAM_STRING, &ruri_user_avp_param},
      {"tag_avp",                  PARAM_STRING, &tag_avp_param},
      {"flags_avp",                PARAM_STRING, &flags_avp_param},
@@ -35,7 +35,7 @@ index 834612c..3f4cb86 100644
      {"rule_id_avp",              PARAM_STRING, &rule_id_avp_param},
      {"defunct_capability",       INT_PARAM, &defunct_capability_param},
      {"defunct_gw_avp",           PARAM_STRING, &defunct_gw_avp_param},
-@@ -760,6 +764,21 @@ static int mod_init(void)
+@@ -775,6 +779,21 @@ static int mod_init(void)
  		flags_avp_type = avp_flags;
  	}
  
@@ -57,16 +57,16 @@ index 834612c..3f4cb86 100644
  	if(rule_id_avp_param) {
  		s.s = rule_id_avp_param;
  		s.len = strlen(s.s);
-@@ -2098,7 +2117,7 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
+@@ -2131,7 +2150,7 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
  		struct ip_addr *ip_addr, char *hostname, unsigned int hostname_len,
- 		unsigned int port, char *params, unsigned int params_len,
+ 		unsigned int port, char *uparams, unsigned int uparams_len,
  		char *transport, unsigned int transport_len, unsigned int flags,
 -		unsigned int rule_id)
 +		unsigned int rule_id, unsigned int gw_id)
  {
  	char *at, *string;
  	int len;
-@@ -2154,13 +2173,18 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
+@@ -2187,13 +2206,18 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
  	/* rule id */
  	string = int2str(rule_id, &len);
  	append_str(at, string, len);
@@ -79,14 +79,14 @@ index 834612c..3f4cb86 100644
  
  static inline int decode_avp_value(char *value, unsigned int *gw_index,
  		str *scheme, unsigned int *strip, str *prefix, str *tag,
- 		struct ip_addr *addr, str *hostname, str *port, str *params,
+ 		struct ip_addr *addr, str *hostname, str *port, str *uparams,
 -		str *transport, unsigned int *flags, unsigned int *rule_id)
 +		str *transport, unsigned int *flags, unsigned int *rule_id,
 +		unsigned int *gw_id)
  {
  	unsigned int u = 0;
  	str s;
-@@ -2276,6 +2300,12 @@ static inline int decode_avp_value(char *value, unsigned int *gw_index,
+@@ -2309,6 +2333,12 @@ static inline int decode_avp_value(char *value, unsigned int *gw_index,
  	s.s = sep + 1;
  	s.len = strlen(s.s);
  	str2int(&s, rule_id);
@@ -99,17 +99,17 @@ index 834612c..3f4cb86 100644
  
  	return 1;
  }
-@@ -2326,7 +2356,8 @@ void add_gws_into_avps(struct gw_info *gws, struct matched_gw_info *matched_gws,
+@@ -2359,7 +2389,8 @@ void add_gws_into_avps(struct gw_info *gws, struct matched_gw_info *matched_gws,
  				gws[index].tag, tag_len, &gws[index].ip_addr,
  				gws[index].hostname, hostname_len, gws[index].port,
- 				gws[index].params, params_len, gws[index].transport,
+ 				gws[index].params, uparams_len, gws[index].transport,
 -				gws[index].transport_len, gws[index].flags, rule_id);
 +				gws[index].transport_len, gws[index].flags, rule_id,
 +				gws[index].gw_id);
  		value.s = (char *)&(encoded_value[0]);
  		val.s = value;
  		add_avp(gw_uri_avp_type | AVP_VAL_STR, gw_uri_avp, val);
-@@ -2489,9 +2520,9 @@ done:
+@@ -2536,9 +2567,9 @@ done:
  		if(matched_gws[i].duplicate == 1)
  			continue;
  		gw_indexes[j] = matched_gws[i].gw_index;
@@ -121,7 +121,7 @@ index 834612c..3f4cb86 100644
  			i = -1;
  		}
  		j++;
-@@ -2523,28 +2554,36 @@ void reset_gw_stats(struct gw_info *gw)
+@@ -2570,28 +2601,36 @@ void reset_gw_stats(struct gw_info *gw)
  
  	gw->rcv_gw_rpl = 0;
  	gw->rcv_gw_rpl_invite = 0;
@@ -166,7 +166,7 @@ index 834612c..3f4cb86 100644
  
  	gw->rcv_gw_rpls_1xx = 0;
  	gw->rcv_gw_rpls_18x = 0;
-@@ -2739,7 +2778,7 @@ done:
+@@ -2803,7 +2842,7 @@ done:
  			} else if(matched_gws[i].stopper == 1) {
  				stopper_flag = 1;
  				LM_DBG("lcr_rule[%d] has stopper, skip the rest\n",
@@ -175,7 +175,7 @@ index 834612c..3f4cb86 100644
  			}
  		}
  	}
-@@ -2838,7 +2877,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
+@@ -2902,7 +2941,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
  static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
  		unsigned int *r_uri_len, char *dst_uri, unsigned int *dst_uri_len,
  		struct ip_addr *addr, unsigned int *gw_index, unsigned int *flags,
@@ -184,16 +184,16 @@ index 834612c..3f4cb86 100644
  {
  	int_str gw_uri_val;
  	struct usr_avp *gu_avp;
-@@ -2864,7 +2903,7 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
+@@ -2928,7 +2967,7 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
  
  	decode_avp_value(gw_uri_val.s.s, gw_index, &scheme, &strip, &prefix,
- 			&tmp_tag, addr, &hostname, &port, &params, &transport, flags,
+ 			&tmp_tag, addr, &hostname, &port, &uparams, &transport, flags,
 -			rule_id);
 +			rule_id, gw_id);
  
  	if(addr->af != 0) {
  		addr_str.s = ip_addr2a(addr);
-@@ -3222,7 +3261,7 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3287,7 +3326,7 @@ static int ki_next_gw(sip_msg_t *_m)
  	int rval;
  	str uri_str, tag_str;
  	char tag[MAX_TAG_LEN];
@@ -202,7 +202,7 @@ index 834612c..3f4cb86 100644
  	char r_uri[MAX_URI_LEN], dst_uri[MAX_URI_LEN];
  	struct ip_addr addr;
  
-@@ -3244,7 +3283,8 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3309,7 +3348,8 @@ static int ki_next_gw(sip_msg_t *_m)
  			return -1;
  		}
  		if(generate_uris(_m, r_uri, &(_m->parsed_uri.user), &r_uri_len, dst_uri,
@@ -212,7 +212,7 @@ index 834612c..3f4cb86 100644
  				<= 0) {
  			return -1;
  		}
-@@ -3263,7 +3303,8 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3328,7 +3368,8 @@ static int ki_next_gw(sip_msg_t *_m)
           * and Destination URIs. */
  
  		if(generate_uris(_m, r_uri, &(ruri_user_val.s), &r_uri_len, dst_uri,
@@ -222,7 +222,7 @@ index 834612c..3f4cb86 100644
  				<= 0) {
  			return -1;
  		}
-@@ -3296,6 +3337,13 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3361,6 +3402,13 @@ static int ki_next_gw(sip_msg_t *_m)
  		LM_DBG("added flags_avp <%u>\n", (unsigned int)val.n);
  	}
  
@@ -236,7 +236,7 @@ index 834612c..3f4cb86 100644
  	/* Set tag_avp */
  	if(tag_avp_param) {
  		val.s = tag_str;
-@@ -3374,6 +3422,11 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -3439,6 +3487,11 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  			add_avp(flags_avp_type, flags_avp, val);
  			LM_DBG("added flags_avp <%u>\n", (unsigned int)val.n);
  		}
@@ -248,10 +248,3 @@ index 834612c..3f4cb86 100644
  		return 1;
  	} else {
  		LM_DBG("request did not come from gw\n");
-@@ -4048,4 +4101,4 @@ static struct gw_info *ki_lcr_check_sip_msg_against_gwlist(sip_msg_t *_m)
- 		}
- 	}
- 	return NULL;
--}
-\ No newline at end of file
-+}

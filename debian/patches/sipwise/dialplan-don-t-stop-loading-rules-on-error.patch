@@ -7,10 +7,10 @@ Subject: dialplan: don't stop loading rules on error
  1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/dialplan/dp_db.c b/src/modules/dialplan/dp_db.c
-index cc4ebeb..a3a9dac 100644
+index 857a2e4..0e18571 100644
 --- a/src/modules/dialplan/dp_db.c
 +++ b/src/modules/dialplan/dp_db.c
-@@ -304,8 +304,10 @@ int dp_load_db(void)
+@@ -332,8 +332,10 @@ int dp_load_db(void)
  
  			values = ROW_VALUES(rows + i);
  

@@ -7,10 +7,10 @@ Subject: sca-fallback-if-no-contact
  1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 414536d..2ded7fc 100644
+index 08a3ecf..a78d3c6 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1978,9 +1978,6 @@ int sca_call_info_update(
+@@ -1984,9 +1984,6 @@ int sca_call_info_update(
  			rc = -1;
  			goto done;
  		}
@@ -20,7 +20,7 @@ index 414536d..2ded7fc 100644
  	}
  	// reset rc to -1 so we don't end up returning 0 to the script
  	rc = -1;
-@@ -2027,6 +2024,13 @@ int sca_call_info_update(
+@@ -2033,6 +2030,13 @@ int sca_call_info_update(
  	LM_DBG("to_aor[%.*s] from_aor[%.*s]\n", STR_FMT(&to_aor),
  			STR_FMT(&from_aor));
  

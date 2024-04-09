@@ -18,7 +18,7 @@ index 1041be8..3820113 100644
  # Copyright 2008 Google Inc. All Rights Reserved.
  
 diff --git a/utils/kamctl/dbtextdb/dbtextdb_test.py b/utils/kamctl/dbtextdb/dbtextdb_test.py
-index 54ce274..fbcad97 100644
+index 8762de1..8232366 100644
 --- a/utils/kamctl/dbtextdb/dbtextdb_test.py
 +++ b/utils/kamctl/dbtextdb/dbtextdb_test.py
 @@ -1,4 +1,4 @@

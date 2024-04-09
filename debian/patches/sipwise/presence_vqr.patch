@@ -25,10 +25,10 @@ Subject: presence_vqr
  create mode 100644 src/modules/presence_vqr/presence_vqr.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index f61bcec..be89aae 100644
+index 698847f..f0fe234 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -121,7 +121,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
+@@ -118,7 +118,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_xml \
  					   pua pua_bla pua_dialoginfo pua_reginfo \
  					   pua_rpc pua_usrloc pua_xmpp \
