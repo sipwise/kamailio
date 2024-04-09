@@ -353,9 +353,14 @@ int auth_client_statefull_sm_process(
 					LM_DBG("In state AUTH_ST_PENDING and received "
 						   "AUTH_EV_RECV_ANS_UNSUCCESS - nothing to do but "
 						   "clean up session\n");
+					cdp_session_cleanup(s, NULL);
+					s = 0;
+					break;
 				case AUTH_EV_SESSION_TIMEOUT:
 				case AUTH_EV_SERVICE_TERMINATED:
 				case AUTH_EV_SESSION_GRACE_TIMEOUT:
+					LM_DBG("in state %d received event %d - clean up session",
+							x->state, event);
 					cdp_session_cleanup(s, NULL);
 					s = 0;
 					break;
@@ -746,7 +751,7 @@ void auth_server_stateless_sm_process(
 int dup_routing_avps(AAAMessage *src, AAAMessage *dest)
 {
 
-	AAA_AVP *avp;
+	AAA_AVP *avp, *avp2;
 	str dest_realm;
 
 	if(!src)
@@ -777,18 +782,24 @@ int dup_routing_avps(AAAMessage *src, AAAMessage *dest)
 		LM_DBG("dup_routing_avps: Origin Realm AVP present, duplicating %.*s\n",
 				avp->data.len, avp->data.s);
 		dest_realm = avp->data;
-		avp = AAACreateAVP(AVP_Destination_Realm, AAA_AVP_FLAG_MANDATORY, 0,
-				dest_realm.s, dest_realm.len, AVP_DUPLICATE_DATA);
-		if(!avp) {
-			LM_ERR("dup_routing_avps: Failed creating Destination Host avp\n");
-			goto error;
-		}
-		if(AAAAddAVPToMessage(dest, avp, dest->avpList.tail)
-				!= AAA_ERR_SUCCESS) {
-			LM_ERR("dup_routing_avps: Failed adding Destination Host avp to "
-				   "message\n");
-			AAAFreeAVP(&avp);
-			goto error;
+		avp2 = AAAFindMatchingAVP(src, src->avpList.head, AVP_Destination_Realm,
+				0, AAA_FORWARD_SEARCH);
+		if(!avp2) {
+			avp = AAACreateAVP(AVP_Destination_Realm, AAA_AVP_FLAG_MANDATORY, 0,
+					dest_realm.s, dest_realm.len, AVP_DUPLICATE_DATA);
+			if(!avp) {
+				LM_ERR("dup_routing_avps: Failed creating Destination Realm "
+					   "avp\n");
+				goto error;
+			}
+			if(AAAAddAVPToMessage(dest, avp, dest->avpList.tail)
+					!= AAA_ERR_SUCCESS) {
+				LM_ERR("dup_routing_avps: Failed adding Destination Realm avp "
+					   "to "
+					   "message\n");
+				AAAFreeAVP(&avp);
+				goto error;
+			}
 		}
 	}
 
@@ -971,11 +982,12 @@ void Send_ASR(cdp_session_t *s, AAAMessage *msg)
 	AAA_AVP *avp = 0;
 	peer *p = 0;
 	char x[4];
-	LM_DBG("Send_ASR() : sending ASR\n");
+
+	LM_DBG("sending ASR\n");
 	asr = AAACreateRequest(s->application_id, IMS_ASR, Flag_Proxyable, s);
 
 	if(!asr) {
-		LM_ERR("Send_ASR(): error creating ASR!\n");
+		LM_ERR("error creating ASR!\n");
 		return;
 	}
 
@@ -992,14 +1004,14 @@ void Send_ASR(cdp_session_t *s, AAAMessage *msg)
 
 	p = get_routing_peer(s, asr);
 	if(!p) {
-		LM_ERR("unable to get routing peer in Send_ASR \n");
-		if(asr)
-			AAAFreeMessage(&asr); //needed in frequency
+		LM_ERR("unable to get routing peer\n");
+		AAAFreeMessage(&asr); //needed in frequency
 	}
 
 	if(!peer_send_msg(p, asr)) {
-		if(asr)
-			AAAFreeMessage(&asr); //needed in frequency
-	} else
+		LM_ERR("unable to send message\n");
+		AAAFreeMessage(&asr); //needed in frequency
+	} else {
 		LM_DBG("success sending ASR\n");
+	}
 }

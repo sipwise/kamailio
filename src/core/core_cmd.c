@@ -137,24 +137,20 @@ static const char *dns_cache_stats_get_doc[] = {
 #ifdef DNS_WATCHDOG_SUPPORT
 void dns_set_server_state_rpc(rpc_t *rpc, void *ctx);
 
-static const char
-		*dns_set_server_state_doc[] =
-				{
-						"sets the state of the DNS servers "
-						"(0: all the servers are down, 1: at least one server "
-						"is up)", /* Documentation string */
-						0		  /* Method signature(s) */
+static const char *dns_set_server_state_doc[] = {
+		"sets the state of the DNS servers "
+		"(0: all the servers are down, 1: at least one server "
+		"is up)", /* Documentation string */
+		0		  /* Method signature(s) */
 };
 
 void dns_get_server_state_rpc(rpc_t *rpc, void *ctx);
 
-static const char
-		*dns_get_server_state_doc[] =
-				{
-						"prints the state of the DNS servers "
-						"(0: all the servers are down, 1: at least one server "
-						"is up)", /* Documentation string */
-						0		  /* Method signature(s) */
+static const char *dns_get_server_state_doc[] = {
+		"prints the state of the DNS servers "
+		"(0: all the servers are down, 1: at least one server "
+		"is up)", /* Documentation string */
+		0		  /* Method signature(s) */
 };
 
 #endif /* DNS_WATCHDOG_SUPPORT */
@@ -174,14 +170,10 @@ static const char *dst_blst_debug_doc[] = {
 		"dst blocklist debug info.", /* Documentation string */
 		0							 /* Method signature(s) */
 };
-static const char
-		*
-				dst_blst_view_doc
-						[] =
-								{
-										"dst blocklist dump in human-readable "
-										"format.", /* Documentation string */
-										0		   /* Method signature(s) */
+static const char *dst_blst_view_doc[] = {
+		"dst blocklist dump in human-readable "
+		"format.", /* Documentation string */
+		0		   /* Method signature(s) */
 };
 static const char *dst_blst_delete_all_doc[] = {
 		"Deletes all the entries from the dst blocklist except the permanent "
@@ -208,13 +200,10 @@ static const char *dst_blst_stats_get_doc[] = {
 static char up_since_ctime[MAX_CTIME_LEN];
 
 
-static const char
-		*
-				system_listMethods_doc[] =
-						{
-								"Lists all RPC methods supported by the "
-								"server.", /* Documentation string */
-								0		   /* Method signature(s) */
+static const char *system_listMethods_doc[] = {
+		"Lists all RPC methods supported by the "
+		"server.", /* Documentation string */
+		0		   /* Method signature(s) */
 };
 
 static void system_listMethods(rpc_t *rpc, void *c)
@@ -309,12 +298,10 @@ static void core_echo(rpc_t *rpc, void *c)
 }
 
 
-static const char
-		*core_echo_delta_doc[] =
-				{
-						"Returns back its parameters with execution delta "
-						"limit.", /* Documentation string */
-						0		  /* Method signature(s) */
+static const char *core_echo_delta_doc[] = {
+		"Returns back its parameters with execution delta "
+		"limit.", /* Documentation string */
+		0		  /* Method signature(s) */
 };
 
 
@@ -368,13 +355,10 @@ static void core_info(rpc_t *rpc, void *c)
 }
 
 
-static const char
-		*
-				core_runinfo_doc[] =
-						{
-								"Runtime info - binary name, version, uptime, "
-								"...", /* Documentation string */
-								0	   /* Method signature(s) */
+static const char *core_runinfo_doc[] = {
+		"Runtime info - binary name, version, uptime, "
+		"...", /* Documentation string */
+		0	   /* Method signature(s) */
 };
 
 static void core_runinfo(rpc_t *rpc, void *c)
@@ -444,14 +428,10 @@ static void core_uptime(rpc_t *rpc, void *c)
 }
 
 
-static const char
-		*
-				core_ps_doc
-						[] =
-								{
-										"Returns the description of running "
-										"processes.", /* Documentation string */
-										0			  /* Method signature(s) */
+static const char *core_ps_doc[] = {
+		"Returns the description of running "
+		"processes.", /* Documentation string */
+		0			  /* Method signature(s) */
 };
 
 
@@ -531,12 +511,10 @@ static void core_pwd(rpc_t *rpc, void *c)
 }
 
 
-static const char
-		*core_arg_doc[] =
-				{
-						"Returns the list of command line arguments used on "
-						"startup.", /* Documentation string */
-						0			/* Method signature(s) */
+static const char *core_arg_doc[] = {
+		"Returns the list of command line arguments used on "
+		"startup.", /* Documentation string */
+		0			/* Method signature(s) */
 };
 
 
@@ -1029,14 +1007,10 @@ static void core_ppdefines(rpc_t *rpc, void *c)
 /**
  *
  */
-static const char
-		*
-				core_ppdefines_full_doc
-						[] =
-								{
-										"List preprocessor defines with full "
-										"details", /* Documentation string */
-										0		   /* Method signature(s) */
+static const char *core_ppdefines_full_doc[] = {
+		"List preprocessor defines with full "
+		"details", /* Documentation string */
+		0		   /* Method signature(s) */
 };
 
 /**

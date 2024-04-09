@@ -76,6 +76,9 @@ int apy3s_exec_func(sip_msg_t *_msg, char *fname, char *fparam, int emode)
 		return -1;
 	}
 
+	/* clear error state */
+	PyErr_Clear();
+
 	if(lock_try(_sr_python_reload_lock) == 0) {
 		if(_sr_python_reload_version
 				&& *_sr_python_reload_version != _sr_python_local_version) {
@@ -98,11 +101,13 @@ int apy3s_exec_func(sip_msg_t *_msg, char *fname, char *fparam, int emode)
 
 	if(pFunc == NULL || !PyCallable_Check(pFunc)) {
 		if(emode == 1) {
-			LM_ERR("%s not found or is not callable\n", fname);
+			LM_ERR("%s not found or is not callable (%p)\n", fname, pFunc);
 		} else {
-			LM_DBG("%s not found or is not callable\n", fname);
+			LM_DBG("%s not found or is not callable (%p)\n", fname, pFunc);
 		}
-		Py_XDECREF(pFunc);
+		if(pFunc) {
+			Py_XDECREF(pFunc);
+		}
 		_sr_apy_env.msg = bmsg;
 		if(emode == 1) {
 			goto error;
@@ -157,6 +162,8 @@ error:
 	if(locked) {
 		lock_release(_sr_python_reload_lock);
 	}
+	/* clear error state */
+	PyErr_Clear();
 	return rval;
 }
 
@@ -175,7 +182,7 @@ int sr_kemi_config_engine_python(
 			ret = apy3s_exec_func(
 					msg, rname->s, (rparam && rparam->s) ? rparam->s : NULL, 0);
 		} else {
-			ret = apy3s_exec_func(msg, "ksr_request_route", NULL, 1);
+			ret = apy3s_exec_func(msg, kemi_request_route_callback.s, NULL, 1);
 		}
 	} else if(rtype == CORE_ONREPLY_ROUTE) {
 		if(kemi_reply_route_callback.len > 0) {

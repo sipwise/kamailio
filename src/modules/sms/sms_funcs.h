@@ -91,14 +91,19 @@ struct sms_msg
 	int ref;
 };
 
+#define SMS_NAME_LEN 64
+#define SMS_SENDER_LEN 32
+#define SMS_ASCII_LEN 500
+#define SMS_SMSC_LEN 32
+
 struct incame_sms
 {
-	char sender[31];
-	char name[64];
+	char sender[SMS_SENDER_LEN];
+	char name[SMS_NAME_LEN];
 	char date[DATE_LEN];
 	char time[TIME_LEN];
-	char ascii[500];
-	char smsc[31];
+	char ascii[SMS_ASCII_LEN];
+	char smsc[SMS_SMSC_LEN];
 	int userdatalength;
 	int is_statusreport;
 	int sms_id;
@@ -111,11 +116,11 @@ extern int net_pipes_in[MAX_NETWORKS];
 extern int nr_of_networks;
 extern int nr_of_modems;
 extern int max_sms_parts;
-extern str domain;
+extern str _sms_domain;
 extern int *queued_msgs;
 extern int use_contact;
 extern int sms_report_type;
-extern struct tm_binds tmb;
+extern struct tm_binds _sms_tmb;
 
 void modem_process(struct modem *);
 int push_on_network(struct sip_msg *, int);

@@ -63,6 +63,8 @@ extern int subscription_expires;
 extern pua_api_t pua;
 extern ipsec_pcscf_api_t ipsec_pcscf;
 
+extern ims_registrar_pcscf_params_t _imsregp_params;
+
 struct sip_msg *get_request_from_reply(struct sip_msg *reply)
 {
 	struct cell *t;
@@ -247,9 +249,20 @@ static inline int update_contacts(struct sip_msg *req, struct sip_msg *rpl,
 							<= 0) { //remove contact - de-register
 						LM_DBG("This is a de-registration for contact <%.*s>\n",
 								c->uri.len, c->uri.s);
-						if(ul.delete_pcontact(_d, pcontact) != 0) {
-							LM_ERR("failed to delete pcscf contact <%.*s>\n",
-									c->uri.len, c->uri.s);
+						if(_imsregp_params.delete_delay <= 0) {
+							if(ul.delete_pcontact(_d, pcontact) != 0) {
+								LM_ERR("failed to delete pcscf contact "
+									   "<%.*s>\n",
+										c->uri.len, c->uri.s);
+							}
+						} else {
+							// rather than delete update the pcontact with expire value of 10 seconds
+							ci.expires = local_time_now
+										 + _imsregp_params.delete_delay;
+							if(ul.update_pcontact(_d, &ci, pcontact) != 0) {
+								LM_DBG("failed to update pcscf contact on "
+									   "de-register\n");
+							}
 						}
 						//TODO_LATEST replace above
 					} else { //update contact
@@ -464,8 +477,15 @@ int save_pending(struct sip_msg *_m, udomain_t *_d)
 				ul.unlock_udomain(_d, &ci.via_host, ci.via_port, ci.via_prot);
 				return -2;
 			}
-		} else {
-			LM_DBG("Contact already exists - not doing anything for now\n");
+		} else if(pcontact->reg_state == PCONTACT_DEREG_PENDING_PUBLISH) {
+			LM_DBG("Contact already exists - Updating contact [%.*s]: setting "
+				   "state to PCONTACT_REG_PENDING\n",
+					pcontact->aor.len, pcontact->aor.s);
+
+			memset(&ci_, 0, sizeof(struct pcontact_info));
+			ci_.reg_state = PCONTACT_REG_PENDING;
+			ci_.num_service_routes = 0;
+			ul.update_pcontact(_d, &ci_, pcontact);
 		}
 	}
 

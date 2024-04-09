@@ -24,6 +24,8 @@
 
 MODULE_VERSION
 
+extern gen_lock_t *process_lock; /* lock on the process table */
+
 struct dlg_binds *dlgb_p;
 
 /* parameters */
@@ -57,7 +59,8 @@ int ro_db_mode = DB_MODE_NONE;
 
 char *domain = "location";
 
-client_ro_cfg cfg = {str_init(""), str_init(""), str_init(""), str_init(""), 0};
+client_ro_cfg cfg = {
+		str_init(""), str_init(""), str_init(""), str_init(""), 0, 0};
 
 static str custom_user_spec = {NULL, 0};
 static str app_provided_party_spec = {NULL, 0};
@@ -87,6 +90,9 @@ int single_ro_session_per_dialog =
 static int mod_init(void);
 static int mod_child_init(int);
 static void mod_destroy(void);
+
+AAAMessage *callback_cdp_request(AAAMessage *request, void *param);
+int *callback_singleton; /*< Callback singleton */
 
 static int w_ro_ccr(struct sip_msg *msg, char *route_name, char *direction,
 		int reservation_units, char *incoming_trunk_id,
@@ -163,6 +169,11 @@ static param_export_t params[] = {
 				&vendor_specific_id}, /* VSI for extra charing info in Ro */
 		{"custom_user_avp", PARAM_STR, &custom_user_spec},
 		{"app_provided_party_avp", PARAM_STR, &app_provided_party_spec},
+		{"strip_plus_from_e164", INT_PARAM,
+				&cfg.strip_plus_from_e164}, /*wheter to strip or keep + sign from E164 numbers (tel: uris), according to diameter spec*/
+		{"use_pani_from_term_invite", INT_PARAM,
+				&cfg.use_pani_from_term_invite}, /*wheter to read and use P-Access-Network-Info header from INVITE on term scenario*/
+		{"node_func", INT_PARAM, &cfg.node_func}, /* node functionality */
 		{0, 0, 0}};
 
 /** module exports */
@@ -223,6 +234,10 @@ int fix_parameters()
 			return -1;
 		}
 	}
+	if(cfg.node_func < 0 || cfg.node_func > 6) {
+		LM_ERR("node_func: invalid value - must be between 0 and 6\n");
+		return 0;
+	}
 
 	init_custom_user(custom_user_spec.s ? &custom_user_avp : 0);
 	init_app_provided_party(
@@ -235,6 +250,9 @@ static int mod_init(void)
 {
 	int n;
 	load_tm_f load_tm;
+
+	callback_singleton = shm_malloc(sizeof(int));
+	*callback_singleton = 0;
 
 	if(!fix_parameters()) {
 		LM_ERR("unable to set Ro configuration parameters correctly\n");
@@ -333,8 +351,8 @@ static int mod_child_init(int rank)
 {
 	ro_db_mode = ro_db_mode_param;
 
-	if(((ro_db_mode == DB_MODE_REALTIME) && (rank > 0 || rank == PROC_TIMER))
-			|| (ro_db_mode == DB_MODE_SHUTDOWN && (rank == PROC_MAIN))) {
+	if((ro_db_mode == DB_MODE_REALTIME && (rank > 0 || rank == PROC_TIMER))
+			|| (ro_db_mode == DB_MODE_SHUTDOWN && rank == PROC_MAIN)) {
 		if(ro_connect_db(&db_url)) {
 			LM_ERR("failed to connect to database (rank=%d)\n", rank);
 			return -1;
@@ -343,17 +361,68 @@ static int mod_child_init(int rank)
 
 	/* in DB_MODE_SHUTDOWN only PROC_MAIN will do a DB dump at the end, so
      * for the rest of the processes will be the same as DB_MODE_NONE */
-	if(ro_db_mode == DB_MODE_SHUTDOWN && rank != PROC_MAIN)
+	if((ro_db_mode == DB_MODE_SHUTDOWN) && rank != PROC_MAIN)
 		ro_db_mode = DB_MODE_NONE;
-	/* in DB_MODE_REALTIME and DB_MODE_DELAYED the PROC_MAIN have no DB handle */
-	if((ro_db_mode == DB_MODE_REALTIME) && rank == PROC_MAIN)
+	/* in DB_MODE_REALTIME the PROC_MAIN have no DB handle */
+	if(ro_db_mode == DB_MODE_REALTIME && rank == PROC_MAIN)
 		ro_db_mode = DB_MODE_NONE;
+
+	lock_get(process_lock);
+	if((*callback_singleton) == 0) {
+		*callback_singleton = 1;
+		cdpb.AAAAddRequestHandler(callback_cdp_request, NULL);
+	}
+	lock_release(process_lock);
 
 	return 0;
 }
 
 static void mod_destroy(void)
 {
+	/* Stop timer first so no more interim updates are being sent before update to db */
+	destroy_ro_timer();
+	if(ro_db_mode == DB_MODE_SHUTDOWN) {
+		ro_update_db(0, 0);
+	}
+}
+
+/**
+ * Handler for incoming Diameter requests.
+ * @param request - the received request
+ * @param param - generic pointer
+ * @returns the answer to this request
+ */
+AAAMessage *callback_cdp_request(AAAMessage *request, void *param)
+{
+	if(is_req(request)) {
+		switch(request->applicationId) {
+			case IMS_Ro:
+				switch(request->commandCode) {
+					case IMS_RAR:
+						return ro_process_rar(request);
+						break;
+					case IMS_ASR:
+						return ro_process_asr(request);
+						break;
+					default:
+						LM_ERR("Ro request handler(): - Received unknown "
+							   "request for Ro command %d, flags %#1x "
+							   "endtoend %u hopbyhop %u\n",
+								request->commandCode, request->flags,
+								request->endtoendId, request->hopbyhopId);
+						return 0;
+						break;
+				}
+				break;
+			default:
+				LM_ERR("Ro request handler(): - Received unknown request "
+					   "for app %d command %d\n",
+						request->applicationId, request->commandCode);
+				return 0;
+				break;
+		}
+	}
+	return 0;
 }
 
 int create_response_avp_string(char *name, str *val)
@@ -585,6 +654,9 @@ static int ki_ro_ccr(sip_msg_t *msg, str *s_route_name, str *s_direction,
 
 		pani = cscf_get_access_network_info(msg, &h);
 	} else if(dir == RO_TERM_DIRECTION) {
+		if(cfg.use_pani_from_term_invite) {
+			pani = cscf_get_access_network_info(msg, &h);
+		}
 		//get callee IMPU from called part id - if not present then skip this
 		if((identity = cscf_get_public_identity_from_called_party_id(msg, &h))
 						.len
@@ -743,20 +815,27 @@ static int ro_fixup_stop(void **param, int param_no)
 	return 0;
 }
 
+/* clang-format off */
 static sr_kemi_t ims_charging_kemi_exports[] = {
-		{str_init("ims_charging"), str_init("Ro_CCR"), SR_KEMIP_INT, ki_ro_ccr,
-				{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_STR,
-						SR_KEMIP_STR, SR_KEMIP_NONE}},
-		{str_init("ims_charging"), str_init("Ro_CCR_Stop"), SR_KEMIP_INT,
-				ki_ro_ccr_stop,
-				{SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_STR, SR_KEMIP_NONE,
-						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-		{str_init("ims_charging"), str_init("Ro_set_session_id_avp"),
-				SR_KEMIP_INT, ki_ro_set_session_id_avp,
-				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-						SR_KEMIP_NONE, SR_KEMIP_NONE}},
+	{ str_init("ims_charging"), str_init("Ro_CCR"),
+		SR_KEMIP_INT, ki_ro_ccr,
+			{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
+				SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE }
+	},
+	{ str_init("ims_charging"), str_init("Ro_CCR_Stop"),
+		SR_KEMIP_INT, ki_ro_ccr_stop,
+			{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_STR,
+				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("ims_charging"), str_init("Ro_set_session_id_avp"),
+		SR_KEMIP_INT, ki_ro_set_session_id_avp,
+			{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 
-		{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}};
+	{ {0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0} }
+};
+/* clang-format on */
 
 int mod_register(char *path, int *dlflags, void *p1, void *p2)
 {

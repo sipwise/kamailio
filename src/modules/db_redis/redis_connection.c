@@ -35,6 +35,11 @@ static unsigned int MAX_URL_LENGTH = 1023;
 #endif
 
 extern int db_redis_verbosity;
+#ifdef WITH_SSL
+extern int db_redis_opt_tls;
+extern char *db_redis_ca_path;
+#endif
+extern char *db_redis_db_pass;
 
 static void print_query(redis_key_t *query)
 {
@@ -120,6 +125,10 @@ int db_redis_connect(km_redis_con_t *con)
 #ifndef WITH_HIREDIS_CLUSTER
 	int db;
 #endif
+#ifdef WITH_SSL
+	redisSSLContext *ssl = NULL;
+#endif
+	char *password = NULL;
 
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
@@ -150,6 +159,20 @@ int db_redis_connect(km_redis_con_t *con)
 		LM_ERR("invalid url scheme\n");
 		goto err;
 	}
+
+#ifdef WITH_SSL
+	if(db_redis_opt_tls != 0) {
+		/* Create SSL context*/
+		redisInitOpenSSL();
+		ssl = redisCreateSSLContext(
+				NULL, db_redis_ca_path, NULL, NULL, NULL, NULL);
+		if(ssl == NULL) {
+			LM_ERR("Unable to create Redis SSL Context.\n");
+			goto err;
+		}
+	}
+#endif
+
 	host_end = strstr(host_begin, "/");
 	if(!host_end) {
 		LM_ERR("invalid url: cannot find end of host part\n");
@@ -168,6 +191,11 @@ int db_redis_connect(km_redis_con_t *con)
 	}
 	redisClusterSetOptionAddNodes(con->con, hosts);
 	redisClusterSetOptionConnectTimeout(con->con, tv);
+#ifdef WITH_SSL
+	if(ssl) {
+		redisClusterSetOptionEnableSSL(con->con, ssl);
+	}
+#endif
 	status = redisClusterConnect2(con->con);
 	if(status != REDIS_OK) {
 		LM_ERR("cannot open connection to cluster with hosts: %s, error: %s\n",
@@ -176,6 +204,20 @@ int db_redis_connect(km_redis_con_t *con)
 	}
 #else
 	LM_DBG("connecting to redis at %s:%d\n", con->id->host, con->id->port);
+
+#ifdef WITH_SSL
+	if(db_redis_opt_tls != 0) {
+		/* Create SSL context*/
+		redisInitOpenSSL();
+		ssl = redisCreateSSLContext(
+				NULL, db_redis_ca_path, NULL, NULL, NULL, NULL);
+		if(ssl == NULL) {
+			LM_ERR("Unable to create Redis SSL Context.\n");
+			goto err;
+		}
+	}
+#endif
+
 	con->con = redisConnectWithTimeout(con->id->host, con->id->port, tv);
 	if(!con->con) {
 		LM_ERR("cannot open connection: %.*s\n", con->id->url.len,
@@ -187,10 +229,19 @@ int db_redis_connect(km_redis_con_t *con)
 				con->id->url.s, con->con->errstr);
 		goto err;
 	}
+#ifdef WITH_SSL
+	if(ssl) {
+		redisInitiateSSLWithContext(con->con, ssl);
+	}
+#endif
 #endif
 
-	if(con->id->password) {
-		reply = redisCommand(con->con, "AUTH %s", con->id->password);
+	password = con->id->password;
+	if(!password) {
+		password = db_redis_db_pass;
+	}
+	if(password) {
+		reply = redisCommand(con->con, "AUTH %s", password);
 		if(!reply) {
 			LM_ERR("cannot authenticate connection %.*s: %s\n",
 					con->id->url.len, con->id->url.s, con->con->errstr);
@@ -299,11 +350,11 @@ km_redis_con_t *db_redis_new_connection(const struct db_id *id)
 	ptr->id = (struct db_id *)id;
 
 	/*
-    LM_DBG("trying to initialize connection to '%.*s' with schema path '%.*s' and keys '%.*s'\n",
-            id->url.len, id->url.s,
-            redis_schema_path.len, redis_schema_path.s,
-            redis_keys.len, redis_keys.s);
-    */
+	LM_DBG("trying to initialize connection to '%.*s' with schema path '%.*s' and keys '%.*s'\n",
+			id->url.len, id->url.s,
+			redis_schema_path.len, redis_schema_path.s,
+			redis_keys.len, redis_keys.s);
+	*/
 	LM_DBG("trying to initialize connection to '%.*s'\n", id->url.len,
 			id->url.s);
 	if(db_redis_parse_schema(ptr) != 0) {

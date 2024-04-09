@@ -62,6 +62,9 @@ extern int redis_allowed_timeouts_param;
 extern int redis_flush_on_reconnect_param;
 extern int redis_allow_dynamic_nodes_param;
 extern int ndb_redis_debug;
+#ifdef WITH_SSL
+extern char *ndb_redis_ca_path;
+#endif
 
 /* backwards compatibility with hiredis < 0.12 */
 #if(HIREDIS_MAJOR == 0) && (HIREDIS_MINOR < 12)
@@ -81,6 +84,9 @@ int redisc_init(void)
 	char addr[256], pass[256], unix_sock_path[256], sentinel_group[256];
 
 	unsigned int port, db, sock = 0, haspass = 0, sentinel_master = 1;
+#ifdef WITH_SSL
+	unsigned int enable_ssl = 0;
+#endif
 	int i, row;
 	redisc_server_t *rsrv = NULL;
 	param_t *pit = NULL;
@@ -133,6 +139,14 @@ int redisc_init(void)
 				snprintf(pass, sizeof(pass) - 1, "%.*s", pit->body.len,
 						pit->body.s);
 				haspass = 1;
+#ifdef WITH_SSL
+			} else if(pit->name.len == 3
+					  && strncmp(pit->name.s, "tls", 3) == 0) {
+				snprintf(pass, sizeof(pass) - 1, "%.*s", pit->body.len,
+						pit->body.s);
+				if(str2int(&pit->body, &enable_ssl) < 0)
+					enable_ssl = 0;
+#endif
 			} else if(pit->name.len == 14
 					  && strncmp(pit->name.s, "sentinel_group", 14) == 0) {
 				snprintf(sentinel_group, sizeof(sentinel_group) - 1, "%.*s",
@@ -218,15 +232,39 @@ int redisc_init(void)
 			}
 		}
 
+#ifdef WITH_SSL
+		if(enable_ssl) {
+			/* Create SSL context*/
+			redisInitOpenSSL();
+			rsrv->sslCtxRedis = redisCreateSSLContext(
+					NULL, ndb_redis_ca_path, NULL, NULL, NULL, NULL);
+			if(rsrv->sslCtxRedis == NULL) {
+				LM_ERR("Unable to create Redis TLS Context.\n");
+			}
+		}
+#endif
+
 		if(sock != 0) {
 			LOG(ndb_redis_debug, "Connecting to unix socket: %s\n",
 					unix_sock_path);
 			rsrv->ctxRedis =
 					redisConnectUnixWithTimeout(unix_sock_path, tv_conn);
 		} else {
+#ifdef WITH_SSL
+			LOG(ndb_redis_debug, "Connecting to %s %s:%d\n",
+					(enable_ssl) ? "TLS" : "UDP", addr, port);
+#else
 			LOG(ndb_redis_debug, "Connecting to %s:%d\n", addr, port);
+#endif
 			rsrv->ctxRedis = redisConnectWithTimeout(addr, port, tv_conn);
 		}
+
+#ifdef WITH_SSL
+		if(enable_ssl) {
+			/* Negotiate SSL/TLS handshake*/
+			redisInitiateSSLWithContext(rsrv->ctxRedis, rsrv->sslCtxRedis);
+		}
+#endif
 
 		LOG(ndb_redis_debug, "rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
 
@@ -420,6 +458,9 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 {
 	char addr[256], pass[256], unix_sock_path[256], sentinel_group[256];
 	unsigned int port, db, sock = 0, haspass = 0, sentinel_master = 1;
+#ifdef WITH_SSL
+	unsigned int enable_ssl = 0;
+#endif
 	char sentinels[MAXIMUM_SENTINELS][256];
 	uint8_t sentinels_count = 0;
 	int i, row;
@@ -456,6 +497,13 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 			snprintf(
 					pass, sizeof(pass) - 1, "%.*s", pit->body.len, pit->body.s);
 			haspass = 1;
+#ifdef WITH_SSL
+		} else if(pit->name.len == 3 && strncmp(pit->name.s, "tls", 3) == 0) {
+			snprintf(
+					pass, sizeof(pass) - 1, "%.*s", pit->body.len, pit->body.s);
+			if(str2int(&pit->body, &enable_ssl) < 0)
+				enable_ssl = 0;
+#endif
 		} else if(pit->name.len == 14
 				  && strncmp(pit->name.s, "sentinel_group", 14) == 0) {
 			snprintf(sentinel_group, sizeof(sentinel_group) - 1, "%.*s",
@@ -485,13 +533,14 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 		for(i = 0; i < sentinels_count; i++) {
 			char *sentinelAddr = sentinels[i];
 			char *pos;
+			int srvfound = 0;
 			redisContext *redis;
 			redisReply *res, *res2;
 
 			port = 6379;
 			if((pos = strchr(sentinelAddr, ':')) != NULL) {
 				port = atoi(pos + 1);
-				pos[i] = '\0';
+				pos[0] = '\0';
 			}
 
 			redis = redisConnectWithTimeout(sentinelAddr, port, tv_conn);
@@ -507,6 +556,7 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 						port = atoi(res->element[1]->str);
 						LOG(ndb_redis_debug, "sentinel replied: %s:%d\n", addr,
 								port);
+						srvfound = 1;
 					}
 				} else {
 					res = redisCommand(
@@ -530,8 +580,12 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 						}
 						LOG(ndb_redis_debug, "slave for %s: %s:%d\n",
 								sentinel_group, addr, port);
+						srvfound = 1;
 					}
 				}
+			}
+			if(srvfound == 1) {
+				break;
 			}
 		}
 	}
@@ -541,12 +595,34 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 		redisFree(rsrv->ctxRedis);
 		rsrv->ctxRedis = NULL;
 	}
+#ifdef WITH_SSL
+	if(rsrv->sslCtxRedis != NULL) {
+		redisFreeSSLContext(rsrv->sslCtxRedis);
+		rsrv->sslCtxRedis = NULL;
+	}
+
+	if(enable_ssl) {
+		/* Create SSL context*/
+		redisInitOpenSSL();
+		rsrv->sslCtxRedis = redisCreateSSLContext(
+				NULL, ndb_redis_ca_path, NULL, NULL, NULL, NULL);
+		if(rsrv->sslCtxRedis == NULL) {
+			LM_ERR("Unable to create Redis TLS Context.\n");
+		}
+	}
+#endif
 
 	if(sock != 0) {
 		rsrv->ctxRedis = redisConnectUnixWithTimeout(unix_sock_path, tv_conn);
 	} else {
 		rsrv->ctxRedis = redisConnectWithTimeout(addr, port, tv_conn);
 	}
+#ifdef WITH_SSL
+	if(enable_ssl) {
+		/* Negotiate SSL/TLS handshake*/
+		redisInitiateSSLWithContext(rsrv->ctxRedis, rsrv->sslCtxRedis);
+	}
+#endif
 	LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
 	if(!rsrv->ctxRedis)
 		goto err;

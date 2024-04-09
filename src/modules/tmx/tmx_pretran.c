@@ -72,19 +72,20 @@ static int _tmx_ptran_size = 0;
  */
 int tmx_init_pretran_table(void)
 {
-	int n;
-	int pn;
+	unsigned int n;
+	unsigned int pn;
 
-	pn = get_max_procs();
+	pn = (unsigned int)get_max_procs();
 
-	if(pn <= 0)
+	if(pn == 0)
 		return -1;
 	if(_tmx_ptran_table != NULL)
 		return -1;
+	n = 1;
 	/* get the highest power of two less than number of processes */
-	n = -1;
-	while(pn >> ++n > 0)
-		;
+	while((pn >> n) > 0) {
+		n++;
+	}
 	n--;
 	if(n <= 1)
 		n = 2;
@@ -336,7 +337,7 @@ int tmx_check_pretran(sip_msg_t *msg)
 			if(_tmx_proc_ptran->vbranch.len != it->vbranch.len)
 				continue;
 			/* shortcut - check last char in Via branch
-			 * - kamailio/ser adds there branch index => in case of paralel
+			 * - kamailio/ser adds there branch index => in case of parallel
 			 *   forking by previous hop, catch it here quickly */
 			if(_tmx_proc_ptran->vbranch.s[it->vbranch.len - 1]
 					!= it->vbranch.s[it->vbranch.len - 1])

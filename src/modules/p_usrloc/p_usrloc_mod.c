@@ -88,6 +88,11 @@ static int child_init(int rank); /*!< Per-child init function */
 extern int bind_usrloc(usrloc_api_t *api);
 extern int ul_locks_no;
 
+#define UL_PRELOAD_SIZE 8
+static char *ul_preload_list[UL_PRELOAD_SIZE];
+static int ul_preload_index = 0;
+static int ul_preload_param(modparam_t type, void *val);
+
 /*
  * Module parameters and their default values
  */
@@ -161,7 +166,9 @@ str uniq_col =
 		str_init(UNIQ_COL); /*!< Name of column containing the uniq value*/
 int db_mode =
 		3; /*!< Database sync scheme:  1-write through, 2-write back, 3-only db */
-int use_domain = 0;		 /*!< Whether usrloc should use domain part of aor */
+int use_domain = 0; /*!< Whether usrloc should use domain part of aor */
+int use_domain_crc32 =
+		1; /*!< Whether usrloc should use domain part of aor when calculating crc32 */
 int desc_time_order = 0; /*!< By default do not enable timestamp ordering */
 
 int ul_fetch_rows = 2000; /*!< number of rows to fetch from result */
@@ -225,6 +232,7 @@ static param_export_t params[] = {{"ruid_column", PARAM_STR, &ruid_col},
 		{"cflags_column", PARAM_STR, &cflags_col},
 		{"db_mode", INT_PARAM, &db_mode},
 		{"use_domain", INT_PARAM, &use_domain},
+		{"use_domain_crc32", INT_PARAM, &use_domain_crc32},
 		{"desc_time_order", INT_PARAM, &desc_time_order},
 		{"user_agent_column", PARAM_STR, &user_agent_col},
 		{"received_column", PARAM_STR, &received_col},
@@ -266,6 +274,7 @@ static param_export_t params[] = {{"ruid_column", PARAM_STR, &ruid_col},
 		{"db_update_as_insert", INT_PARAM,
 				&default_p_usrloc_cfg.db_update_as_insert},
 		{"mdb_availability_control", INT_PARAM, &mdb_availability_control},
+		{"preload", PARAM_STRING | USE_FUNC_PARAM, (void *)ul_preload_param},
 		{0, 0, 0}};
 
 
@@ -307,6 +316,8 @@ struct module_exports exports = {
  */
 static int mod_init(void)
 {
+	int i = 0;
+	udomain_t *d;
 	int matching_mode_cfg = cfg_get(p_usrloc, p_usrloc_cfg, matching_mode);
 
 #ifdef STATISTICS
@@ -347,6 +358,14 @@ static int mod_init(void)
 	if(init_ulcb_list() < 0) {
 		LM_ERR("usrloc/callbacks initialization failed\n");
 		return -1;
+	}
+
+	/* preload tables */
+	for(i = 0; i < ul_preload_index; i++) {
+		if(register_udomain((const char *)ul_preload_list[i], &d) < 0) {
+			LM_ERR("cannot register preloaded table %s\n", ul_preload_list[i]);
+			return -1;
+		}
 	}
 
 	if(db_mode != DB_ONLY) {
@@ -509,4 +528,24 @@ time_t ul_db_datetime_get(time_t v)
 	} else {
 		return v;
 	}
+}
+
+/*! \brief
+ * preload module parameter handler
+ */
+static int ul_preload_param(modparam_t type, void *val)
+{
+	if(val == NULL) {
+		LM_ERR("invalid parameter\n");
+		goto error;
+	}
+	if(ul_preload_index >= UL_PRELOAD_SIZE) {
+		LM_ERR("too many preloaded tables\n");
+		goto error;
+	}
+	ul_preload_list[ul_preload_index] = (char *)val;
+	ul_preload_index++;
+	return 0;
+error:
+	return -1;
 }

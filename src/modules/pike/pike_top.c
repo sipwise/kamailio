@@ -33,7 +33,7 @@
 static struct TopListItem_t *top_list_root = 0;
 static struct TopListItem_t *top_list_iter = 0;
 
-static char buff[PIKE_BUFF_SIZE];
+static char _pike_top_buff[PIKE_BUFF_SIZE];
 
 struct TopListItem_t *pike_top_get_root()
 {
@@ -41,39 +41,39 @@ struct TopListItem_t *pike_top_get_root()
 }
 
 char *pike_top_print_addr(
-		unsigned char *ip, int iplen, char *buff, int buffsize)
+		unsigned char *ip, int iplen, char *obuff, int obuffsize)
 {
 	unsigned short *ipv6_ptr = (unsigned short *)ip;
-	int bsize;
 	int blen;
 
-	bsize = PIKE_BUFF_SIZE * sizeof(char);
-	memset(buff, 0, bsize);
+	memset(obuff, 0, obuffsize);
 
-	DBG("pike:top:print_addr(iplen: %d, buffsize: %d)", iplen, buffsize);
+	DBG("address iplen: %d, buffsize: %d", iplen, obuffsize);
 
 	if(iplen == 4) {
-		inet_ntop(AF_INET, ip, buff, buffsize);
+		inet_ntop(AF_INET, ip, obuff, obuffsize);
 	} else if(iplen == 16) {
-		inet_ntop(AF_INET6, ip, buff, buffsize);
+		inet_ntop(AF_INET6, ip, obuff, obuffsize);
 	} else {
-		blen = snprintf(buff, bsize, "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
-				htons(ipv6_ptr[0]), htons(ipv6_ptr[1]), htons(ipv6_ptr[2]),
-				htons(ipv6_ptr[3]), htons(ipv6_ptr[4]), htons(ipv6_ptr[5]),
-				htons(ipv6_ptr[6]), htons(ipv6_ptr[7]));
-		if(blen < 0 || blen >= bsize) {
+		blen = snprintf(obuff, obuffsize,
+				"%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x", htons(ipv6_ptr[0]),
+				htons(ipv6_ptr[1]), htons(ipv6_ptr[2]), htons(ipv6_ptr[3]),
+				htons(ipv6_ptr[4]), htons(ipv6_ptr[5]), htons(ipv6_ptr[6]),
+				htons(ipv6_ptr[7]));
+		if(blen < 0 || blen >= obuffsize) {
 			LM_ERR("failed to print the address - reset it\n");
-			memset(buff, 0, bsize);
+			memset(obuff, 0, obuffsize);
 		}
 	}
 
-	return buff;
+	return obuff;
 }
 
 /* if you do not need global buffer, you can use this simpler call */
 static char *print_addr(unsigned char *ip, int iplen)
 {
-	return pike_top_print_addr(ip, iplen, buff, sizeof(buff));
+	return pike_top_print_addr(
+			ip, iplen, _pike_top_buff, sizeof(_pike_top_buff));
 }
 
 int pike_top_add_entry(unsigned char *ip_addr, int addr_len,
@@ -89,8 +89,8 @@ int pike_top_add_entry(unsigned char *ip_addr, int addr_len,
 	print_addr(ip_addr, addr_len);
 	DBG("pike_top_add_enrty(ip: %s, leaf_hits[%d,%d], hits[%d,%d],"
 		" expires: %d, status: %d)",
-			buff, leaf_hits[0], leaf_hits[1], hits[0], hits[1], expires,
-			status);
+			_pike_top_buff, leaf_hits[0], leaf_hits[1], hits[0], hits[1],
+			expires, status);
 	assert(new_item != 0);
 
 	memset((void *)new_item, 0, sizeof(struct TopListItem_t));
@@ -124,5 +124,5 @@ void pike_top_list_clear()
 		top_list_iter = ptr;
 	}
 	top_list_root = 0;
-	memset(buff, 0, sizeof(buff));
+	memset(_pike_top_buff, 0, sizeof(_pike_top_buff));
 }

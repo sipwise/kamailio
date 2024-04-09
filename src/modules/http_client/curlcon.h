@@ -52,4 +52,8 @@ int curl_parse_param(char *val);
 curl_con_t *curl_get_connection(str *name);
 curl_con_pkg_t *curl_get_pkg_connection(curl_con_t *con);
 
+/*! Fixup CURL connections - if timeout is not configured, Use as default global connection_timeout.
+ */
+void curl_conn_list_fixup(void);
+
 #endif

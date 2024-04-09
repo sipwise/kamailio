@@ -55,48 +55,45 @@ int janssonmod_set_append(struct sip_msg *msg, char *type_in, char *path_in,
 {
 	return janssonmod_set(1, msg, type_in, path_in, value_in, result);
 }
-int janssonmod_get_field(
-		struct sip_msg *msg, char *jansson_in, char *path_in, char *result)
-{
-	return janssonmod_get(msg, path_in, jansson_in, result);
-}
 
+/* clang-format off */
 /* Exported functions */
 static cmd_export_t cmds[] = {
-		{"jansson_get", (cmd_function)janssonmod_get, 3, fixup_get_params,
-				fixup_get_params_free, ANY_ROUTE},
-		{"jansson_pv_get", (cmd_function)janssonmod_pv_get, 3,
-				fixup_pv_get_params, fixup_pv_get_params_free, ANY_ROUTE},
-		{"jansson_array_size", (cmd_function)janssonmod_array_size, 3,
-				fixup_get_params, fixup_get_params_free, ANY_ROUTE},
-		{"jansson_set", (cmd_function)janssonmod_set_replace, 4,
-				fixup_set_params, fixup_set_params_free, ANY_ROUTE},
-		{"jansson_append", (cmd_function)janssonmod_set_append, 4,
-				fixup_set_params, fixup_set_params_free, ANY_ROUTE},
-		{"jansson_xdecode", (cmd_function)jansson_xdecode, 2, fixup_spve_spve,
-				fixup_free_spve_spve, ANY_ROUTE},
-		{"jansson_xencode", (cmd_function)jansson_xencode, 2, fixup_xencode,
-				fixup_xencode_free, ANY_ROUTE},
-		/* for backwards compatibility */
-		{"jansson_get_field", (cmd_function)janssonmod_get_field, 3,
-				fixup_get_params, fixup_get_params_free, ANY_ROUTE},
-		/* non-script functions */
-		{"jansson_to_val", (cmd_function)jansson_to_val, 0, 0, 0, 0},
+	{"jansson_get", (cmd_function)janssonmod_get, 3, fixup_get_params,
+			fixup_get_params_free, ANY_ROUTE},
+	{"jansson_pv_get", (cmd_function)janssonmod_pv_get, 3,
+			fixup_pv_get_params, fixup_pv_get_params_free, ANY_ROUTE},
+	{"jansson_array_size", (cmd_function)janssonmod_array_size, 3,
+			fixup_get_params, fixup_get_params_free, ANY_ROUTE},
+	{"jansson_set", (cmd_function)janssonmod_set_replace, 4,
+			fixup_set_params, fixup_set_params_free, ANY_ROUTE},
+	{"jansson_append", (cmd_function)janssonmod_set_append, 4,
+			fixup_set_params, fixup_set_params_free, ANY_ROUTE},
+	{"jansson_xdecode", (cmd_function)jansson_xdecode, 2, fixup_spve_spve,
+			fixup_free_spve_spve, ANY_ROUTE},
+	{"jansson_xencode", (cmd_function)jansson_xencode, 2, fixup_xencode,
+			fixup_xencode_free, ANY_ROUTE},
+	{"jansson_get_field", (cmd_function)janssonmod_get_field, 3,
+			fixup_get_params, fixup_get_params_free, ANY_ROUTE},
+	/* non-script functions */
+	{"jansson_to_val", (cmd_function)jansson_to_val, 0, 0, 0, 0},
 
-		{0, 0, 0, 0, 0, 0}};
+	{0, 0, 0, 0, 0, 0}
+};
 
 struct module_exports exports = {
-		"jansson",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* cmd (cfg function) exports */
-		0,				 /* param exports */
-		0,				 /* RPC method exports */
-		0,				 /* pseudo-variables exports */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		0,				 /* per-child init function */
-		0				 /* module destroy function */
+	"jansson",		 /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			 /* cmd (cfg function) exports */
+	0,				 /* param exports */
+	0,				 /* RPC method exports */
+	0,				 /* pseudo-variables exports */
+	0,				 /* response handling function */
+	mod_init,		 /* module init function */
+	0,				 /* per-child init function */
+	0				 /* module destroy function */
 };
+/* clang-format off */
 
 
 static int fixup_get_params(void **param, int param_no)
@@ -244,18 +241,23 @@ static int ki_jansson_get(sip_msg_t *msg, str *spath, str *sdoc, str *spv)
 		return -1;
 	}
 
-	return janssonmod_get_helper(msg, spath, sdoc, pvs);
+	return janssonmod_get_helper(msg, spath, 0, sdoc, pvs);
 }
 
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_jansson_exports[] = {
-		{str_init("jansson"), str_init("get"), SR_KEMIP_INT, ki_jansson_get,
-				{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
-						SR_KEMIP_NONE, SR_KEMIP_NONE}},
+	{ str_init("jansson"), str_init("get"),
+		SR_KEMIP_INT, ki_jansson_get,
+			{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
+	},
 
-		{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}};
+	{ {0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0} }
+};
+/* clang-format on */
 
 /**
  *

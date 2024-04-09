@@ -54,6 +54,9 @@ int redis_allowed_timeouts_param = -1;
 int redis_flush_on_reconnect_param = 0;
 int redis_allow_dynamic_nodes_param = 0;
 int ndb_redis_debug = L_DBG;
+#ifdef WITH_SSL
+char *ndb_redis_ca_path = 0;
+#endif
 
 static int w_redis_cmd3(
 		struct sip_msg *msg, char *ssrv, char *scmd, char *sres);
@@ -76,8 +79,9 @@ static int w_redis_execute(struct sip_msg *msg, char *ssrv);
 
 static int w_redis_free_reply(struct sip_msg *msg, char *res);
 
-static void mod_destroy(void);
+static int mod_init(void);
 static int child_init(int rank);
+static void mod_destroy(void);
 
 int bind_ndb_redis(ndb_redis_api_t *api);
 
@@ -88,67 +92,92 @@ static int pv_get_rediscd(
 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 static int pv_parse_rediscd_name(pv_spec_p sp, str *in);
 
+/* clang-format off */
 static pv_export_t mod_pvs[] = {
-		{{"redis", sizeof("redis") - 1}, PVT_OTHER, pv_get_redisc, 0,
-				pv_parse_redisc_name, 0, 0, 0},
-		{{"redisd", sizeof("redisd") - 1}, PVT_OTHER, pv_get_rediscd, 0,
-				pv_parse_rediscd_name, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
-
-
-static cmd_export_t cmds[] = {{"redis_cmd", (cmd_function)w_redis_cmd3, 3,
-									  fixup_redis_cmd6, 0, ANY_ROUTE},
-		{"redis_cmd", (cmd_function)w_redis_cmd4, 4, fixup_redis_cmd6, 0,
-				ANY_ROUTE},
-		{"redis_cmd", (cmd_function)w_redis_cmd5, 5, fixup_redis_cmd6, 0,
-				ANY_ROUTE},
-		{"redis_cmd", (cmd_function)w_redis_cmd6, 6, fixup_redis_cmd6, 0,
-				ANY_ROUTE},
-		{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd3, 3, fixup_redis_cmd6,
-				0, ANY_ROUTE},
-		{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd4, 4, fixup_redis_cmd6,
-				0, ANY_ROUTE},
-		{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd5, 5, fixup_redis_cmd6,
-				0, ANY_ROUTE},
-		{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd6, 6, fixup_redis_cmd6,
-				0, ANY_ROUTE},
-		{"redis_execute", (cmd_function)w_redis_execute, 1, fixup_redis_cmd6, 0,
-				ANY_ROUTE},
-		{"redis_free", (cmd_function)w_redis_free_reply, 1, fixup_spve_null, 0,
-				ANY_ROUTE},
-
-		{"bind_ndb_redis", (cmd_function)bind_ndb_redis, 0, 0, 0, 0},
-
-		{0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {
-		{"server", PARAM_STRING | USE_FUNC_PARAM, (void *)redis_srv_param},
-		{"init_without_redis", INT_PARAM, &init_without_redis},
-		{"connect_timeout", INT_PARAM, &redis_connect_timeout_param},
-		{"cmd_timeout", INT_PARAM, &redis_cmd_timeout_param},
-		{"cluster", INT_PARAM, &redis_cluster_param},
-		{"disable_time", INT_PARAM, &redis_disable_time_param},
-		{"allowed_timeouts", INT_PARAM, &redis_allowed_timeouts_param},
-		{"flush_on_reconnect", INT_PARAM, &redis_flush_on_reconnect_param},
-		{"allow_dynamic_nodes", INT_PARAM, &redis_allow_dynamic_nodes_param},
-		{"debug", PARAM_INT, &ndb_redis_debug}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"ndb_redis", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds, params, 0,			  /* exported RPC methods */
-		mod_pvs,					  /* exported pseudo-variables */
-		0,							  /* response function */
-		0,							  /* module initialization function */
-		child_init,					  /* per child init function */
-		mod_destroy					  /* destroy function */
+	{{"redis", sizeof("redis") - 1}, PVT_OTHER, pv_get_redisc, 0,
+			pv_parse_redisc_name, 0, 0, 0},
+	{{"redisd", sizeof("redisd") - 1}, PVT_OTHER, pv_get_rediscd, 0,
+			pv_parse_rediscd_name, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
 };
 
+
+static cmd_export_t cmds[] = {
+	{"redis_cmd", (cmd_function)w_redis_cmd3, 3,
+			fixup_redis_cmd6, 0, ANY_ROUTE},
+	{"redis_cmd", (cmd_function)w_redis_cmd4, 4, fixup_redis_cmd6, 0,
+			ANY_ROUTE},
+	{"redis_cmd", (cmd_function)w_redis_cmd5, 5, fixup_redis_cmd6, 0,
+			ANY_ROUTE},
+	{"redis_cmd", (cmd_function)w_redis_cmd6, 6, fixup_redis_cmd6, 0,
+			ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd3, 3, fixup_redis_cmd6,
+			0, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd4, 4, fixup_redis_cmd6,
+			0, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd5, 5, fixup_redis_cmd6,
+			0, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd6, 6, fixup_redis_cmd6,
+			0, ANY_ROUTE},
+	{"redis_execute", (cmd_function)w_redis_execute, 1, fixup_redis_cmd6, 0,
+			ANY_ROUTE},
+	{"redis_free", (cmd_function)w_redis_free_reply, 1, fixup_spve_null, 0,
+			ANY_ROUTE},
+
+	{"bind_ndb_redis", (cmd_function)bind_ndb_redis, 0, 0, 0, 0},
+
+	{0, 0, 0, 0, 0, 0}
+};
+
+static param_export_t params[] = {
+	{"server", PARAM_STRING | USE_FUNC_PARAM, (void *)redis_srv_param},
+	{"init_without_redis", INT_PARAM, &init_without_redis},
+	{"connect_timeout", INT_PARAM, &redis_connect_timeout_param},
+	{"cmd_timeout", INT_PARAM, &redis_cmd_timeout_param},
+	{"cluster", INT_PARAM, &redis_cluster_param},
+	{"disable_time", INT_PARAM, &redis_disable_time_param},
+	{"allowed_timeouts", INT_PARAM, &redis_allowed_timeouts_param},
+	{"flush_on_reconnect", INT_PARAM, &redis_flush_on_reconnect_param},
+	{"allow_dynamic_nodes", INT_PARAM, &redis_allow_dynamic_nodes_param},
+	{"debug", PARAM_INT, &ndb_redis_debug},
+#ifdef WITH_SSL
+	{"ca_path", PARAM_STRING, &ndb_redis_ca_path},
+#endif
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"ndb_redis",		/* module name */
+	DEFAULT_DLFLAGS,	/* dlopen flags */
+	cmds,				/* exported functions */
+	params,				/* exported parameters */
+	0,					/* exported RPC methods */
+	mod_pvs,			/* exported pseudo-variables */
+	0,					/* response function */
+	mod_init,			/* module initialization function */
+	child_init,			/* per child init function */
+	mod_destroy			/* destroy function */
+};
+/* clang-format on */
+
+/**
+ *
+ */
+static int mod_init(void)
+{
+	/*
+	 * register the need to be called post-fork of all children
+	 * with the special rank PROC_POSTCHILDINIT by main attendant
+	 */
+	ksr_module_set_flag(KSRMOD_FLAG_POSTCHILDINIT);
+	return 0;
+}
 
 /* each child get a new connection to the database */
 static int child_init(int rank)
 {
-	/* skip child init for non-worker process ranks */
-	if(rank == PROC_INIT || rank == PROC_MAIN || rank == PROC_TCP_MAIN)
+	/* skip child init for special process ranks */
+	if(rank == PROC_INIT || rank == PROC_MAIN)
 		return 0;
 
 	if(redisc_init() < 0) {

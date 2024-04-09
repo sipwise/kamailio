@@ -114,6 +114,7 @@ extern int version_len;
 
 str _ksr_xavp_via_params = STR_NULL;
 str _ksr_xavp_via_fields = STR_NULL;
+str _ksr_xavp_via_reply_params = STR_NULL;
 int ksr_local_rport = 0;
 
 /** per process fixup function for global_req_flags.
@@ -547,11 +548,15 @@ static inline int lumps_len(
 	int new_len;
 	struct lump *t;
 	struct lump *r;
-	str *send_address_str;
-	str *send_port_str;
+	str *send_address_str = NULL;
+	str *send_port_str = NULL;
+	int send_proto_id = PROTO_NONE;
+	int send_af = 0;
 	str *recv_address_str = NULL;
 	str *recv_port_str = NULL;
 	int recv_port_no = 0;
+	int recv_proto_id = PROTO_NONE;
+	int recv_af = 0;
 	struct socket_info *send_sock;
 
 
@@ -595,19 +600,17 @@ static inline int lumps_len(
 		case SUBST_RCV_IP:                                                   \
 			if(msg->rcv.bind_address && STR_WITHVAL(recv_address_str)) {     \
 				new_len += recv_address_str->len;                            \
-				if(msg->rcv.bind_address->address.af != AF_INET)             \
+				if(recv_af == AF_INET6)                                      \
 					new_len += 2;                                            \
 			} else {                                                         \
-				/* FIXME */                                                  \
-				LM_CRIT("FIXME: null bind_address\n");                       \
+				LM_CRIT("rcv ip - null bind_address\n");                     \
 			};                                                               \
 			break;                                                           \
 		case SUBST_RCV_PORT:                                                 \
 			if(msg->rcv.bind_address && STR_WITHVAL(recv_port_str)) {        \
 				new_len += recv_port_str->len;                               \
 			} else {                                                         \
-				/* FIXME */                                                  \
-				LM_CRIT("FIXME: null bind_address\n");                       \
+				LM_CRIT(" rcv port - null bind_address\n");                  \
 			};                                                               \
 			break;                                                           \
 		case SUBST_RCV_PROTO:                                                \
@@ -637,16 +640,14 @@ static inline int lumps_len(
 								msg->rcv.bind_address->proto);               \
 				}                                                            \
 			} else {                                                         \
-				/* FIXME */                                                  \
-				LM_CRIT("FIXME: null bind_address\n");                       \
+				LM_CRIT("null bind_address\n");                              \
 			};                                                               \
 			break;                                                           \
 		case SUBST_RCV_ALL:                                                  \
 		case SUBST_RCV_ALL_EX:                                               \
 			if(msg->rcv.bind_address && STR_WITHVAL(recv_address_str)) {     \
 				new_len += recv_address_str->len;                            \
-				if((msg->rcv.bind_address->address.af == AF_INET6)           \
-						&& (recv_address_str->s[0] != '[')                   \
+				if((recv_af == AF_INET6) && (recv_address_str->s[0] != '[')  \
 						&& (memchr(recv_address_str->s, ':',                 \
 									recv_address_str->len)                   \
 								!= NULL))                                    \
@@ -656,7 +657,7 @@ static inline int lumps_len(
 					new_len += 1 + recv_port_str->len;                       \
 				}                                                            \
 				/*add;transport=xxx*/                                        \
-				switch(msg->rcv.bind_address->proto) {                       \
+				switch(recv_proto_id) {                                      \
 					case PROTO_NONE:                                         \
 					case PROTO_UDP:                                          \
 						break; /* udp is the default */                      \
@@ -672,6 +673,10 @@ static inline int lumps_len(
 								break;                                       \
 						}                                                    \
 						break;                                               \
+					case PROTO_WS:                                           \
+					case PROTO_WSS:                                          \
+						new_len += TRANSPORT_PARAM_LEN + 2;                  \
+						break;                                               \
 					case PROTO_SCTP:                                         \
 						new_len += TRANSPORT_PARAM_LEN + 4;                  \
 						break;                                               \
@@ -686,25 +691,23 @@ static inline int lumps_len(
 				}                                                            \
 				RCVCOMP_LUMP_LEN                                             \
 			} else {                                                         \
-				/* FIXME */                                                  \
-				LM_CRIT("FIXME: null bind_address\n");                       \
+				LM_CRIT("null bind_address\n");                              \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_IP:                                                   \
 			if(send_sock) {                                                  \
 				new_len += send_address_str->len;                            \
-				if(send_sock->address.af == AF_INET6                         \
-						&& send_address_str->s[0] != '[')                    \
+				if(send_af == AF_INET6 && send_address_str->s[0] != '[')     \
 					new_len += 2;                                            \
 			} else {                                                         \
-				LM_CRIT("FIXME: null send_sock\n");                          \
+				LM_CRIT("null send_sock\n");                                 \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_PORT:                                                 \
 			if(send_sock) {                                                  \
 				new_len += send_port_str->len;                               \
 			} else {                                                         \
-				LM_CRIT("FIXME: null send_sock\n");                          \
+				LM_CRIT("null send_sock\n");                                 \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_PROTO:                                                \
@@ -733,15 +736,14 @@ static inline int lumps_len(
 						LM_CRIT("unknown proto %d\n", send_sock->proto);     \
 				}                                                            \
 			} else {                                                         \
-				LM_CRIT("FIXME: null send_sock\n");                          \
+				LM_CRIT("null send_sock\n");                                 \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_ALL:                                                  \
 		case SUBST_SND_ALL_EX:                                               \
 			if(send_sock) {                                                  \
 				new_len += send_address_str->len;                            \
-				if((send_sock->address.af == AF_INET6)                       \
-						&& (send_address_str->s[0] != '[')                   \
+				if((send_af == AF_INET6) && (send_address_str->s[0] != '[')  \
 						&& (memchr(send_address_str->s, ':',                 \
 									send_address_str->len)                   \
 								!= NULL))                                    \
@@ -752,7 +754,7 @@ static inline int lumps_len(
 					new_len += 1 + send_port_str->len;                       \
 				}                                                            \
 				/*add;transport=xxx*/                                        \
-				switch(send_sock->proto) {                                   \
+				switch(send_proto_id) {                                      \
 					case PROTO_NONE:                                         \
 					case PROTO_UDP:                                          \
 						break; /* udp is the default */                      \
@@ -768,6 +770,10 @@ static inline int lumps_len(
 								break;                                       \
 						}                                                    \
 						break;                                               \
+					case PROTO_WS:                                           \
+					case PROTO_WSS:                                          \
+						new_len += TRANSPORT_PARAM_LEN + 2;                  \
+						break;                                               \
 					case PROTO_SCTP:                                         \
 						new_len += TRANSPORT_PARAM_LEN + 4;                  \
 						break;                                               \
@@ -780,8 +786,7 @@ static inline int lumps_len(
 				}                                                            \
 				SENDCOMP_LUMP_LEN                                            \
 			} else {                                                         \
-				/* FIXME */                                                  \
-				LM_CRIT("FIXME: null send_sock\n");                          \
+				LM_CRIT("null send_sock\n");                                 \
 			};                                                               \
 			break;                                                           \
 		case SUBST_NOP: /* do nothing */                                     \
@@ -798,30 +803,50 @@ static inline int lumps_len(
 	s_offset = 0;
 	new_len = 0;
 	/* init send_address_str & send_port_str */
-	if(send_sock && send_sock->useinfo.name.len > 0)
+	if(send_sock && send_sock->useinfo.name.len > 0) {
 		send_address_str = &(send_sock->useinfo.name);
-	else if(msg->set_global_address.len)
+		send_af = send_sock->useinfo.af;
+	} else if(msg->set_global_address.len) {
 		send_address_str = &(msg->set_global_address);
-	else
+		if(send_sock) {
+			send_af = send_sock->address.af;
+		}
+	} else if(send_sock) {
 		send_address_str = &(send_sock->address_str);
+		send_af = send_sock->address.af;
+	}
 	if(send_sock && send_sock->useinfo.port_no > 0)
 		send_port_str = &(send_sock->useinfo.port_no_str);
 	else if(msg->set_global_port.len)
 		send_port_str = &(msg->set_global_port);
 	else
 		send_port_str = &(send_sock->port_no_str);
+	if(send_sock) {
+		if(send_sock->useinfo.proto != PROTO_NONE)
+			send_proto_id = send_sock->useinfo.proto;
+		else
+			send_proto_id = send_sock->proto;
+	}
 	/* init recv_address_str, recv_port_str & recv_port_no */
 	if(msg->rcv.bind_address) {
-		if(msg->rcv.bind_address->useinfo.name.len > 0)
+		if(msg->rcv.bind_address->useinfo.name.len > 0) {
 			recv_address_str = &(msg->rcv.bind_address->useinfo.name);
-		else
+			recv_af = msg->rcv.bind_address->useinfo.af;
+		} else {
 			recv_address_str = &(msg->rcv.bind_address->address_str);
+			recv_af = msg->rcv.bind_address->address.af;
+		}
 		if(msg->rcv.bind_address->useinfo.port_no > 0) {
 			recv_port_str = &(msg->rcv.bind_address->useinfo.port_no_str);
 			recv_port_no = msg->rcv.bind_address->useinfo.port_no;
 		} else {
 			recv_port_str = &(msg->rcv.bind_address->port_no_str);
 			recv_port_no = msg->rcv.bind_address->port_no;
+		}
+		if(msg->rcv.bind_address->useinfo.proto != PROTO_NONE) {
+			recv_proto_id = msg->rcv.bind_address->useinfo.proto;
+		} else {
+			recv_proto_id = msg->rcv.bind_address->proto;
 		}
 	}
 
@@ -924,11 +949,15 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 	int size;
 	int offset;
 	int s_offset;
-	str *send_address_str;
-	str *send_port_str;
+	str *send_address_str = NULL;
+	str *send_port_str = NULL;
+	int send_proto_id = PROTO_NONE;
+	int send_af = 0;
 	str *recv_address_str = NULL;
 	str *recv_port_str = NULL;
 	int recv_port_no = 0;
+	int recv_proto_id = PROTO_NONE;
+	int recv_af = 0;
 	struct socket_info *send_sock;
 
 #ifdef USE_COMP
@@ -978,320 +1007,322 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 #define SENDCOMP_PARAM_ADD
 #endif /* USE_COMP */
 
-#define SUBST_LUMP(subst_l)                                                  \
-	switch((subst_l)->u.subst) {                                             \
-		case SUBST_RCV_IP:                                                   \
-			if(msg->rcv.bind_address && STR_WITHVAL(recv_address_str)) {     \
-				if(msg->rcv.bind_address->address.af != AF_INET) {           \
-					new_buf[offset] = '[';                                   \
-					offset++;                                                \
-				}                                                            \
-				memcpy(new_buf + offset, recv_address_str->s,                \
-						recv_address_str->len);                              \
-				offset += recv_address_str->len;                             \
-				if(msg->rcv.bind_address->address.af != AF_INET) {           \
-					new_buf[offset] = ']';                                   \
-					offset++;                                                \
-				}                                                            \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null bind_address\n");                       \
-			};                                                               \
-			break;                                                           \
-		case SUBST_RCV_PORT:                                                 \
-			if(msg->rcv.bind_address && STR_WITHVAL(recv_port_str)) {        \
-				memcpy(new_buf + offset, recv_port_str->s,                   \
-						recv_port_str->len);                                 \
-				offset += recv_port_str->len;                                \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null bind_address\n");                       \
-			};                                                               \
-			break;                                                           \
-		case SUBST_RCV_ALL:                                                  \
-		case SUBST_RCV_ALL_EX:                                               \
-			if(msg->rcv.bind_address && STR_WITHVAL(recv_address_str)) {     \
-				/* address */                                                \
-				if((msg->rcv.bind_address->address.af == AF_INET6)           \
-						&& (recv_address_str->s[0] != '[')                   \
-						&& (memchr(recv_address_str->s, ':',                 \
-									recv_address_str->len)                   \
-								!= NULL)) {                                  \
-					new_buf[offset] = '[';                                   \
-					offset++;                                                \
-				}                                                            \
-				memcpy(new_buf + offset, recv_address_str->s,                \
-						recv_address_str->len);                              \
-				offset += recv_address_str->len;                             \
-				if((msg->rcv.bind_address->address.af == AF_INET6)           \
-						&& (recv_address_str->s[0] != '[')                   \
-						&& (memchr(recv_address_str->s, ':',                 \
-									recv_address_str->len)                   \
-								!= NULL)) {                                  \
-					new_buf[offset] = ']';                                   \
-					offset++;                                                \
-				}                                                            \
-				/* :port */                                                  \
-				if(recv_port_no != SIP_PORT && STR_WITHVAL(recv_port_str)) { \
-					new_buf[offset] = ':';                                   \
-					offset++;                                                \
-					memcpy(new_buf + offset, recv_port_str->s,               \
-							recv_port_str->len);                             \
-					offset += recv_port_str->len;                            \
-				}                                                            \
-				switch(msg->rcv.bind_address->proto) {                       \
-					case PROTO_NONE:                                         \
-					case PROTO_UDP:                                          \
-						break; /* nothing to do, udp is default*/            \
-					case PROTO_TCP:                                          \
-						memcpy(new_buf + offset, TRANSPORT_PARAM,            \
-								TRANSPORT_PARAM_LEN);                        \
-						offset += TRANSPORT_PARAM_LEN;                       \
-						if(msg->rcv.proto == PROTO_WS) {                     \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tcp", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_TLS:                                          \
-						memcpy(new_buf + offset, TRANSPORT_PARAM,            \
-								TRANSPORT_PARAM_LEN);                        \
-						offset += TRANSPORT_PARAM_LEN;                       \
-						if(msg->rcv.proto == PROTO_WS                        \
-								|| msg->rcv.proto == PROTO_WSS) {            \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tls", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_SCTP:                                         \
-						memcpy(new_buf + offset, TRANSPORT_PARAM,            \
-								TRANSPORT_PARAM_LEN);                        \
-						offset += TRANSPORT_PARAM_LEN;                       \
-						memcpy(new_buf + offset, "sctp", 4);                 \
-						offset += 4;                                         \
-						break;                                               \
-					default:                                                 \
-						LM_CRIT("unknown proto %d\n",                        \
-								msg->rcv.bind_address->proto);               \
-				}                                                            \
-				if((subst_l)->u.subst == SUBST_RCV_ALL_EX                    \
-						&& msg->rcv.bind_address->sockname.len > 0) {        \
-					memcpy(new_buf + offset, SOCKNAME_PARAM,                 \
-							SOCKNAME_PARAM_LEN);                             \
-					offset += SOCKNAME_PARAM_LEN;                            \
-					memcpy(new_buf + offset,                                 \
-							msg->rcv.bind_address->sockname.s,               \
-							msg->rcv.bind_address->sockname.len);            \
-					offset += msg->rcv.bind_address->sockname.len;           \
-				}                                                            \
-				RCVCOMP_PARAM_ADD                                            \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null bind_address\n");                       \
-			};                                                               \
-			break;                                                           \
-		case SUBST_SND_IP:                                                   \
-			if(send_sock) {                                                  \
-				if((send_sock->address.af != AF_INET)                        \
-						&& (send_address_str->s[0] != '[')) {                \
-					new_buf[offset] = '[';                                   \
-					offset++;                                                \
-				}                                                            \
-				memcpy(new_buf + offset, send_address_str->s,                \
-						send_address_str->len);                              \
-				offset += send_address_str->len;                             \
-				if((send_sock->address.af != AF_INET)                        \
-						&& (send_address_str->s[0] != '[')) {                \
-					new_buf[offset] = ']';                                   \
-					offset++;                                                \
-				}                                                            \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null send_sock\n");                          \
-			};                                                               \
-			break;                                                           \
-		case SUBST_SND_PORT:                                                 \
-			if(send_sock) {                                                  \
-				memcpy(new_buf + offset, send_port_str->s,                   \
-						send_port_str->len);                                 \
-				offset += send_port_str->len;                                \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null send_sock\n");                          \
-			};                                                               \
-			break;                                                           \
-		case SUBST_SND_ALL:                                                  \
-		case SUBST_SND_ALL_EX:                                               \
-			if(send_sock) {                                                  \
-				/* address */                                                \
-				if((send_sock->address.af == AF_INET6)                       \
-						&& (send_address_str->s[0] != '[')                   \
-						&& (memchr(send_address_str->s, ':',                 \
-									send_address_str->len)                   \
-								!= NULL)) {                                  \
-					new_buf[offset] = '[';                                   \
-					offset++;                                                \
-				}                                                            \
-				memcpy(new_buf + offset, send_address_str->s,                \
-						send_address_str->len);                              \
-				offset += send_address_str->len;                             \
-				if((send_sock->address.af == AF_INET6)                       \
-						&& (send_address_str->s[0] != '[')                   \
-						&& (memchr(send_address_str->s, ':',                 \
-									send_address_str->len)                   \
-								!= NULL)) {                                  \
-					new_buf[offset] = ']';                                   \
-					offset++;                                                \
-				}                                                            \
-				/* :port */                                                  \
-				if((send_sock->port_no != SIP_PORT)                          \
-						|| (send_port_str != &(send_sock->port_no_str))) {   \
-					new_buf[offset] = ':';                                   \
-					offset++;                                                \
-					memcpy(new_buf + offset, send_port_str->s,               \
-							send_port_str->len);                             \
-					offset += send_port_str->len;                            \
-				}                                                            \
-				switch(send_sock->proto) {                                   \
-					case PROTO_NONE:                                         \
-					case PROTO_UDP:                                          \
-						break; /* nothing to do, udp is default*/            \
-					case PROTO_TCP:                                          \
-						memcpy(new_buf + offset, TRANSPORT_PARAM,            \
-								TRANSPORT_PARAM_LEN);                        \
-						offset += TRANSPORT_PARAM_LEN;                       \
-						if(send_info->proto == PROTO_WS) {                   \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tcp", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_TLS:                                          \
-						memcpy(new_buf + offset, TRANSPORT_PARAM,            \
-								TRANSPORT_PARAM_LEN);                        \
-						offset += TRANSPORT_PARAM_LEN;                       \
-						if(send_info->proto == PROTO_WS                      \
-								|| send_info->proto == PROTO_WSS) {          \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tls", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_SCTP:                                         \
-						memcpy(new_buf + offset, TRANSPORT_PARAM,            \
-								TRANSPORT_PARAM_LEN);                        \
-						offset += TRANSPORT_PARAM_LEN;                       \
-						memcpy(new_buf + offset, "sctp", 4);                 \
-						offset += 4;                                         \
-						break;                                               \
-					default:                                                 \
-						LM_CRIT("unknown proto %d\n", send_sock->proto);     \
-				}                                                            \
-				if((subst_l)->u.subst == SUBST_SND_ALL_EX                    \
-						&& send_sock->sockname.len > 0) {                    \
-					memcpy(new_buf + offset, SOCKNAME_PARAM,                 \
-							SOCKNAME_PARAM_LEN);                             \
-					offset += SOCKNAME_PARAM_LEN;                            \
-					memcpy(new_buf + offset, send_sock->sockname.s,          \
-							send_sock->sockname.len);                        \
-					offset += send_sock->sockname.len;                       \
-				}                                                            \
-				SENDCOMP_PARAM_ADD                                           \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null bind_address\n");                       \
-			};                                                               \
-			break;                                                           \
-		case SUBST_RCV_PROTO:                                                \
-			if(msg->rcv.bind_address) {                                      \
-				switch(msg->rcv.bind_address->proto) {                       \
-					case PROTO_NONE:                                         \
-					case PROTO_UDP:                                          \
-						memcpy(new_buf + offset, "udp", 3);                  \
-						offset += 3;                                         \
-						break;                                               \
-					case PROTO_TCP:                                          \
-						if(msg->rcv.proto == PROTO_WS) {                     \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tcp", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_TLS:                                          \
-						if(msg->rcv.proto == PROTO_WS                        \
-								|| msg->rcv.proto == PROTO_WSS) {            \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tls", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_SCTP:                                         \
-						memcpy(new_buf + offset, "sctp", 4);                 \
-						offset += 4;                                         \
-						break;                                               \
-					default:                                                 \
-						LM_CRIT("unknown proto %d\n",                        \
-								msg->rcv.bind_address->proto);               \
-				}                                                            \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null send_sock \n");                         \
-			};                                                               \
-			break;                                                           \
-		case SUBST_SND_PROTO:                                                \
-			if(send_sock) {                                                  \
-				switch(send_sock->proto) {                                   \
-					case PROTO_NONE:                                         \
-					case PROTO_UDP:                                          \
-						memcpy(new_buf + offset, "udp", 3);                  \
-						offset += 3;                                         \
-						break;                                               \
-					case PROTO_TCP:                                          \
-						if(send_info->proto == PROTO_WS) {                   \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tcp", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_TLS:                                          \
-						if(send_info->proto == PROTO_WS                      \
-								|| send_info->proto == PROTO_WSS) {          \
-							memcpy(new_buf + offset, "ws", 2);               \
-							offset += 2;                                     \
-						} else {                                             \
-							memcpy(new_buf + offset, "tls", 3);              \
-							offset += 3;                                     \
-						}                                                    \
-						break;                                               \
-					case PROTO_SCTP:                                         \
-						memcpy(new_buf + offset, "sctp", 4);                 \
-						offset += 4;                                         \
-						break;                                               \
-					default:                                                 \
-						LM_CRIT("unknown proto %d\n", send_sock->proto);     \
-				}                                                            \
-			} else {                                                         \
-				/*FIXME*/                                                    \
-				LM_CRIT("FIXME: null send_sock \n");                         \
-			};                                                               \
-			break;                                                           \
-		default:                                                             \
-			LM_CRIT("unknown subst type %d\n", (subst_l)->u.subst);          \
+#define SUBST_LUMP(subst_l)                                                    \
+	switch((subst_l)->u.subst) {                                               \
+		case SUBST_RCV_IP:                                                     \
+			if(msg->rcv.bind_address && STR_WITHVAL(recv_address_str)) {       \
+				if(recv_af == AF_INET6) {                                      \
+					new_buf[offset] = '[';                                     \
+					offset++;                                                  \
+				}                                                              \
+				memcpy(new_buf + offset, recv_address_str->s,                  \
+						recv_address_str->len);                                \
+				offset += recv_address_str->len;                               \
+				if(recv_af == AF_INET6) {                                      \
+					new_buf[offset] = ']';                                     \
+					offset++;                                                  \
+				}                                                              \
+			} else {                                                           \
+				LM_CRIT("null bind_address\n");                                \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_RCV_PORT:                                                   \
+			if(msg->rcv.bind_address && STR_WITHVAL(recv_port_str)) {          \
+				memcpy(new_buf + offset, recv_port_str->s,                     \
+						recv_port_str->len);                                   \
+				offset += recv_port_str->len;                                  \
+			} else {                                                           \
+				LM_CRIT("null bind_address\n");                                \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_RCV_ALL:                                                    \
+		case SUBST_RCV_ALL_EX:                                                 \
+			if(msg->rcv.bind_address && STR_WITHVAL(recv_address_str)) {       \
+				/* address */                                                  \
+				if((recv_af == AF_INET6) && (recv_address_str->s[0] != '[')    \
+						&& (memchr(recv_address_str->s, ':',                   \
+									recv_address_str->len)                     \
+								!= NULL)) {                                    \
+					new_buf[offset] = '[';                                     \
+					offset++;                                                  \
+				}                                                              \
+				memcpy(new_buf + offset, recv_address_str->s,                  \
+						recv_address_str->len);                                \
+				offset += recv_address_str->len;                               \
+				if((recv_af == AF_INET6) && (recv_address_str->s[0] != '[')    \
+						&& (memchr(recv_address_str->s, ':',                   \
+									recv_address_str->len)                     \
+								!= NULL)) {                                    \
+					new_buf[offset] = ']';                                     \
+					offset++;                                                  \
+				}                                                              \
+				/* :port */                                                    \
+				if(recv_port_no != SIP_PORT && STR_WITHVAL(recv_port_str)) {   \
+					new_buf[offset] = ':';                                     \
+					offset++;                                                  \
+					memcpy(new_buf + offset, recv_port_str->s,                 \
+							recv_port_str->len);                               \
+					offset += recv_port_str->len;                              \
+				}                                                              \
+				switch(recv_proto_id) {                                        \
+					case PROTO_NONE:                                           \
+					case PROTO_UDP:                                            \
+						break; /* nothing to do, udp is default*/              \
+					case PROTO_TCP:                                            \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						if(msg->rcv.proto == PROTO_WS) {                       \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tcp", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_TLS:                                            \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						if(msg->rcv.proto == PROTO_WS                          \
+								|| msg->rcv.proto == PROTO_WSS) {              \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tls", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_WS:                                             \
+					case PROTO_WSS:                                            \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						memcpy(new_buf + offset, "ws", 2);                     \
+						offset += 2;                                           \
+						break;                                                 \
+					case PROTO_SCTP:                                           \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						memcpy(new_buf + offset, "sctp", 4);                   \
+						offset += 4;                                           \
+						break;                                                 \
+					default:                                                   \
+						LM_CRIT("unknown proto %d\n",                          \
+								msg->rcv.bind_address->proto);                 \
+				}                                                              \
+				if((subst_l)->u.subst == SUBST_RCV_ALL_EX                      \
+						&& msg->rcv.bind_address->sockname.len > 0) {          \
+					memcpy(new_buf + offset, SOCKNAME_PARAM,                   \
+							SOCKNAME_PARAM_LEN);                               \
+					offset += SOCKNAME_PARAM_LEN;                              \
+					memcpy(new_buf + offset,                                   \
+							msg->rcv.bind_address->sockname.s,                 \
+							msg->rcv.bind_address->sockname.len);              \
+					offset += msg->rcv.bind_address->sockname.len;             \
+				}                                                              \
+				RCVCOMP_PARAM_ADD                                              \
+			} else {                                                           \
+				LM_CRIT("null bind_address\n");                                \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_SND_IP:                                                     \
+			if(send_sock) {                                                    \
+				if((send_af == AF_INET6) && (send_address_str->s[0] != '[')) { \
+					new_buf[offset] = '[';                                     \
+					offset++;                                                  \
+				}                                                              \
+				memcpy(new_buf + offset, send_address_str->s,                  \
+						send_address_str->len);                                \
+				offset += send_address_str->len;                               \
+				if((send_af == AF_INET6) && (send_address_str->s[0] != '[')) { \
+					new_buf[offset] = ']';                                     \
+					offset++;                                                  \
+				}                                                              \
+			} else {                                                           \
+				LM_CRIT("null send_sock\n");                                   \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_SND_PORT:                                                   \
+			if(send_sock) {                                                    \
+				memcpy(new_buf + offset, send_port_str->s,                     \
+						send_port_str->len);                                   \
+				offset += send_port_str->len;                                  \
+			} else {                                                           \
+				LM_CRIT("null send_sock\n");                                   \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_SND_ALL:                                                    \
+		case SUBST_SND_ALL_EX:                                                 \
+			if(send_sock) {                                                    \
+				/* address */                                                  \
+				if((send_af == AF_INET6) && (send_address_str->s[0] != '[')    \
+						&& (memchr(send_address_str->s, ':',                   \
+									send_address_str->len)                     \
+								!= NULL)) {                                    \
+					new_buf[offset] = '[';                                     \
+					offset++;                                                  \
+				}                                                              \
+				memcpy(new_buf + offset, send_address_str->s,                  \
+						send_address_str->len);                                \
+				offset += send_address_str->len;                               \
+				if((send_af == AF_INET6) && (send_address_str->s[0] != '[')    \
+						&& (memchr(send_address_str->s, ':',                   \
+									send_address_str->len)                     \
+								!= NULL)) {                                    \
+					new_buf[offset] = ']';                                     \
+					offset++;                                                  \
+				}                                                              \
+				/* :port */                                                    \
+				if((send_sock->port_no != SIP_PORT)                            \
+						|| (send_port_str != &(send_sock->port_no_str))) {     \
+					new_buf[offset] = ':';                                     \
+					offset++;                                                  \
+					memcpy(new_buf + offset, send_port_str->s,                 \
+							send_port_str->len);                               \
+					offset += send_port_str->len;                              \
+				}                                                              \
+				switch(send_proto_id) {                                        \
+					case PROTO_NONE:                                           \
+					case PROTO_UDP:                                            \
+						break; /* nothing to do, udp is default*/              \
+					case PROTO_TCP:                                            \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						if(send_info->proto == PROTO_WS) {                     \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tcp", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_TLS:                                            \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						if(send_info->proto == PROTO_WS                        \
+								|| send_info->proto == PROTO_WSS) {            \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tls", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_WS:                                             \
+					case PROTO_WSS:                                            \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						memcpy(new_buf + offset, "ws", 2);                     \
+						offset += 2;                                           \
+						break;                                                 \
+					case PROTO_SCTP:                                           \
+						memcpy(new_buf + offset, TRANSPORT_PARAM,              \
+								TRANSPORT_PARAM_LEN);                          \
+						offset += TRANSPORT_PARAM_LEN;                         \
+						memcpy(new_buf + offset, "sctp", 4);                   \
+						offset += 4;                                           \
+						break;                                                 \
+					default:                                                   \
+						LM_CRIT("unknown proto %d\n", send_sock->proto);       \
+				}                                                              \
+				if((subst_l)->u.subst == SUBST_SND_ALL_EX                      \
+						&& send_sock->sockname.len > 0) {                      \
+					memcpy(new_buf + offset, SOCKNAME_PARAM,                   \
+							SOCKNAME_PARAM_LEN);                               \
+					offset += SOCKNAME_PARAM_LEN;                              \
+					memcpy(new_buf + offset, send_sock->sockname.s,            \
+							send_sock->sockname.len);                          \
+					offset += send_sock->sockname.len;                         \
+				}                                                              \
+				SENDCOMP_PARAM_ADD                                             \
+			} else {                                                           \
+				LM_CRIT("null bind_address\n");                                \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_RCV_PROTO:                                                  \
+			if(msg->rcv.bind_address) {                                        \
+				switch(msg->rcv.bind_address->proto) {                         \
+					case PROTO_NONE:                                           \
+					case PROTO_UDP:                                            \
+						memcpy(new_buf + offset, "udp", 3);                    \
+						offset += 3;                                           \
+						break;                                                 \
+					case PROTO_TCP:                                            \
+						if(msg->rcv.proto == PROTO_WS) {                       \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tcp", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_TLS:                                            \
+						if(msg->rcv.proto == PROTO_WS                          \
+								|| msg->rcv.proto == PROTO_WSS) {              \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tls", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_SCTP:                                           \
+						memcpy(new_buf + offset, "sctp", 4);                   \
+						offset += 4;                                           \
+						break;                                                 \
+					default:                                                   \
+						LM_CRIT("unknown proto %d\n",                          \
+								msg->rcv.bind_address->proto);                 \
+				}                                                              \
+			} else {                                                           \
+				LM_CRIT("null send_sock\n");                                   \
+			};                                                                 \
+			break;                                                             \
+		case SUBST_SND_PROTO:                                                  \
+			if(send_sock) {                                                    \
+				switch(send_sock->proto) {                                     \
+					case PROTO_NONE:                                           \
+					case PROTO_UDP:                                            \
+						memcpy(new_buf + offset, "udp", 3);                    \
+						offset += 3;                                           \
+						break;                                                 \
+					case PROTO_TCP:                                            \
+						if(send_info->proto == PROTO_WS) {                     \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tcp", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_TLS:                                            \
+						if(send_info->proto == PROTO_WS                        \
+								|| send_info->proto == PROTO_WSS) {            \
+							memcpy(new_buf + offset, "ws", 2);                 \
+							offset += 2;                                       \
+						} else {                                               \
+							memcpy(new_buf + offset, "tls", 3);                \
+							offset += 3;                                       \
+						}                                                      \
+						break;                                                 \
+					case PROTO_SCTP:                                           \
+						memcpy(new_buf + offset, "sctp", 4);                   \
+						offset += 4;                                           \
+						break;                                                 \
+					default:                                                   \
+						LM_CRIT("unknown proto %d\n", send_sock->proto);       \
+				}                                                              \
+			} else {                                                           \
+				LM_CRIT("null send_sock\n");                                   \
+			};                                                                 \
+			break;                                                             \
+		default:                                                               \
+			LM_CRIT("unknown subst type %d\n", (subst_l)->u.subst);            \
 	}
 
 	if(send_info) {
@@ -1300,39 +1331,50 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 		send_sock = 0;
 	}
 	/* init send_address_str & send_port_str */
-	if(msg->set_global_address.len)
-		send_address_str = &(msg->set_global_address);
-	else
-		send_address_str = &(send_sock->address_str);
-	if(msg->set_global_port.len)
-		send_port_str = &(msg->set_global_port);
-	else
-		send_port_str = &(send_sock->port_no_str);
-	/* init send_address_str & send_port_str */
-	if(send_sock && send_sock->useinfo.name.len > 0)
+	if(send_sock && send_sock->useinfo.name.len > 0) {
 		send_address_str = &(send_sock->useinfo.name);
-	else if(msg->set_global_address.len)
+		send_af = send_sock->useinfo.af;
+	} else if(msg->set_global_address.len) {
 		send_address_str = &(msg->set_global_address);
-	else
+		if(send_sock) {
+			send_af = send_sock->address.af;
+		}
+	} else if(send_sock) {
 		send_address_str = &(send_sock->address_str);
+		send_af = send_sock->address.af;
+	}
 	if(send_sock && send_sock->useinfo.port_no > 0)
 		send_port_str = &(send_sock->useinfo.port_no_str);
 	else if(msg->set_global_port.len)
 		send_port_str = &(msg->set_global_port);
 	else
 		send_port_str = &(send_sock->port_no_str);
+	if(send_sock) {
+		if(send_sock->useinfo.proto != PROTO_NONE)
+			send_proto_id = send_sock->useinfo.proto;
+		else
+			send_proto_id = send_sock->proto;
+	}
 	/* init recv_address_str, recv_port_str & recv_port_no */
 	if(msg->rcv.bind_address) {
-		if(msg->rcv.bind_address->useinfo.name.len > 0)
+		if(msg->rcv.bind_address->useinfo.name.len > 0) {
 			recv_address_str = &(msg->rcv.bind_address->useinfo.name);
-		else
+			recv_af = msg->rcv.bind_address->useinfo.af;
+		} else {
 			recv_address_str = &(msg->rcv.bind_address->address_str);
+			recv_af = msg->rcv.bind_address->address.af;
+		}
 		if(msg->rcv.bind_address->useinfo.port_no > 0) {
 			recv_port_str = &(msg->rcv.bind_address->useinfo.port_no_str);
 			recv_port_no = msg->rcv.bind_address->useinfo.port_no;
 		} else {
 			recv_port_str = &(msg->rcv.bind_address->port_no_str);
 			recv_port_no = msg->rcv.bind_address->port_no;
+		}
+		if(msg->rcv.bind_address->useinfo.proto != PROTO_NONE) {
+			recv_proto_id = msg->rcv.bind_address->useinfo.proto;
+		} else {
+			recv_proto_id = msg->rcv.bind_address->proto;
 		}
 	}
 
@@ -2319,6 +2361,9 @@ char *generate_res_buf_from_sip_res(
 	unsigned offset, s_offset, via_offset;
 	char *buf;
 	unsigned int len;
+	str xparams;
+	str sdup;
+	sr_lump_t *anchor;
 
 	buf = msg->buf;
 	len = msg->len;
@@ -2335,6 +2380,33 @@ char *generate_res_buf_from_sip_res(
 		} else {
 			via_len = msg->h_via1->len;
 			via_offset = msg->h_via1->name.s - buf;
+		}
+	}
+
+	/* test and add xavp via reply params */
+	if(msg && msg->via2 && (msg->msg_flags & FL_ADD_XAVP_VIA_REPLY_PARAMS)
+			&& _ksr_xavp_via_reply_params.len > 0) {
+		xparams.s = pv_get_buffer();
+		xparams.len = xavp_serialize_fields_style(&_ksr_xavp_via_reply_params,
+				1, xparams.s, pv_get_buffer_size());
+		if(xparams.len > 0) {
+			LM_DBG("adding via reply xavp params\n");
+			anchor = anchor_lump(msg,
+					msg->via2->params.s + msg->via2->params.len - msg->buf, 0,
+					0);
+			if(anchor == NULL) {
+				LM_ERR("unable to get the anchor\n");
+				goto error;
+			}
+			if(pkg_str_dup(&sdup, &xparams) < 0) {
+				PKG_MEM_ERROR;
+				goto error;
+			}
+			if(insert_new_lump_after(anchor, sdup.s, sdup.len, 0) == 0) {
+				LM_ERR("unable to add via reply xavp params\n");
+				pkg_free(sdup.s);
+				goto error;
+			}
 		}
 	}
 
@@ -2356,9 +2428,8 @@ char *generate_res_buf_from_sip_res(
 		}
 	}
 
-	new_len =
-			len + body_delta + lumps_len(msg, msg->add_rm, 0); /*FIXME: we don't
-														know the send sock */
+	/* note: unknow the send sock */
+	new_len = len + body_delta + lumps_len(msg, msg->add_rm, 0);
 
 	LM_DBG("old size: %d, new size: %d\n", len, new_len);
 	new_buf = (char *)pkg_malloc(new_len + 1); /* +1 is for debugging
@@ -2369,9 +2440,9 @@ char *generate_res_buf_from_sip_res(
 	}
 	new_buf[new_len] = 0; /* debug: print the message */
 	offset = s_offset = 0;
-	/*FIXME: no send sock*/
-	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, 0,
-			FLAG_MSG_ALL); /*FIXME:*/
+	/* note: no send sock*/
+	process_lumps(
+			msg, msg->add_rm, new_buf, &offset, &s_offset, 0, FLAG_MSG_ALL);
 	process_lumps(
 			msg, msg->body_lumps, new_buf, &offset, &s_offset, 0, FLAG_MSG_ALL);
 	/* copy the rest of the message */
@@ -2415,6 +2486,7 @@ char *build_res_buf_from_sip_req(unsigned int code, str *text, str *new_tag,
 	char *totags;
 	int httpreq;
 	char *pvia;
+	str xparams = STR_NULL;
 
 	body = 0;
 	buf = 0;
@@ -2454,6 +2526,17 @@ char *build_res_buf_from_sip_req(unsigned int code, str *text, str *new_tag,
 		}
 		if(msg->via1->rport)
 			len -= msg->via1->rport->size + 1; /* include ';' */
+	}
+
+	/* test and add xavp via reply params */
+	if((msg->msg_flags & FL_ADD_XAVP_VIA_REPLY_PARAMS)
+			&& _ksr_xavp_via_reply_params.len > 0) {
+		xparams.s = pv_get_buffer();
+		xparams.len = xavp_serialize_fields_style(&_ksr_xavp_via_reply_params,
+				1, xparams.s, pv_get_buffer_size());
+		if(xparams.len > 0) {
+			len += xparams.len; /* starting ';' included */
+		}
 	}
 
 	/* first line */
@@ -2587,6 +2670,9 @@ char *build_res_buf_from_sip_req(unsigned int code, str *text, str *new_tag,
 					/* normal whole via copy */
 					append_str_trans(p, hdr->name.s,
 							(hdr->body.s + hdr->body.len) - hdr->name.s, msg);
+				}
+				if(xparams.len > 0) {
+					append_str(p, xparams.s, xparams.len);
 				}
 				append_str(p, CRLF, CRLF_LEN);
 				/* if is HTTP, replace Via with Sia
@@ -2768,7 +2854,7 @@ int branch_builder(unsigned int hash_index,
 }
 
 
-/* uses only the send_info->send_socket, send_info->proto and
+/* uses only the send_info->send_socket, send_info->proto, send_info->id and
  * send_info->comp (so that a send_info used for sending can be passed
  * to this function w/o changes and the correct via will be built) */
 char *via_builder(unsigned int *len, sip_msg_t *msg,
@@ -2787,6 +2873,7 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 	char *comp_name;
 #endif /* USE_COMP */
 	int port;
+	int proto;
 	struct ip_addr ip;
 	union sockaddr_union *from = NULL;
 	union sockaddr_union local_addr;
@@ -2830,7 +2917,23 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 		else
 			port_str = &(send_sock->port_no_str);
 	}
-
+	proto = PROTO_NONE;
+	if(msg && (msg->msg_flags & FL_USE_XAVP_VIA_FIELDS)
+			&& _ksr_xavp_via_fields.len > 0) {
+		xname.s = "proto";
+		xname.len = 5;
+		rxavp = xavp_get_child_with_sval(&_ksr_xavp_via_fields, &xname);
+		if(rxavp != NULL) {
+			proto = get_valid_proto_id(&rxavp->val.v.s);
+		}
+	}
+	if(proto == PROTO_NONE) {
+		if(send_sock->useinfo.proto != PROTO_NONE) {
+			proto = send_sock->useinfo.proto;
+		} else {
+			proto = send_info->proto;
+		}
+	}
 	comp_len = comp_name_len = 0;
 #ifdef USE_COMP
 	comp_name = 0;
@@ -2853,7 +2956,7 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 	}
 #endif /* USE_COMP */
 
-	via_prefix_len = MY_VIA_LEN + (send_info->proto == PROTO_SCTP);
+	via_prefix_len = MY_VIA_LEN + (proto == PROTO_SCTP);
 	max_len = via_prefix_len + address_str->len /* space in MY_VIA */
 			  + 2 /* just in case it is a v6 address ... [ ] */
 			  + 1 /*':'*/ + port_str->len
@@ -2872,15 +2975,15 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 	via_len = via_prefix_len + address_str->len; /*space included in MY_VIA*/
 
 	memcpy(line_buf, MY_VIA, MY_VIA_LEN);
-	if(send_info->proto == PROTO_UDP) {
+	if(proto == PROTO_UDP) {
 		/* do nothing */
-	} else if(send_info->proto == PROTO_TCP) {
+	} else if(proto == PROTO_TCP) {
 		memcpy(line_buf + MY_VIA_LEN - 4, "TCP ", 4);
-	} else if(send_info->proto == PROTO_TLS) {
+	} else if(proto == PROTO_TLS) {
 		memcpy(line_buf + MY_VIA_LEN - 4, "TLS ", 4);
-	} else if(send_info->proto == PROTO_SCTP) {
+	} else if(proto == PROTO_SCTP) {
 		memcpy(line_buf + MY_VIA_LEN - 4, "SCTP ", 5);
-	} else if(send_info->proto == PROTO_WS) {
+	} else if(proto == PROTO_WS) {
 		if(unlikely(send_info->send_flags.f & SND_F_FORCE_SOCKET
 					&& send_info->send_sock)) {
 			local_addr = send_info->send_sock->su;
@@ -2919,10 +3022,10 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 			return 0;
 		}
 		tcpconn_put(con);
-	} else if(send_info->proto == PROTO_WSS) {
+	} else if(proto == PROTO_WSS) {
 		memcpy(line_buf + MY_VIA_LEN - 4, "WSS ", 4);
 	} else {
-		LM_CRIT("unknown proto %d\n", send_info->proto);
+		LM_CRIT("unknown proto %d\n", proto);
 		pkg_free(line_buf);
 		return 0;
 	}

@@ -59,7 +59,7 @@ static param_t *_tr_uri_params = NULL;
 
 /*! transformation buffer size */
 #define TR_BUFFER_SIZE 65536
-#define TR_BUFFER_SLOTS 8
+#define TR_BUFFER_SLOTS 16
 
 /*! transformation buffer */
 static char **_tr_buffer_list = NULL;
@@ -1011,7 +1011,7 @@ int tr_eval_string(
 				return -1;
 			}
 			if(!(val->flags & PV_VAL_INT)
-					&& (str2int(&val->rs, (unsigned int *)&val->ri) != 0)) {
+					&& (str2slong(&val->rs, &val->ri) != 0)) {
 				LM_ERR("value is not numeric (cfg line: %d)\n",
 						get_cfg_crt_line());
 				return -1;
@@ -1036,6 +1036,8 @@ int tr_eval_string(
 			memcpy(s, st.s, st.len);
 			s[st.len] = '\0';
 			t = val->ri;
+			memset(&tmv, 0, sizeof(struct tm));
+			_tr_buffer[0] = '\0';
 			localtime_r(&t, &tmv);
 			val->rs.len = strftime(_tr_buffer, TR_BUFFER_SIZE - 1, s, &tmv);
 			pkg_free(s);
@@ -2562,6 +2564,10 @@ int tr_eval_val(
 					&& (*_p == ' ' || *_p == '\t' || *_p == '\n'))             \
 				_p++;                                                          \
 			while(is_in_str(_p, _in) && *_p >= '0' && *_p <= '9') {            \
+				if(_n > ((LONG_MAX / 10) - 10)) {                              \
+					LM_ERR("number value is too large\n");                     \
+					goto error;                                                \
+				}                                                              \
 				_n = _n * 10 + *_p - '0';                                      \
 				_p++;                                                          \
 			}                                                                  \
@@ -2572,7 +2578,7 @@ int tr_eval_val(
 			}                                                                  \
 			memset(_tp, 0, sizeof(tr_param_t));                                \
 			_tp->type = TR_PARAM_NUMBER;                                       \
-			_tp->v.n = sign * n;                                               \
+			_tp->v.n = n * sign;                                               \
 		} else {                                                               \
 			LM_ERR("tinvalid param in transformation: %.*s!!\n", _in->len,     \
 					_in->s);                                                   \
@@ -2655,7 +2661,7 @@ char *tr_parse_string(str *in, trans_t *t)
 	str name;
 	str s;
 	pv_spec_t *spec = NULL;
-	int n;
+	long n;
 	int sign;
 	tr_param_t *tp = NULL;
 
@@ -3318,7 +3324,7 @@ char *tr_parse_paramlist(str *in, trans_t *t)
 	char *start_pos;
 	str s;
 	str name;
-	int n;
+	long n;
 	int sign;
 	pv_spec_t *spec = NULL;
 	tr_param_t *tp = NULL;
@@ -3555,7 +3561,7 @@ char *tr_parse_line(str *in, trans_t *t)
 	char *ps;
 	str s;
 	str name;
-	int n;
+	long n;
 	int sign;
 	pv_spec_t *spec = NULL;
 	tr_param_t *tp = NULL;

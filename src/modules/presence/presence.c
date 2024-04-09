@@ -111,9 +111,9 @@ static int sip_uri_case_sensitive_match(str *s1, str *s2);
 static int sip_uri_case_insensitive_match(str *s1, str *s2);
 
 /* TM bind */
-struct tm_binds tmb;
+struct tm_binds _pres_tmb;
 /* SL API structure */
-sl_api_t slb;
+sl_api_t _pres_slb;
 
 /** module functions */
 
@@ -340,13 +340,13 @@ static int mod_init(void)
 	}
 
 	/* bind the SL API */
-	if(sl_load_api(&slb) != 0) {
+	if(sl_load_api(&_pres_slb) != 0) {
 		LM_ERR("cannot bind to SL API\n");
 		return -1;
 	}
 
 	/* load all TM stuff */
-	if(load_tm_api(&tmb) == -1) {
+	if(load_tm_api(&_pres_tmb) == -1) {
 		LM_ERR("Can't load tm functions. Module TM not loaded?\n");
 		return -1;
 	}
@@ -1859,6 +1859,23 @@ static const char *rpc_presence_cleanup_doc[3] = {
 		"presentity, and watchers tables.",
 		0};
 
+
+void rpc_presence_publish_cache_sync(rpc_t *rpc, void *ctx)
+{
+	LM_DBG("Synchronizing presentity table with the publish cache.\n");
+	if(pres_htable_db_restore() == -1) {
+		rpc->fault(ctx, 500,
+				"Failed to sync presinity table with the publish cache.");
+	} else {
+		rpc->rpl_printf(ctx, "OK");
+	}
+	return;
+}
+
+static const char *rpc_presence_publish_cache_sync_doc[4] = {
+		"Syncs changes made to presentity table with the publish cache.", 0};
+
+
 /*! \brief
  *  Build the rpc response for listing presentity records
  *	- imode - output attributes control
@@ -2124,6 +2141,8 @@ static const char *rpc_presence_watcher_list_doc[2] = {
 
 
 rpc_export_t presence_rpc[] = {
+		{"presence.publish_cache_sync", rpc_presence_publish_cache_sync,
+				rpc_presence_publish_cache_sync_doc, 0},
 		{"presence.cleanup", rpc_presence_cleanup, rpc_presence_cleanup_doc, 0},
 		{"presence.refreshWatchers", rpc_presence_refresh_watchers,
 				rpc_presence_refresh_watchers_doc, 0},

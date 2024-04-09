@@ -48,6 +48,7 @@ static int timeoutlogs = -10;	 /*!< for aggregating timeout logs */
 static int *active = NULL;
 static uint16_t *global_id = NULL;
 
+ksr_loglevels_t _ksr_loglevels_pdb = KSR_LOGLEVELS_DEFAULTS;
 
 /*!
  * Generic parameter that holds a string, an int or a pseudo-variable
@@ -90,7 +91,7 @@ static int rpc_child_init(void);
 static void mod_destroy();
 
 /* debug function for the new client <-> server protocol */
-static void pdb_msg_dbg(struct pdb_msg msg, char *dbg_msg);
+static void pdb_msg_dbg(struct pdb_msg *msg, char *dbg_msg);
 
 /* build the new protocol message before transmission */
 static int pdb_msg_format_send(struct pdb_msg *msg, uint8_t version,
@@ -103,9 +104,15 @@ static cmd_export_t cmds[] = {
 		{0, 0, 0, 0, 0, 0}};
 
 
-static param_export_t params[] = {{"server", PARAM_STRING, &modp_server},
-		{"timeout", INT_PARAM, &timeout}, {0, 0, 0}};
+/* clang-format off */
+static param_export_t params[] = {
+	{"server", PARAM_STRING, &modp_server},
+	{"timeout", PARAM_INT, &timeout},
+	{"ll_info", PARAM_INT, &_ksr_loglevels_pdb.ll_info},
 
+	{0, 0, 0}
+};
+/* clang-format on */
 
 struct module_exports exports = {
 		"pdb",			 /* module name */
@@ -145,15 +152,15 @@ static struct server_list_t *server_list;
 
 
 /* debug function for the new client <-> server protocol */
-static void pdb_msg_dbg(struct pdb_msg msg, char *dbg_msg)
+static void pdb_msg_dbg(struct pdb_msg *msg, char *dbg_msg)
 {
 	int i;
 	char buf[PAYLOADSIZE * 3 + 1];
 	char *ptr = buf;
 
-	if(msg.hdr.length > sizeof(msg.hdr)) {
-		for(i = 0; i < msg.hdr.length - sizeof(msg.hdr); i++) {
-			ptr += sprintf(ptr, "%02X ", msg.bdy.payload[i]);
+	if(msg->hdr.length > sizeof(msg->hdr)) {
+		for(i = 0; i < msg->hdr.length - sizeof(msg->hdr); i++) {
+			ptr += sprintf(ptr, "%02X ", msg->bdy.payload[i]);
 		}
 	} else {
 		*ptr = '\0';
@@ -162,8 +169,8 @@ static void pdb_msg_dbg(struct pdb_msg msg, char *dbg_msg)
 	LM_DBG("%s\n"
 		   "version = %d\ntype = %d\ncode = %d\nid = %d\nlen = %d\n"
 		   "payload = %s\n",
-			dbg_msg, msg.hdr.version, msg.hdr.type, msg.hdr.code, msg.hdr.id,
-			msg.hdr.length, buf);
+			dbg_msg, msg->hdr.version, msg->hdr.type, msg->hdr.code,
+			msg->hdr.id, msg->hdr.length, buf);
 }
 
 /* build the message before send */
@@ -297,7 +304,7 @@ static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number,
 		case PDB_VERSION_1:
 			pdb_msg_format_send(&msg, PDB_VERSION, PDB_TYPE_REQUEST_ID,
 					PDB_CODE_DEFAULT, htons(*global_id), buf, reqlen);
-			pdb_msg_dbg(msg, "Kamailio pdb client sends:");
+			pdb_msg_dbg(&msg, "Kamailio pdb client sends:");
 
 			/* increment msg id for the next request */
 			*global_id = *global_id + 1;
@@ -369,7 +376,7 @@ static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number,
 					switch(PDB_VERSION) {
 						case PDB_VERSION_1:
 							memcpy(&msg, buf, bytes_received);
-							pdb_msg_dbg(msg, "Kamailio pdb client receives:");
+							pdb_msg_dbg(&msg, "Kamailio pdb client receives:");
 
 							_idv = msg.hdr.id; /* make gcc happy */
 							msg.hdr.id = ntohs(_idv);
@@ -386,20 +393,20 @@ static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number,
 										goto found;
 									}
 									break;
-								case PDB_CODE_NOT_NUMBER:
-									LM_NOTICE("Number %s has letters in it\n",
-											number.s);
-									carrierid = 0;
-									goto found;
 								case PDB_CODE_NOT_FOUND:
 									LM_NOTICE("Number %s pdb_id not found\n",
 											number.s);
-									carrierid = 0;
+									carrierid = -1;
+									goto found;
+								case PDB_CODE_NOT_NUMBER:
+									LM_NOTICE("Number %s has letters in it\n",
+											number.s);
+									carrierid = -2;
 									goto found;
 								default:
 									LM_NOTICE("Invalid code %d received\n",
 											msg.hdr.code);
-									carrierid = 0;
+									carrierid = -3;
 									goto found;
 							}
 
@@ -429,7 +436,7 @@ found:
 		timeoutlogs = -10;
 	}
 	if(gettimeofday(&tnow, NULL) == 0) {
-		LM_INFO("got an answer in %f ms\n",
+		LLM_INFO("got an answer in %f ms\n",
 				((double)(tnow.tv_usec - tstart.tv_usec
 						  + (tnow.tv_sec - tstart.tv_sec) * 1000000))
 						/ 1000);

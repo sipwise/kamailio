@@ -22,14 +22,19 @@
 #define _DT_H_
 
 
+
+
 #include "common.h"
 
 
-struct dt_node_t
-{
+
+
+struct dt_node_t {
 	struct dt_node_t *child[10];
 	carrier_t carrier;
 };
+
+
 
 
 /*
@@ -62,8 +67,7 @@ void dt_clear(struct dt_node_t *root);
  digit is marked with the given carrier id.
  Returns 0 on success, -1 otherwise.
 */
-int dt_insert(struct dt_node_t *root, const char *number, int numberlen,
-		carrier_t carrier);
+int dt_insert(struct dt_node_t *root, const char *number, int numberlen, carrier_t carrier);
 
 /*
  Returns the number of nodes in the given tree.
@@ -89,16 +93,14 @@ int dt_leaves(struct dt_node_t *root);
  In case no (partial) match is found, return -1 (i.e,
  not even the very first digit could be prefixed).
 */
-int dt_longest_match(struct dt_node_t *root, const char *number, int numberlen,
-		carrier_t *carrier);
+int dt_longest_match(struct dt_node_t *root, const char *number, int numberlen, carrier_t *carrier);
 
 /*
  Returns 1 if number is found in root and  set *carrier
  according to value in dtree.
  Returns 0 if the number is not found.
 */
-int dt_contains(struct dt_node_t *root, const char *number, int numberlen,
-		carrier_t *carrier);
+int dt_contains(struct dt_node_t *root, const char *number, int numberlen, carrier_t *carrier);
 
 /*
  Optimizes the tree by means of compression. Effectively,
@@ -106,6 +108,8 @@ int dt_contains(struct dt_node_t *root, const char *number, int numberlen,
  prefixes (as opposed to [likely complete] phone numbers).
 */
 void dt_optimize(struct dt_node_t *root);
+
+
 
 
 #endif

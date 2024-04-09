@@ -121,7 +121,9 @@ static int ht_pack_values(
 	len = 0;
 	for(c = 1; c < cols; c++) {
 		if(VAL_NULL(&RES_ROWS(db_res)[row].values[c])) {
-			len += 1;
+			if(ht->pack[2] != '\0') {
+				len += 1;
+			}
 		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STRING) {
 			len += strlen(RES_ROWS(db_res)[row].values[c].val.string_val);
 		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STR) {
@@ -143,8 +145,10 @@ static int ht_pack_values(
 	p = vbuf;
 	for(c = 1; c < cols; c++) {
 		if(VAL_NULL(&RES_ROWS(db_res)[row].values[c])) {
-			*p = ht->pack[2];
-			p++;
+			if(ht->pack[2] != '\0') {
+				*p = ht->pack[2];
+				p++;
+			}
 		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STRING) {
 			strcpy(p, RES_ROWS(db_res)[row].values[c].val.string_val);
 			p += strlen(RES_ROWS(db_res)[row].values[c].val.string_val);
@@ -194,7 +198,7 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 	int i;
 	int ret;
 	int cnt;
-	int now;
+	long now;
 	int ncols;
 	int c;
 
@@ -266,7 +270,7 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 	pname.s = "";
 	n = 0;
 	last_ktype = 0;
-	now = (int)time(NULL);
+	now = (long)time(NULL);
 	do {
 		for(i = 0; i < RES_ROW_N(db_res); i++) {
 			if(VAL_NULL(&RES_ROWS(db_res)[i].values[0])) {

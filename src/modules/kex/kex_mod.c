@@ -50,6 +50,7 @@ MODULE_VERSION
 
 /** module functions */
 int w_is_myself(struct sip_msg *msg, char *uri, str *s2);
+int w_is_myhost(struct sip_msg *msg, char *uri, str *s2);
 int w_setdebug(struct sip_msg *msg, char *level, str *s2);
 int w_resetdebug(struct sip_msg *msg, char *uri, str *s2);
 
@@ -63,56 +64,67 @@ static sruid_t _kex_sruid;
 static int pv_get_sruid_val(
 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 
-static pv_export_t mod_pvs[] = {{{"sruid", sizeof("sruid") - 1}, PVT_OTHER,
-										pv_get_sruid_val, 0, 0, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
+/* clang-format off */
+static pv_export_t mod_pvs[] = {
+	{{"sruid", sizeof("sruid") - 1}, PVT_OTHER, pv_get_sruid_val,
+		0, 0, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
 
 static cmd_export_t cmds[] = {
-		{"setsflag", (cmd_function)w_setsflag, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"resetsflag", (cmd_function)w_resetsflag, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"issflagset", (cmd_function)w_issflagset, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"setbflag", (cmd_function)w_setbflag, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"setbflag", (cmd_function)w_setbflag, 2, fixup_igp_igp,
-				fixup_free_igp_igp, ANY_ROUTE},
-		{"resetbflag", (cmd_function)w_resetbflag, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"resetbflag", (cmd_function)w_resetbflag, 2, fixup_igp_igp,
-				fixup_free_igp_igp, ANY_ROUTE},
-		{"isbflagset", (cmd_function)w_isbflagset, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"isbflagset", (cmd_function)w_isbflagset, 2, fixup_igp_igp,
-				fixup_free_igp_igp, ANY_ROUTE},
-		{"setdsturi", (cmd_function)w_setdsturi, 1, fixup_spve_null,
-				fixup_free_spve_null, ANY_ROUTE},
-		{"resetdsturi", (cmd_function)w_resetdsturi, 0, 0, 0, ANY_ROUTE},
-		{"isdsturiset", (cmd_function)w_isdsturiset, 0, 0, 0, ANY_ROUTE},
-		{"pv_printf", (cmd_function)w_pv_printf, 2, pv_printf_fixup, 0,
-				ANY_ROUTE},
-		{"avp_printf", (cmd_function)w_pv_printf, 2, pv_printf_fixup, 0,
-				ANY_ROUTE},
-		{"is_myself", (cmd_function)w_is_myself, 1, fixup_spve_null,
-				fixup_free_spve_null, ANY_ROUTE},
-		{"setdebug", (cmd_function)w_setdebug, 1, fixup_igp_null,
-				fixup_free_igp_null, ANY_ROUTE},
-		{"resetdebug", (cmd_function)w_resetdebug, 0, 0, 0, ANY_ROUTE},
+	{"setsflag", (cmd_function)w_setsflag, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"resetsflag", (cmd_function)w_resetsflag, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"issflagset", (cmd_function)w_issflagset, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"setbflag", (cmd_function)w_setbflag, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"setbflag", (cmd_function)w_setbflag, 2, fixup_igp_igp,
+			fixup_free_igp_igp, ANY_ROUTE},
+	{"resetbflag", (cmd_function)w_resetbflag, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"resetbflag", (cmd_function)w_resetbflag, 2, fixup_igp_igp,
+			fixup_free_igp_igp, ANY_ROUTE},
+	{"isbflagset", (cmd_function)w_isbflagset, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"isbflagset", (cmd_function)w_isbflagset, 2, fixup_igp_igp,
+		fixup_free_igp_igp, ANY_ROUTE},
+	{"setdsturi", (cmd_function)w_setdsturi, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
+	{"resetdsturi", (cmd_function)w_resetdsturi, 0, 0, 0, ANY_ROUTE},
+	{"isdsturiset", (cmd_function)w_isdsturiset, 0, 0, 0, ANY_ROUTE},
+	{"pv_printf", (cmd_function)w_pv_printf, 2, pv_printf_fixup, 0,
+			ANY_ROUTE},
+	{"avp_printf", (cmd_function)w_pv_printf, 2, pv_printf_fixup, 0,
+			ANY_ROUTE},
+	{"is_myself", (cmd_function)w_is_myself, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
+	{"is_myhost", (cmd_function)w_is_myhost, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
+	{"setdebug", (cmd_function)w_setdebug, 1, fixup_igp_null,
+			fixup_free_igp_null, ANY_ROUTE},
+	{"resetdebug", (cmd_function)w_resetdebug, 0, 0, 0, ANY_ROUTE},
 
-		{0, 0, 0, 0, 0, 0}};
+	{0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t params[] = {{0, 0, 0}};
-
+static param_export_t params[] = {
+	{0, 0, 0}
+};
 
 /** module exports */
-struct module_exports exports = {"kex", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds, params, 0, /* exported RPC methods */
-		mod_pvs,		 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* per-child init function */
-		destroy};
+struct module_exports exports = {
+	"kex", DEFAULT_DLFLAGS,	/* dlopen flags */
+	cmds, params,
+	0,					/* exported RPC methods */
+	mod_pvs,			/* exported pseudo-variables */
+	0,					/* response handling function */
+	mod_init,			/* module initialization function */
+	child_init,			/* per-child init function */
+	destroy
+};
+/* clang-format on */
 
 /**
  * init module function
@@ -180,6 +192,35 @@ int w_is_myself(struct sip_msg *msg, char *uri, str *s2)
 		}
 		ret = check_self(&puri.host, (puri.port.s) ? puri.port_no : 0,
 				(puri.transport_val.s) ? puri.proto : 0);
+	} else {
+		ret = check_self(&suri, 0, 0);
+	}
+	if(ret != 1)
+		return -1;
+	return 1;
+}
+
+/**
+ *
+ */
+int w_is_myhost(struct sip_msg *msg, char *uri, str *s2)
+{
+	int ret;
+	str suri;
+	struct sip_uri puri;
+
+	if(fixup_get_svalue(msg, (gparam_p)uri, &suri) != 0) {
+		LM_ERR("cannot get the URI parameter\n");
+		return -1;
+	}
+	if(suri.len > 4
+			&& (strncmp(suri.s, "sip:", 4) == 0
+					|| strncmp(suri.s, "sips:", 5) == 0)) {
+		if(parse_uri(suri.s, suri.len, &puri) != 0) {
+			LM_ERR("failed to parse uri [%.*s]\n", suri.len, suri.s);
+			return -1;
+		}
+		ret = check_self(&puri.host, 0, 0);
 	} else {
 		ret = check_self(&suri, 0, 0);
 	}

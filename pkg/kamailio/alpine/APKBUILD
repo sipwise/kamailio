@@ -4,7 +4,7 @@
 # Maintainer: Nathan Angelacos <nangel@alpinelinux.org>
 
 pkgname=kamailio
-pkgver=5.7.4
+pkgver=5.8.1
 pkgrel=0
 
 # If building from a git snapshot, specify the gitcommit
@@ -27,7 +27,7 @@ depends="gawk"
 options="!check"
 makedepends="bison db-dev flex freeradius-client-dev expat-dev
 	lksctp-tools-dev perl-dev postgresql-dev python3-dev
-	pcre-dev mariadb-dev libxml2-dev curl-dev unixodbc-dev
+	pcre2-dev mariadb-dev libxml2-dev curl-dev unixodbc-dev
 	confuse-dev ncurses-dev sqlite-dev lua-dev openldap-dev openssl-dev
 	net-snmp-dev libuuid libev-dev jansson-dev json-c-dev libevent-dev
 	linux-headers libmemcached-dev rabbitmq-c-dev hiredis-dev
@@ -79,7 +79,7 @@ _mod_list_dbuid="db2_ops uid_auth_db uid_avp_db uid_domain uid_gflags \
 # - modules for devel purposes
 _mod_list_devel="misctest print print_lib"
 
-# - modules depending on pcre3 library
+# - modules depending on pcre2 library
 _mod_list_pcre="dialplan lcr regex"
 
 # - modules depending on radius client library
@@ -131,7 +131,7 @@ _mod_list_purple="purple"
 _mod_list_memcached="memcached"
 
 # - modules depending on openssl library
-_mod_list_tls="auth_identity crypto tls"
+_mod_list_tls="crypto tls"
 
 # - modules depending on openssl library
 _mod_list_outbound="outbound"
@@ -227,9 +227,6 @@ _mod_list_jansson="acc_json jansson janssonrpcc"
 # - modules depending on libm
 _mod_list_jsdt="app_jsdt"
 
-# - modules depending on sqlang
-_mod_list_sqlang="app_sqlang"
-
 # - modules depending on rabbitmq
 _mod_list_rabbitmq="rabbitmq"
 
@@ -251,7 +248,7 @@ for _i in db postgres sqlite dbtext mysql \
 	cpl xml unixodbc snmpstats xmpp carrierroute \
 	ldap utils tls presence lua ims outbound debugger \
 	extras json websocket authephemeral mongodb\
-	uuid ev memcached redis geoip2 jansson sqlang sipdump \
+	uuid ev memcached redis geoip2 jansson sipdump \
 	jsdt http_async kazoo rabbitmq sctp radius perl \
 	python3 ruby; do
 
@@ -555,11 +552,6 @@ python3() {
 ruby() {
 	_generic_pkg "Execute embedded Ruby scripts" \
 		"$_mod_list_ruby"
-}
-
-sqlang() {
-	_generic_pkg "Squirrel Language (SQLang) for Kamailio" \
-		"$_mod_list_sqlang"
 }
 
 rabbitmq() {

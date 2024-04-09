@@ -51,9 +51,18 @@
 #include <uuid/uuid.h>
 
 #include <stdint.h>
+
+#if RABBITMQ_DEPRECATION
+#include <rabbitmq-c/tcp_socket.h>
+#include <rabbitmq-c/amqp.h>
+#include <rabbitmq-c/framing.h>
+#include <rabbitmq-c/ssl_socket.h>
+#else
 #include <amqp_tcp_socket.h>
+#include <amqp_ssl_socket.h>
 #include <amqp.h>
 #include <amqp_framing.h>
+#endif
 
 #include <assert.h>
 
@@ -73,10 +82,12 @@ static amqp_connection_state_t amqp_conn = NULL;
 /* module parameters */
 static struct amqp_connection_info amqp_info;
 static char *amqp_url = RABBITMQ_DEFAULT_AMQP_URL;
+static char *rmq_amqps_ca_file = NULL;
 static int max_reconnect_attempts = 1;
 static int timeout_sec = 1;
 static int timeout_usec = 0;
 static int direct_reply_to = 0;
+static int amqp_ssl_init_called = 0;
 
 /* module helper functions */
 static int rabbitmq_connect(amqp_connection_state_t *conn);
@@ -117,13 +128,14 @@ static int rbmq_fixup_free_params(void **param, int param_no)
 /* module commands */
 static cmd_export_t cmds[] = {
 		{"rabbitmq_publish", (cmd_function)rabbitmq_publish, 4, fixup_spve_all,
-				fixup_free_spve_all, REQUEST_ROUTE},
+				fixup_free_spve_all, ANY_ROUTE},
 		{"rabbitmq_publish_consume", (cmd_function)rabbitmq_publish_consume, 5,
 				rbmq_fixup_params, rbmq_fixup_free_params, REQUEST_ROUTE},
 		{0, 0, 0, 0, 0, 0}};
 
 /* module parameters */
 static param_export_t params[] = {{"url", PARAM_STRING, &amqp_url},
+		{"amqps_ca_file", PARAM_STRING, &rmq_amqps_ca_file},
 		{"timeout_sec", PARAM_INT, &timeout_sec},
 		{"timeout_usec", PARAM_INT, &timeout_usec},
 		{"direct_reply_to", PARAM_INT, &direct_reply_to}, {0, 0, 0}};
@@ -558,6 +570,13 @@ static int rabbitmq_connect(amqp_connection_state_t *conn)
 	int log_ret;
 	//	amqp_rpc_reply_t reply;
 
+	// amqp_ssl_init_called should only be called once
+	if(amqp_info.ssl && !amqp_ssl_init_called) {
+		amqp_set_initialize_ssl_library(1);
+		amqp_ssl_init_called = 1;
+		LM_DBG("AMQP SSL library initialized\n");
+	}
+
 	// establish a new connection to RabbitMQ server
 	*conn = amqp_new_connection();
 	if(!*conn) {
@@ -570,16 +589,32 @@ static int rabbitmq_connect(amqp_connection_state_t *conn)
 		return RABBITMQ_ERR_CONNECT;
 	}
 
-	amqp_sock = amqp_tcp_socket_new(*conn);
+	amqp_sock = (amqp_info.ssl) ? amqp_ssl_socket_new(*conn)
+								: amqp_tcp_socket_new(*conn);
 	if(!amqp_sock) {
 		LM_ERR("FAIL: create TCP amqp_sock");
 		amqp_destroy_connection(*conn);
 		return RABBITMQ_ERR_SOCK;
 	}
 
+	if(rmq_amqps_ca_file) {
+		if(amqp_ssl_socket_set_cacert(amqp_sock, rmq_amqps_ca_file)) {
+			LM_ERR("Failed to set CA certificate for amqps connection\n");
+			return RABBITMQ_ERR_SSL_CACERT;
+		}
+	}
+
+#if AMQP_VERSION_MAJOR == 0 && AMQP_VERSION_MINOR < 8
+	amqp_ssl_socket_set_verify(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
+#else
+	amqp_ssl_socket_set_verify_peer(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
+	amqp_ssl_socket_set_verify_hostname(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
+#endif
+
 	ret = amqp_socket_open(amqp_sock, amqp_info.host, amqp_info.port);
 	if(ret != AMQP_STATUS_OK) {
-		LM_ERR("FAIL: open TCP sock, amqp_status=%d", ret);
+		LM_ERR("FAIL: open %s sock, amqp_status=%d",
+				(amqp_info.ssl) ? "SSL" : "TCP", ret);
 		// amqp_destroy_connection(*conn);
 		return RABBITMQ_ERR_SOCK;
 	}

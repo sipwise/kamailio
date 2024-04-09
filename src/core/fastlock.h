@@ -414,7 +414,7 @@ inline static void release_lock(fl_lock_t *lock)
 #ifdef __CPU_mips
 #warning mips1 smp mode not supported (no membars), try compiling with -DNOSMP
 #else
-				  "    sync \n\t"
+				 "    sync \n\t"
 #endif
 #endif
 				 "    sw $0, %0 \n\t"

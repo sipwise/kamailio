@@ -36,7 +36,9 @@
  *
  * =====================================================================================
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
@@ -366,6 +368,7 @@ int print_encoded_header(FILE *fd, char *msg, int msglen,
 {
 	char *hdr_start_ptr;
 	short int start_idx, i;
+	int j;
 
 	memcpy(&start_idx, payload, 2);
 	start_idx = ntohs(start_idx);
@@ -378,9 +381,9 @@ int print_encoded_header(FILE *fd, char *msg, int msglen,
 			hdr_start_ptr);
 	fprintf(fd, "%sHEADER:[%.*s]\n", prefix, i - 2, hdr_start_ptr);
 	fprintf(fd, "%sHEADER CODE=", prefix);
-	for(i = 0; i < len; i++)
-		fprintf(fd, "%s%d%s", i == 0 ? "[" : ":", payload[i],
-				i == len - 1 ? "]\n" : "");
+	for(j = 0; j < len; j++)
+		fprintf(fd, "%s%d%s", j == 0 ? "[" : ":", payload[j],
+				j == len - 1 ? "]\n" : "");
 	if(len == 4)
 		return 1;
 	switch(type) {

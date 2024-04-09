@@ -29,7 +29,7 @@
 
       <itemizedlist>
         <listitem>
-          <para>Dialog</para>
+          <para>IMS Dialog</para>
         </listitem>
 
         <listitem>
@@ -517,6 +517,68 @@ modparam("ims_qos", "rr_default_bandwidth", 2000)
         </programlisting>
       </example>
     </section>
+
+    <section>
+      <title><varname>suspend_transaction</varname> integer</title>
+
+      <para>If enabled, suspends the tm transaction while doing the AAR.</para>
+
+      <para><emphasis> Default value is 1 (enabled)</emphasis></para>
+
+      <example>
+        <title><varname>suspend_transaction</varname> parameter
+        usage</title>
+
+        <programlisting format="linespecific">
+...
+modparam("ims_qos", "suspend_transaction", 0)
+...
+        </programlisting>
+      </example>
+    </section>
+
+    <section>
+      <title><varname>recv_mode</varname> integer</title>
+
+	  <para>If set to 0, rx_aar_register() takes the received-from address values
+	  (IP, port, proto) from the IP frame. If set to 1, it takes them from
+      Via header. </para>
+
+      <para><emphasis> Default value is 0</emphasis></para>
+
+      <example>
+        <title><varname>recv_mode</varname> parameter
+        usage</title>
+
+        <programlisting format="linespecific">
+...
+modparam("ims_qos", "recv_mode", 1)
+...
+        </programlisting>
+      </example>
+    </section>
+
+    <section>
+      <title><varname>dialog_direction</varname> integer</title>
+
+	  <para>If set to 1, DLG_MOBILE_ORIGINATING is set to
+	  rx_add_media_component_description_avp() instead of DLG_MOBILE_REGISTER
+	  (which corresponds to value 3).
+      </para>
+
+      <para><emphasis> Default value is 3</emphasis></para>
+
+      <example>
+        <title><varname>dialog_direction</varname> parameter
+        usage</title>
+
+        <programlisting format="linespecific">
+...
+modparam("ims_qos", "dialog_direction", 1)
+...
+        </programlisting>
+      </example>
+    </section>
   </section>
 
   <section>
@@ -625,8 +687,8 @@ route[REG_AAR_REPLY]
 	</listitem>
 	</itemizedlist>
 
-      <para>This function can be used from REQUEST_ROUTE or
-      ONREPLY_ROUTE.</para>
+	<para>This function can be used only from ONREPLY_ROUTE, only for replies to INVITE, UPDATE, PRACK.
+	The reply and request must have SDP, for this function to work properly.</para>
 
       <para>p.s. this is executed asynchronously. See example on how to
       retrieve return value</para>

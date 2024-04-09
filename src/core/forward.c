@@ -72,7 +72,7 @@
 
 
 /* return a socket_info_pointer to the sending socket; as opposed to
- * get_send_socket, which returns process's default socket, get_out_socket
+ * get_send_socket, which returns process' default socket, get_out_socket
  * attempts to determine the outbound interface which will be used;
  * it uses a temporary connected socket to determine it; it will
  * be very likely noticeably slower, but it can deal better with
@@ -290,10 +290,10 @@ not_forced:
 		case PROTO_WS:
 		case PROTO_TCP:
 			/* on tcp just use the "main address", we don't really know the
-		 * sending address (we can find it out, but we'll need also to see
-		 * if we listen on it, and if yes on which port -> too complicated*/
+			 * sending address (we can find it out, but we'll need also to see
+			 * if we listen on it, and if yes on which port
+			 * -> too complicated */
 			switch(to->s.sa_family) {
-				/* FIXME */
 				case AF_INET:
 					send_sock = sendipv4_tcp;
 					break;
@@ -310,7 +310,6 @@ not_forced:
 		case PROTO_WSS:
 		case PROTO_TLS:
 			switch(to->s.sa_family) {
-				/* FIXME */
 				case AF_INET:
 					send_sock = sendipv4_tls;
 					break;

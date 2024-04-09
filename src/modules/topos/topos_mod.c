@@ -79,6 +79,9 @@ db_func_t _tpsdbf;
 /* sruid to get internal uid */
 sruid_t _tps_sruid;
 
+extern str tt_table_name;
+extern str td_table_name;
+
 /** module parameters */
 static str _tps_db_url = str_init(DEFAULT_DB_URL);
 int _tps_param_mask_callid = 0;
@@ -102,6 +105,11 @@ int _tps_clean_interval = 60;
 #define TPS_EVENTRT_SENDING 2
 #define TPS_EVENTRT_INCOMING 4
 #define TPS_EVENTRT_RECEIVING 8
+#define TT_TABLE_VERSION 2
+#define TD_TABLE_VERSION 2
+
+static int _tps_version_table_check = 1;
+
 static int _tps_eventrt_mode = TPS_EVENTRT_OUTGOING | TPS_EVENTRT_SENDING
 							   | TPS_EVENTRT_INCOMING | TPS_EVENTRT_RECEIVING;
 static int _tps_eventrt_outgoing = -1;
@@ -115,7 +123,7 @@ static int _tps_eventrt_receiving = -1;
 static str _tps_eventrt_receiving_name = str_init("topos:msg-receiving");
 
 str _tps_contact_host = str_init("");
-int _tps_contact_mode = 0;
+int _tps_contact_mode = TPS_CONTACT_MODE_SKEYUSER;
 str _tps_cparam_name = str_init("tps");
 
 str _tps_xavu_cfg = STR_NULL;
@@ -126,7 +134,7 @@ str _tps_xavu_field_contact_host = STR_NULL;
 str _tps_context_param = STR_NULL;
 str _tps_context_value = STR_NULL;
 
-sanity_api_t scb;
+static sanity_api_t _tps_scb;
 
 int tps_msg_received(sr_event_param_t *evp);
 int tps_msg_sent(sr_event_param_t *evp);
@@ -146,58 +154,65 @@ static int w_tps_set_context(sip_msg_t *msg, char *pctx, char *p2);
 
 int bind_topos(topos_api_t *api);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"tps_set_context", (cmd_function)w_tps_set_context, 1, fixup_spve_null,
-				fixup_free_spve_null, ANY_ROUTE},
+	{"tps_set_context", (cmd_function)w_tps_set_context, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
 
-		{"bind_topos", (cmd_function)bind_topos, 0, 0, 0, 0},
+	{"bind_topos", (cmd_function)bind_topos, 0, 0, 0, 0},
 
-		{0, 0, 0, 0, 0, 0}};
+	{0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t params[] = {{"storage", PARAM_STR, &_tps_storage},
-		{"db_url", PARAM_STR, &_tps_db_url},
-		{"mask_callid", PARAM_INT, &_tps_param_mask_callid},
-		{"sanity_checks", PARAM_INT, &_tps_sanity_checks},
-		{"header_mode", PARAM_INT, &_tps_header_mode},
-		{"branch_expire", PARAM_INT, &_tps_branch_expire},
-		{"dialog_expire", PARAM_INT, &_tps_dialog_expire},
-		{"clean_interval", PARAM_INT, &_tps_clean_interval},
-		{"event_callback", PARAM_STR, &_tps_eventrt_callback},
-		{"event_mode", PARAM_INT, &_tps_eventrt_mode},
-		{"contact_host", PARAM_STR, &_tps_contact_host},
-		{"contact_mode", PARAM_INT, &_tps_contact_mode},
-		{"cparam_name", PARAM_STR, &_tps_cparam_name},
-		{"xavu_cfg", PARAM_STR, &_tps_xavu_cfg},
-		{"xavu_field_a_contact", PARAM_STR, &_tps_xavu_field_acontact},
-		{"xavu_field_b_contact", PARAM_STR, &_tps_xavu_field_bcontact},
-		{"xavu_field_contact_host", PARAM_STR, &_tps_xavu_field_contact_host},
-		{"rr_update", PARAM_INT, &_tps_rr_update},
-		{"context", PARAM_STR, &_tps_context_param},
-		{"methods_nocontact", PARAM_STR, &_tps_methods_nocontact_list},
-		{"methods_noinitial", PARAM_STR, &_tps_methods_noinitial_list},
+static param_export_t params[] = {
+	{"storage", PARAM_STR, &_tps_storage},
+	{"db_url", PARAM_STR, &_tps_db_url},
+	{"mask_callid", PARAM_INT, &_tps_param_mask_callid},
+	{"sanity_checks", PARAM_INT, &_tps_sanity_checks},
+	{"header_mode", PARAM_INT, &_tps_header_mode},
+	{"branch_expire", PARAM_INT, &_tps_branch_expire},
+	{"dialog_expire", PARAM_INT, &_tps_dialog_expire},
+	{"clean_interval", PARAM_INT, &_tps_clean_interval},
+	{"event_callback", PARAM_STR, &_tps_eventrt_callback},
+	{"event_mode", PARAM_INT, &_tps_eventrt_mode},
+	{"contact_host", PARAM_STR, &_tps_contact_host},
+	{"contact_mode", PARAM_INT, &_tps_contact_mode},
+	{"cparam_name", PARAM_STR, &_tps_cparam_name},
+	{"xavu_cfg", PARAM_STR, &_tps_xavu_cfg},
+	{"xavu_field_a_contact", PARAM_STR, &_tps_xavu_field_acontact},
+	{"xavu_field_b_contact", PARAM_STR, &_tps_xavu_field_bcontact},
+	{"xavu_field_contact_host", PARAM_STR, &_tps_xavu_field_contact_host},
+	{"rr_update", PARAM_INT, &_tps_rr_update},
+	{"context", PARAM_STR, &_tps_context_param},
+	{"methods_nocontact", PARAM_STR, &_tps_methods_nocontact_list},
+	{"methods_noinitial", PARAM_STR, &_tps_methods_noinitial_list},
+	{"version_table", INT_PARAM, &_tps_version_table_check},
 
-		{0, 0, 0}};
+	{0, 0, 0}
+};
 
 
 /** module exports */
 struct module_exports exports = {
-		"topos",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported  functions */
-		params,			 /* exported parameters */
-		0,				 /* exported rpc functions */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* child initialization function */
-		destroy			 /* destroy function */
+	"topos",		 /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			 /* exported  functions */
+	params,			 /* exported parameters */
+	0,				 /* exported rpc functions */
+	0,				 /* exported pseudo-variables */
+	0,				 /* response handling function */
+	mod_init,		 /* module initialization function */
+	child_init,		 /* child initialization function */
+	destroy			 /* destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function
  */
 static int mod_init(void)
 {
+	db1_con_t *topos_db_con = NULL;
 	_tps_eventrt_outgoing =
 			route_lookup(&event_rt, _tps_eventrt_outgoing_name.s);
 	if(_tps_eventrt_outgoing < 0
@@ -252,6 +267,27 @@ static int mod_init(void)
 					"provide all functions needed\n");
 			return -1;
 		}
+		if(_tps_version_table_check != 0) {
+			topos_db_con = _tpsdbf.init(&_tps_db_url);
+			if(topos_db_con == NULL) {
+				LM_ERR("failed to open database connection\n");
+				goto dberror;
+			}
+			if(db_check_table_version(
+					   &_tpsdbf, topos_db_con, &td_table_name, TD_TABLE_VERSION)
+					< 0) {
+				DB_TABLE_VERSION_ERROR(td_table_name);
+				goto dberror;
+			}
+			if(db_check_table_version(
+					   &_tpsdbf, topos_db_con, &tt_table_name, TT_TABLE_VERSION)
+					< 0) {
+				DB_TABLE_VERSION_ERROR(tt_table_name);
+				goto dberror;
+			}
+			_tpsdbf.close(topos_db_con);
+			topos_db_con = NULL;
+		}
 	} else {
 		if(_tps_storage.len != 7 && strncmp(_tps_storage.s, "redis", 5) != 0) {
 			LM_ERR("unknown storage type: %.*s\n", _tps_storage.len,
@@ -261,7 +297,7 @@ static int mod_init(void)
 	}
 
 	if(_tps_sanity_checks != 0) {
-		if(sanity_load_api(&scb) < 0) {
+		if(sanity_load_api(&_tps_scb) < 0) {
 			LM_ERR("cannot bind to sanity module\n");
 			goto error;
 		}
@@ -274,7 +310,7 @@ static int mod_init(void)
 	if(sruid_init(&_tps_sruid, '-', "tpsh", SRUID_INC) < 0)
 		return -1;
 
-	if(_tps_contact_mode == 2
+	if(_tps_contact_mode == TPS_CONTACT_MODE_XAVPUSER
 			&& (_tps_xavu_cfg.len <= 0 || _tps_xavu_field_acontact.len <= 0
 					|| _tps_xavu_field_bcontact.len <= 0)) {
 		LM_ERR("contact_mode parameter is 2,"
@@ -302,6 +338,12 @@ static int mod_init(void)
 
 	return 0;
 error:
+	return -1;
+dberror:
+	if(topos_db_con) {
+		_tpsdbf.close(topos_db_con);
+		topos_db_con = NULL;
+	}
 	return -1;
 }
 
@@ -497,7 +539,7 @@ int tps_msg_received(sr_event_param_t *evp)
 
 	if(msg.first_line.type == SIP_REQUEST) {
 		if(_tps_sanity_checks != 0) {
-			if(scb.check_defaults(&msg) < 1) {
+			if(_tps_scb.check_defaults(&msg) < 1) {
 				LM_ERR("sanity checks failed\n");
 				goto done;
 			}

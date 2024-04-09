@@ -41,6 +41,17 @@
 #include "db_mysql.h"
 
 extern int db_mysql_opt_ssl_mode;
+extern char *db_mysql_opt_ssl_ca;
+
+#if MYSQL_VERSION_ID > 50012
+#ifdef MARIADB_VERSION_ID
+#define KSR_MYSQL_OPT_RECONNECT
+#else
+#if MYSQL_VERSION_ID < 80034
+#define KSR_MYSQL_OPT_RECONNECT
+#endif
+#endif
+#endif
 
 /*! \brief
  * Create a new connection structure,
@@ -52,7 +63,7 @@ struct my_con *db_mysql_new_connection(const struct db_id *id)
 	char *host, *grp, *egrp;
 	unsigned int connection_flag = 0;
 
-#if MYSQL_VERSION_ID > 50012
+#ifdef KSR_MYSQL_OPT_RECONNECT
 #if MYSQL_VERSION_ID > 80000 && !defined MARIADB_BASE_VERSION
 	bool rec;
 #else
@@ -116,7 +127,36 @@ struct my_con *db_mysql_new_connection(const struct db_id *id)
 			(const void *)&db_mysql_timeout_interval);
 	mysql_options(ptr->con, MYSQL_OPT_WRITE_TIMEOUT,
 			(const void *)&db_mysql_timeout_interval);
-#if MYSQL_VERSION_ID > 50710 && !defined(MARIADB_BASE_VERSION)
+
+#ifdef MARIADB_BASE_VERSION
+	/*
+	 * emulate SSL_MODE_XXXX from MySQL
+	 */
+
+	switch(db_mysql_opt_ssl_mode) {
+		case 0: /* opt_ssl_mode = 0(off) */
+		case 1: /* SSL_MODE_DISABLED */
+			break;
+		case 2: /* SSL_MODE_PREFERRED */
+		case 3: /* SSL_MODE_REQUIRED */
+		case 4: /* SSL_MODE_VERIFY_CA */
+#if MYSQL_VERSION_ID >= 100339
+			mysql_options(ptr->con, MYSQL_OPT_SSL_ENFORCE, (void *)&(int){1});
+#else
+			LM_WARN("ssl mode not supported by %s\n", MARIADB_BASE_VERSION);
+#endif
+			break;
+		case 5: /* SSL_MODE_VERIFY_IDENTITY */
+			mysql_options(ptr->con, MYSQL_OPT_SSL_VERIFY_SERVER_CERT,
+					(void *)&(int){1});
+			break;
+		default:
+			LM_WARN("opt_ssl_mode = %d not supported by MariaDB Connector/C\n",
+					db_mysql_opt_ssl_mode);
+			break;
+	}
+#else
+#if MYSQL_VERSION_ID > 50710
 	if(db_mysql_opt_ssl_mode != 0) {
 		unsigned int optuint = 0;
 		if(db_mysql_opt_ssl_mode == 1) {
@@ -136,9 +176,13 @@ struct my_con *db_mysql_new_connection(const struct db_id *id)
 				"ignoring\n",
 				(unsigned int)db_mysql_opt_ssl_mode);
 	}
-#endif
+#endif /* MYSQL_VERSION_ID */
+#endif /* MARIADB_BASE_VERSION */
+	if(db_mysql_opt_ssl_ca)
+		mysql_options(
+				ptr->con, MYSQL_OPT_SSL_CA, (const void *)db_mysql_opt_ssl_ca);
 
-#if MYSQL_VERSION_ID > 50012
+#ifdef KSR_MYSQL_OPT_RECONNECT
 	/* set reconnect flag if enabled */
 	if(db_mysql_auto_reconnect) {
 		rec = 1;

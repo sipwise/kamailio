@@ -315,9 +315,9 @@ inline static void mb_atomic_set_int(volatile int *v, int i)
 				 : "m"(*v), "0"(i)
 				 : "memory"
 #else
-				  : "+q"(i), "=m"(*v)
-				  : "m"(*v)
-				  : "memory"
+				 : "+q"(i), "=m"(*v)
+				 : "m"(*v)
+				 : "memory"
 #endif
 	);
 }

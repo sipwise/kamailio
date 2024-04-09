@@ -53,7 +53,6 @@
 #include "tls_util.h"
 #include "tls_wolfssl_mod.h"
 #include "tls_cfg.h"
-#include "tls_rand.h"
 
 #ifndef TLS_HOOKS
 #error "TLS_HOOKS must be defined, or the tls module won't work"
@@ -84,8 +83,6 @@ static void destroy(void);
 
 static int w_is_peer_verified(struct sip_msg *msg, char *p1, char *p2);
 static int w_tls_set_connect_server_id(sip_msg_t *msg, char *psrvid, char *p2);
-
-int ksr_rand_engine_param(modparam_t type, void *val);
 
 MODULE_VERSION
 
@@ -225,13 +222,9 @@ static param_export_t params[] = {
 		{"ct_wq_max", PARAM_INT, &default_tls_cfg.ct_wq_max},
 		{"ct_wq_blk_size", PARAM_INT, &default_tls_cfg.ct_wq_blk_size},
 		{"tls_force_run", PARAM_INT, &default_tls_cfg.force_run},
-		{"low_mem_threshold1", PARAM_INT, &default_tls_cfg.low_mem_threshold1},
-		{"low_mem_threshold2", PARAM_INT, &default_tls_cfg.low_mem_threshold2},
 		{"renegotiation", PARAM_INT, &sr_tls_renegotiation},
 		{"xavp_cfg", PARAM_STR, &sr_tls_xavp_cfg},
 		{"event_callback", PARAM_STR, &sr_tls_event_callback},
-		{"rand_engine", PARAM_STR | USE_FUNC_PARAM,
-				(void *)ksr_rand_engine_param},
 
 		{0, 0, 0}};
 
@@ -422,40 +415,12 @@ static void destroy(void)
 }
 
 
-int ksr_rand_engine_param(modparam_t type, void *val)
-{
-	str *reng;
-
-	if(val == NULL) {
-		return -1;
-	}
-	reng = (str *)val;
-	LM_DBG("random engine: %.*s\n", reng->len, reng->s);
-	if(reng->len == 5 && strncasecmp(reng->s, "krand", 5) == 0) {
-		LM_DBG("setting krand random engine\n");
-		wolfSSL_RAND_set_rand_method(RAND_ksr_krand_method());
-	} else if(reng->len == 8 && strncasecmp(reng->s, "fastrand", 8) == 0) {
-		LM_DBG("setting fastrand random engine\n");
-		wolfSSL_RAND_set_rand_method(RAND_ksr_fastrand_method());
-	} else if(reng->len == 10 && strncasecmp(reng->s, "cryptorand", 10) == 0) {
-		LM_DBG("setting cryptorand random engine\n");
-		wolfSSL_RAND_set_rand_method(RAND_ksr_cryptorand_method());
-	}
-
-	/* WOLFFIX else if (reng->len == 8 && strncasecmp(reng->s, "kxlibssl", 8) == 0) {
-		LM_DBG("setting kxlibssl random engine\n");
-		wolfSSL_RAND_set_rand_method(RAND_ksr_kxlibssl_method());
-		} */
-
-	return 0;
-}
-
 static int ki_is_peer_verified(sip_msg_t *msg)
 {
 	struct tcp_connection *c;
 	SSL *ssl;
 	long ssl_verify;
-	X509 *x509_cert;
+	WOLFSSL_X509 *x509_cert;
 
 	LM_DBG("started...\n");
 	if(msg->rcv.proto != PROTO_TLS) {
@@ -488,7 +453,8 @@ static int ki_is_peer_verified(sip_msg_t *msg)
 	ssl = ((struct tls_extra_data *)c->extra_data)->ssl;
 
 	ssl_verify = wolfSSL_get_verify_result(ssl);
-	if(ssl_verify != X509_V_OK) {
+	// WOLFSSL_X509_V_OK / X509_V_OK
+	if(ssl_verify != 0) {
 		LM_WARN("verification of presented certificate failed... return -1\n");
 		tcpconn_put(c);
 		return -1;
@@ -505,7 +471,7 @@ static int ki_is_peer_verified(sip_msg_t *msg)
 		return -1;
 	}
 
-	X509_free(x509_cert);
+	wolfSSL_X509_free(x509_cert);
 
 	tcpconn_put(c);
 
@@ -592,9 +558,6 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 		return -1;
 
 	register_tls_hooks(&tls_h);
-
-	LM_DBG("setting cryptorand random engine\n");
-	wolfSSL_RAND_set_rand_method(RAND_ksr_cryptorand_method());
 
 	sr_kemi_modules_add(sr_kemi_tls_exports);
 

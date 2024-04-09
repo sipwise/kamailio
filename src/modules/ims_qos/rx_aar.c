@@ -76,11 +76,13 @@ extern usrloc_api_t ul;
 extern struct ims_qos_counters_h ims_qos_cnts_h;
 
 extern int authorize_video_flow;
+extern int _ims_qos_suspend_transaction;
 
 extern str af_signaling_ip;
 extern str af_signaling_ip6;
 extern str component_media_type;
 extern str flow_protocol;
+extern ims_qos_params_t _imsqos_params;
 
 str IMS_Serv_AVP_val = {"IMS Services", 12};
 str IMS_Em_Serv_AVP_val = {"Emergency IMS Call", 18};
@@ -113,19 +115,21 @@ void async_aar_callback(
 
 	LM_DBG("received AAA answer");
 
-	if(tmb.t_lookup_ident(&t, data->tindex, data->tlabel) < 0) {
-		LM_ERR("t_continue: transaction not found\n");
-		goto error;
-	} else {
-		LM_DBG("t_continue: transaction found\n");
+	if(_ims_qos_suspend_transaction) {
+		if(tmb.t_lookup_ident(&t, data->tindex, data->tlabel) < 0) {
+			LM_ERR("t_continue: transaction not found\n");
+			goto error;
+		} else {
+			LM_DBG("t_continue: transaction found\n");
+		}
+		//we have T, lets restore our state (esp. for AVPs)
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, &t->uri_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, &t->uri_avps_to);
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER, &t->user_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, &t->user_avps_to);
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
 	}
-	//we have T, lets restore our state (esp. for AVPs)
-	set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, &t->uri_avps_from);
-	set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, &t->uri_avps_to);
-	set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER, &t->user_avps_from);
-	set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, &t->user_avps_to);
-	set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
-	set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
 
 	if(is_timeout != 0) {
 		LM_ERR("Error timeout when sending AAR message via CDP\n");
@@ -228,7 +232,9 @@ done:
 	if(aaa)
 		cdpb.AAAFreeMessage(&aaa);
 
-	tmb.t_continue(data->tindex, data->tlabel, data->act);
+	if(_ims_qos_suspend_transaction) {
+		tmb.t_continue(data->tindex, data->tlabel, data->act);
+	}
 	free_saved_transaction_global_data(data);
 }
 
@@ -272,17 +278,19 @@ void async_aar_reg_callback(
 		   "failures flag is [%d]\n",
 			data->answers_not_received, data->failed);
 
-	if(tmb.t_lookup_ident(&t, data->tindex, data->tlabel) < 0) {
-		LM_ERR("t_continue: transaction not found\n");
-		goto error;
+	if(_ims_qos_suspend_transaction) {
+		if(tmb.t_lookup_ident(&t, data->tindex, data->tlabel) < 0) {
+			LM_ERR("t_continue: transaction not found\n");
+			goto error;
+		}
+		//we have T, lets restore our state (esp. for AVPs)
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, &t->uri_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, &t->uri_avps_to);
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER, &t->user_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, &t->user_avps_to);
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
 	}
-	//we have T, lets restore our state (esp. for AVPs)
-	set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, &t->uri_avps_from);
-	set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, &t->uri_avps_to);
-	set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER, &t->user_avps_from);
-	set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, &t->user_avps_to);
-	set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
-	set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
 
 	if(is_timeout != 0) {
 		LM_ERR("Error timeout when sending AAR message via CDP\n");
@@ -423,7 +431,9 @@ done:
 		cdpb.AAAFreeMessage(&aaa);
 
 	if(finalReply) {
-		tmb.t_continue(data->tindex, data->tlabel, data->act);
+		if(_ims_qos_suspend_transaction) {
+			tmb.t_continue(data->tindex, data->tlabel, data->act);
+		}
 		free_saved_transaction_global_data(data);
 	}
 	free_saved_transaction_data(local_data);
@@ -603,7 +613,6 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 						} else {
 							ipA = req_sdp_session->ip_addr;
 							portA = req_sdp_stream->port;
-
 
 							ipB = rpl_sdp_session->ip_addr;
 							portB = rpl_sdp_stream->port;
@@ -1121,7 +1130,7 @@ int rx_send_aar_register(struct sip_msg *msg, AAASession *auth,
 			&via_host, &port_from,
 			ip_version == AF_INET ? &af_signaling_ip : &af_signaling_ip6,
 			&port_to, &flow_protocol, &raw_stream, &raw_stream,
-			DLG_MOBILE_REGISTER, AVP_EPC_Flow_Usage_AF_Signaling);
+			_imsqos_params.dlg_direction, AVP_EPC_Flow_Usage_AF_Signaling);
 
 	/* Add specific action AVP's */
 	rx_add_specific_action_avp(aar, 1); // CHARGING_CORRELATION_EXCHANGE

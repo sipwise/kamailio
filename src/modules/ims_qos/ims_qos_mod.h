@@ -49,6 +49,12 @@
 
 #define MOD_NAME "ims_qos"
 
+typedef struct ims_qos_params
+{
+	int recv_mode;
+	int dlg_direction;
+} ims_qos_params_t;
+
 /** callback functions */
 
 struct AAAMessage;

@@ -19,6 +19,7 @@ endif
 
 export JAVA_HOME=/usr/lib/jvm/java-gcj
 export RADCLI=1
+export WOLFSSL_INTERNAL=no
 # tlsa
 export KTLS_INCLUDE_TLSA=no
 export LIBSSL_STATIC_SRCLIB=yes
@@ -38,6 +39,9 @@ EXTRA_EXCLUDED_MODULES += iptrtpproxy
 EXTRA_EXCLUDED_MODULES += secsipid
 EXTRA_EXCLUDED_MODULES += lwsc
 EXTRA_EXCLUDED_MODULES += nats
+EXTRA_EXCLUDED_MODULES += microhttpd
+EXTRA_EXCLUDED_MODULES += ims
+EXTRA_EXCLUDED_MODULES += tls_wolfssl
 ## --EXCLUDED--
 
 
@@ -69,7 +73,6 @@ PACKAGE_GROUPS += sqlite
 PACKAGE_GROUPS += json
 PACKAGE_GROUPS += mono
 PACKAGE_GROUPS += ruby
-PACKAGE_GROUPS += ims
 PACKAGE_GROUPS += sctp
 PACKAGE_GROUPS += java
 PACKAGE_GROUPS += tls
@@ -93,6 +96,10 @@ EXTRA_GROUPS += gzcompress
 EXTRA_GROUPS += jansson
 EXTRA_GROUPS += uuid
 EXTRA_GROUPS += http_async
+
+.PHONY: skip-modules
+skip-modules:
+	@echo "$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)"
 
 D = $(CURDIR)/debian/$(DEB_SOURCE)
 

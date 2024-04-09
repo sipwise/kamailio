@@ -242,6 +242,7 @@ int shm_init_api(sr_shm_api_t *ap)
 	_shm_root.xreallocxf = ap->xreallocxf;
 	_shm_root.xresize = ap->xresize;
 	_shm_root.xstatus = ap->xstatus;
+	_shm_root.xstatus_filter = ap->xstatus_filter;
 	_shm_root.xinfo = ap->xinfo;
 	_shm_root.xreport = ap->xreport;
 	_shm_root.xavailable = ap->xavailable;
@@ -251,6 +252,7 @@ int shm_init_api(sr_shm_api_t *ap)
 	_shm_root.xfmodstats = ap->xfmodstats;
 	_shm_root.xglock = ap->xglock;
 	_shm_root.xgunlock = ap->xgunlock;
+	_shm_root.xsetfunc = ap->xsetfunc;
 	return 0;
 }
 

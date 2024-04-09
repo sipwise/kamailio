@@ -82,6 +82,11 @@
 
 #define DS_HN_SIZE 256
 
+#define DS_MATCHED_ADDR 1
+#define DS_MATCHED_PORT (1 << 1)
+#define DS_MATCHED_PROTO (1 << 2)
+#define DS_MATCHED_SOCK (1 << 3)
+
 /* increment call load */
 #define DS_LOAD_INC(dgrp, didx)      \
 	do {                             \
@@ -109,6 +114,7 @@ static int *_ds_ping_active = NULL;
 extern int ds_force_dst;
 extern str ds_event_callback;
 extern int ds_ping_latency_stats;
+extern int ds_retain_latency_stats;
 extern float ds_latency_estimator_alpha;
 extern int ds_attrs_none;
 extern param_t *ds_db_extra_attrs_list;
@@ -124,6 +130,10 @@ static ds_set_t **ds_lists = NULL;
 static int *ds_list_nr = NULL;
 static int *ds_crt_idx = NULL;
 static int *ds_next_idx = NULL;
+
+static ds_set_t *ds_strictest_node = NULL;
+static int ds_strictest_idx;
+static int ds_strictness;
 
 #define _ds_list (ds_lists[*ds_crt_idx])
 #define _ds_list_nr (*ds_list_nr)
@@ -543,7 +553,7 @@ err:
  *
  */
 int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
-		int list_idx, int *setn, int dload)
+		int list_idx, int *setn, int dload, ds_latency_stats_t *latency_stats)
 {
 	ds_dest_t *dp = NULL;
 	ds_set_t *sp = NULL;
@@ -553,6 +563,17 @@ int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 	dp = pack_dest(uri, flags, priority, attrs, dload);
 	if(!dp)
 		goto err;
+
+	if(latency_stats != NULL) {
+		dp->latency_stats.stdev = latency_stats->stdev;
+		dp->latency_stats.m2 = latency_stats->m2;
+		dp->latency_stats.max = latency_stats->max;
+		dp->latency_stats.min = latency_stats->min;
+		dp->latency_stats.average = latency_stats->average;
+		dp->latency_stats.estimate = latency_stats->estimate;
+		dp->latency_stats.count = latency_stats->count;
+		dp->latency_stats.timeout = latency_stats->timeout;
+	}
 
 	sp = ds_avl_insert(&ds_lists[list_idx], id, setn);
 	if(!sp) {
@@ -811,6 +832,7 @@ int ds_load_list(char *lfile)
 	int id, setn, flags, priority;
 	str uri;
 	str attrs;
+	ds_latency_stats_t *latency_stats;
 
 	if((*ds_crt_idx) != (*ds_next_idx)) {
 		LM_WARN("load command already generated, aborting reload...\n");
@@ -906,8 +928,12 @@ int ds_load_list(char *lfile)
 		attrs.len = p - attrs.s;
 
 	add_destination:
-		if(add_dest2list(
-				   id, uri, flags, priority, &attrs, *ds_next_idx, &setn, 0)
+		latency_stats = NULL;
+		if(ds_ping_latency_stats && ds_retain_latency_stats) {
+			latency_stats = latency_stats_find(id, &uri);
+		}
+		if(add_dest2list(id, uri, flags, priority, &attrs, *ds_next_idx, &setn,
+				   0, latency_stats)
 				!= 0) {
 			LM_WARN("unable to add destination %.*s to set %d -- skipping\n",
 					uri.len, uri.s, id);
@@ -1054,6 +1080,7 @@ int ds_load_db(void)
 	int plen;
 #define DS_ATTRS_MAXSIZE 1024
 	char ds_attrs_buf[DS_ATTRS_MAXSIZE];
+	ds_latency_stats_t *latency_stats;
 
 	query_cols[0] = &ds_set_id_col;
 	query_cols[1] = &ds_dest_uri_col;
@@ -1161,8 +1188,12 @@ int ds_load_db(void)
 		}
 		LM_DBG("attributes string: [%.*s]\n", attrs.len,
 				(attrs.s) ? attrs.s : "");
-		if(add_dest2list(
-				   id, uri, flags, priority, &attrs, *ds_next_idx, &setn, 0)
+		latency_stats = NULL;
+		if(ds_ping_latency_stats && ds_retain_latency_stats) {
+			latency_stats = latency_stats_find(id, &uri);
+		}
+		if(add_dest2list(id, uri, flags, priority, &attrs, *ds_next_idx, &setn,
+				   0, latency_stats)
 				!= 0) {
 			dest_errs++;
 			LM_WARN("unable to add destination %.*s to set %d -- skipping\n",
@@ -1574,6 +1605,25 @@ int ds_list_exist(int set)
 	}
 	LM_DBG("destination set [%d] found\n", set);
 	return 1; /* True */
+}
+
+/*
+ * Return a destination set
+ */
+ds_set_t *ds_list_lookup(int set)
+{
+	ds_set_t *si = NULL;
+	LM_DBG("looking for destination set [%d]\n", set);
+
+	/* get the index of the set */
+	si = ds_avl_find(_ds_list, set);
+
+	if(si == NULL) {
+		LM_DBG("destination set [%d] not found\n", set);
+		return NULL;
+	}
+	LM_DBG("destination set [%d] found\n", set);
+	return si;
 }
 
 /**
@@ -2649,7 +2699,8 @@ void ds_add_dest_cb(ds_set_t *node, int i, void *arg)
 
 	if(add_dest2list(node->id, node->dlist[i].uri, node->dlist[i].flags,
 			   node->dlist[i].priority, &node->dlist[i].attrs.body,
-			   *ds_next_idx, &setn, node->dlist[i].dload)
+			   *ds_next_idx, &setn, node->dlist[i].dload,
+			   &node->dlist[i].latency_stats)
 			!= 0) {
 		LM_WARN("failed to add destination in group %d - %.*s\n", node->id,
 				node->dlist[i].uri.len, node->dlist[i].uri.s);
@@ -2671,8 +2722,8 @@ int ds_add_dst(int group, str *address, int flags, int priority, str *attrs)
 	ds_iter_set(_ds_list, &ds_add_dest_cb, NULL);
 
 	// add new destination
-	if(add_dest2list(
-			   group, *address, flags, priority, attrs, *ds_next_idx, &setn, 0)
+	if(add_dest2list(group, *address, flags, priority, attrs, *ds_next_idx,
+			   &setn, 0, NULL)
 			!= 0) {
 		LM_WARN("unable to add destination %.*s to set %d", address->len,
 				address->s, group);
@@ -2712,7 +2763,8 @@ void ds_filter_dest_cb(ds_set_t *node, int i, void *arg)
 
 	if(add_dest2list(node->id, node->dlist[i].uri, node->dlist[i].flags,
 			   node->dlist[i].priority, &node->dlist[i].attrs.body,
-			   *ds_next_idx, filter_arg->setn, node->dlist[i].dload)
+			   *ds_next_idx, filter_arg->setn, node->dlist[i].dload,
+			   &node->dlist[i].latency_stats)
 			!= 0) {
 		LM_WARN("failed to add destination in group %d - %.*s\n", node->id,
 				node->dlist[i].uri.len, node->dlist[i].uri.s);
@@ -2823,6 +2875,36 @@ void latency_stats_init(
 	latency_stats->average = latency;
 	latency_stats->estimate = latency;
 	latency_stats->count = count;
+}
+
+ds_latency_stats_t *latency_stats_find(int group, str *address)
+{
+
+	int i = 0;
+	ds_set_t *idx = NULL;
+
+	if(_ds_list == NULL || _ds_list_nr <= 0) {
+		LM_DBG("the list is null\n");
+		return NULL;
+	}
+
+	/* get the index of the set */
+	if(ds_get_index(group, *ds_crt_idx, &idx) != 0) {
+		LM_DBG("destination set [%d] not found\n", group);
+		return NULL;
+	}
+
+	while(i < idx->nr) {
+		if(idx->dlist[i].uri.len == address->len
+				&& strncasecmp(idx->dlist[i].uri.s, address->s, address->len)
+						   == 0) {
+			/* destination address found - copy current stats */
+			return &idx->dlist[i].latency_stats;
+		}
+		i++;
+	}
+
+	return NULL;
 }
 
 #define _VOR1(v) ((v) ? (v) : 1)
@@ -2946,6 +3028,14 @@ int ds_update_latency(int group, str *address, int code)
 			}
 			if(code == 408 && latency_stats->timeout < UINT32_MAX)
 				latency_stats->timeout++;
+
+			if(latency_stats->start.tv_sec == 0
+					&& latency_stats->start.tv_usec == 0) {
+				/* If we don't have a start time, we can't calculate latency */
+				i++;
+				continue;
+			}
+
 			gettimeofday(&now, NULL);
 			latency_ms = (now.tv_sec - latency_stats->start.tv_sec) * 1000
 						 + (now.tv_usec - latency_stats->start.tv_usec) / 1000;
@@ -3433,17 +3523,45 @@ int ds_fprint_list(FILE *fout)
 	return 0;
 }
 
+static int ds_set_vars(
+		sip_msg_t *_m, ds_set_t *node, int idx, int export_set_pv)
+{
+	pv_value_t val;
+	if(!node)
+		return -1;
+
+	if(export_set_pv && ds_setid_pvname.s != 0) {
+		memset(&val, 0, sizeof(pv_value_t));
+		val.flags = PV_VAL_INT | PV_TYPE_INT;
+
+		val.ri = node->id;
+		if(ds_setid_pv.setf(_m, &ds_setid_pv.pvp, (int)EQ_T, &val) < 0) {
+			LM_ERR("setting PV failed\n");
+			return -2;
+		}
+	}
+	if(ds_attrs_pvname.s != 0 && node->dlist[idx].attrs.body.len > 0) {
+		memset(&val, 0, sizeof(pv_value_t));
+		val.flags = PV_VAL_STR;
+		val.rs = node->dlist[idx].attrs.body;
+		if(ds_attrs_pv.setf(_m, &ds_attrs_pv.pvp, (int)EQ_T, &val) < 0) {
+			LM_ERR("setting attrs pv failed\n");
+			return -3;
+		}
+	}
+	return 1;
+}
 
 int ds_is_addr_from_set(sip_msg_t *_m, struct ip_addr *pipaddr,
 		unsigned short tport, unsigned short tproto, ds_set_t *node, int mode,
 		int export_set_pv)
 {
-	pv_value_t val;
 	ip_addr_t *ipa;
 	ip_addr_t ipaddress;
 	char hn[DS_HN_SIZE];
 	struct hostent *he;
 	int j;
+	int node_strictness;
 	unsigned short sport = 0;
 	char sproto = PROTO_NONE;
 
@@ -3486,33 +3604,54 @@ int ds_is_addr_from_set(sip_msg_t *_m, struct ip_addr *pipaddr,
 		}
 		if(ip_addr_cmp(pipaddr, ipa)
 				&& ((mode & DS_MATCH_NOPORT) || node->dlist[j].port == 0
-						|| tport == node->dlist[j].port)
-				&& ((mode & DS_MATCH_NOPROTO) || tproto == node->dlist[j].proto)
+						|| tport == node->dlist[j].port
+						|| (mode & DS_MATCH_MIXSOCKPRPORT))
+				&& ((mode & DS_MATCH_NOPROTO) || tproto == node->dlist[j].proto
+						|| (mode & DS_MATCH_MIXSOCKPRPORT))
 				&& (((mode & DS_MATCH_ACTIVE)
 							&& !ds_skip_dst(node->dlist[j].flags))
-						|| !(mode & DS_MATCH_ACTIVE))) {
-			if(export_set_pv && ds_setid_pvname.s != 0) {
-				memset(&val, 0, sizeof(pv_value_t));
-				val.flags = PV_VAL_INT | PV_TYPE_INT;
+						|| !(mode & DS_MATCH_ACTIVE))
+				&& (((mode & DS_MATCH_SOCKET)
+							&& node->dlist[j].sock == _m->rcv.bind_address)
+						|| !node->dlist[j].sock || !(mode & DS_MATCH_SOCKET))) {
 
-				val.ri = node->id;
-				if(ds_setid_pv.setf(_m, &ds_setid_pv.pvp, (int)EQ_T, &val)
-						< 0) {
-					LM_ERR("setting PV failed\n");
-					return -2;
+			if(mode & DS_MATCH_MIXSOCKPRPORT) {
+				node_strictness = DS_MATCHED_ADDR;
+				if(node->dlist[j].port) {
+					if(tport != node->dlist[j].port)
+						continue;
+					else
+						node_strictness |= DS_MATCHED_PORT;
 				}
-			}
-			if(ds_attrs_pvname.s != 0 && node->dlist[j].attrs.body.len > 0) {
-				memset(&val, 0, sizeof(pv_value_t));
-				val.flags = PV_VAL_STR;
-				val.rs = node->dlist[j].attrs.body;
-				if(ds_attrs_pv.setf(_m, &ds_attrs_pv.pvp, (int)EQ_T, &val)
-						< 0) {
-					LM_ERR("setting attrs pv failed\n");
-					return -3;
+
+				if(node->dlist[j].proto) {
+					if(tproto != node->dlist[j].proto)
+						continue;
+					else
+						node_strictness |= DS_MATCHED_PROTO;
 				}
+
+				if(node->dlist[j].sock) {
+					if(node->dlist[j].sock != _m->rcv.bind_address)
+						continue;
+					else
+						node_strictness |= DS_MATCHED_SOCK;
+				}
+
+				if(node_strictness
+						== (DS_MATCHED_ADDR | DS_MATCHED_PORT | DS_MATCHED_PROTO
+								| DS_MATCHED_SOCK))
+					return ds_set_vars(_m, node, j, export_set_pv);
+
+				if(ds_strictness < node_strictness) {
+					ds_strictness = node_strictness;
+					ds_strictest_node = node;
+					ds_strictest_idx = j;
+				}
+				continue;
 			}
-			return 1;
+
+			return ds_set_vars(_m, node, j, export_set_pv);
 		}
 	}
 	return -1;
@@ -3599,6 +3738,11 @@ int ds_is_addr_from_list(sip_msg_t *_m, int group, str *uri, int mode)
 	}
 
 
+	if(mode & DS_MATCH_MIXSOCKPRPORT) {
+		ds_strictness = 0;
+		ds_strictest_node = NULL;
+	}
+
 	if(group == -1) {
 		rc = ds_is_addr_from_set_r(
 				_m, pipaddr, tport, tproto, _ds_list, mode, 1);
@@ -3607,6 +3751,11 @@ int ds_is_addr_from_list(sip_msg_t *_m, int group, str *uri, int mode)
 		if(list) {
 			rc = ds_is_addr_from_set(_m, pipaddr, tport, tproto, list, mode, 0);
 		}
+	}
+
+	if(rc == -1 && (mode & DS_MATCH_MIXSOCKPRPORT) && ds_strictest_node) {
+		rc = ds_set_vars(
+				_m, ds_strictest_node, ds_strictest_idx, group == -1 ? 1 : 0);
 	}
 
 	return rc;

@@ -23,6 +23,7 @@
  */
 
 #include "../../core/sr_module.h"
+#include "../../core/mod_fix.h"
 #include "../../modules/tm/tm_load.h"
 #include "../ims_usrloc_pcscf/usrloc.h"
 
@@ -56,12 +57,16 @@ static int child_init(int);
 static void mod_destroy(void);
 static int w_create(struct sip_msg *_m, char *_d, char *_cflags);
 static int w_forward(struct sip_msg *_m, char *_d, char *_cflags);
-static int w_destroy(struct sip_msg *_m, char *_d, char *_cflags);
+static int w_destroy(struct sip_msg *_m, char *_d, char *_aor);
+static int w_destroy_by_contact(struct sip_msg *_m, char *_d, char *_aor,
+		char *_received_host, char *_received_port);
 
 /*! \brief Fixup functions */
 static int domain_fixup(void **param, int param_no);
 static int save_fixup2(void **param, int param_no);
 static int free_uint_fixup(void **param, int param_no);
+static int unregister_fixup(void **param, int param_no);
+static int unregister2_fixup(void **param, int param_no);
 
 extern int bind_ipsec_pcscf(usrloc_api_t *api);
 
@@ -83,6 +88,10 @@ static cmd_export_t cmds[] = {
 		free_uint_fixup, REQUEST_ROUTE | ONREPLY_ROUTE },
 	{"ipsec_destroy", (cmd_function)w_destroy, 1, save_fixup2,
 		0, REQUEST_ROUTE | ONREPLY_ROUTE },
+	{"ipsec_destroy", (cmd_function)w_destroy, 2, unregister_fixup,
+		0, ANY_ROUTE },
+	{"ipsec_destroy_by_contact", (cmd_function)w_destroy_by_contact, 4,
+		unregister2_fixup, 0, ANY_ROUTE},
 	{"bind_ims_ipsec_pcscf", (cmd_function)bind_ipsec_pcscf, 1, 0,
 		0, 0},
 	{0, 0, 0, 0, 0, 0}
@@ -448,6 +457,27 @@ static int save_fixup2(void **param, int param_no)
 	return 0;
 }
 
+/*! \brief
+ * Fixup for "unregister" operation - both domain and aor
+ */
+static int unregister_fixup(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return domain_fixup(param, param_no);
+	} else {
+		return fixup_spve_all(param, param_no);
+	}
+	return E_CFG;
+}
+
+static int unregister2_fixup(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return domain_fixup(param, param_no);
+	} else {
+		return fixup_spve_all(param, param_no);
+	}
+}
 
 /*! \brief
  * Wrapper to ipsec functions
@@ -468,7 +498,57 @@ static int w_forward(struct sip_msg *_m, char *_d, char *_cflags)
 	return ipsec_forward(_m, (udomain_t *)_d, 0);
 }
 
-static int w_destroy(struct sip_msg *_m, char *_d, char *_cflags)
+static int w_destroy(struct sip_msg *_m, char *_d, char *_aor)
 {
-	return ipsec_destroy(_m, (udomain_t *)_d);
+	str aor;
+
+	if(_aor) {
+		if(fixup_get_svalue(_m, (gparam_t *)_aor, &aor) < 0) {
+			LM_ERR("failed to get aor parameter\n");
+			return -1;
+		}
+		LM_DBG("URI: %.*s\n", aor.len, aor.s);
+
+		return ipsec_destroy(_m, (udomain_t *)_d, &aor);
+	}
+	return ipsec_destroy(_m, (udomain_t *)_d, NULL);
+}
+
+static int w_destroy_by_contact(struct sip_msg *_m, char *_d, char *_aor,
+		char *_received_host, char *_received_port)
+{
+	str aor;
+	str received_host;
+	str received_port;
+	int port = 0;
+
+	if((_aor == NULL) || (_received_host == NULL) || (_received_port == NULL)) {
+		LM_ERR("error - bad parameters\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(_m, (gparam_t *)_aor, &aor) < 0) {
+		LM_ERR("failed to get aor parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(_m, (gparam_t *)_received_host, &received_host) < 0) {
+		LM_ERR("failed to get received host parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(_m, (gparam_t *)_received_port, &received_port) < 0) {
+		LM_ERR("failed to get received host parameter\n");
+		return -1;
+	}
+
+	LM_DBG("URI: %.*s\n", aor.len, aor.s);
+	LM_DBG("Received-Host: %.*s\n", received_host.len, received_host.s);
+	LM_DBG("Received-Port: %.*s\n", received_port.len, received_port.s);
+	if(str2sint(&received_port, &port) != 0) {
+		LM_ERR("error - cannot convert %.*s to an int!\n", received_port.len,
+				received_port.s);
+		return -1;
+	}
+
+	return ipsec_destroy_by_contact(
+			(udomain_t *)_d, &aor, &received_host, port);
 }

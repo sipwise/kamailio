@@ -400,7 +400,7 @@ inline static void final_response_handler(
 			&& is_invite(t)
 			/* parallel forking does not allow silent state discarding */
 			&& t->nr_of_outgoings == 1
-			/* on_negativ reply handler not installed -- serial forking
+			/* on_negative reply handler not installed -- serial forking
 		 * could occur otherwise */
 			&& t->on_failure == 0
 			/* the same for FAILURE callbacks */
@@ -486,8 +486,8 @@ ticks_t retr_buf_handler(ticks_t ticks, struct timer_ln *tl, void *p)
 	unsigned long crt_retr_interval_ms;
 	struct cell *t;
 
-	rbuf = (struct retr_buf *)((void *)tl
-							   - (void *)(&((struct retr_buf *)0)->timer));
+	rbuf = ksr_container_of(tl, struct retr_buf, timer);
+
 	membar_depends(); /* to be on the safe side */
 	t = rbuf->my_T;
 

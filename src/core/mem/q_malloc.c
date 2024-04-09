@@ -196,12 +196,30 @@ struct qm_block *qm_malloc_init(char *address, unsigned long size, int type)
 	unsigned long init_overhead;
 	int h;
 
-	/* make address and size multiple of 8*/
+	if((sizeof(struct qm_frag) % ROUNDTO != 0)
+			|| (sizeof(struct qm_frag_end) % ROUNDTO != 0)) {
+		LM_ERR("memory fragment align constraints failure (%lu %% %lu = %lu "
+			   "::: %lu %% "
+			   "%lu = %lu)\n",
+				sizeof(struct qm_frag), ROUNDTO,
+				sizeof(struct qm_frag) % ROUNDTO, sizeof(struct qm_frag_end),
+				ROUNDTO, sizeof(struct qm_frag_end) % ROUNDTO);
+		return 0;
+	}
+	if(sizeof(struct qm_block) % ROUNDTO != 0) {
+		LM_ERR("memory block align constraints failure (%lu %% %lu = %lu)\n",
+				sizeof(struct qm_block), ROUNDTO,
+				sizeof(struct qm_block) % ROUNDTO);
+		return 0;
+	}
+	/* make address and size multiple of ROUNDTO */
 	start = (char *)ROUNDUP((unsigned long)address);
-	LM_DBG("QM_OPTIMIZE=%lu, /ROUNDTO=%lu\n", QM_MALLOC_OPTIMIZE,
-			QM_MALLOC_OPTIMIZE / ROUNDTO);
-	LM_DBG("QM_HASH_SIZE=%lu, qm_block size=%lu\n", QM_HASH_SIZE,
-			(unsigned long)sizeof(struct qm_block));
+	LM_DBG("QM_OPTIMIZE=%lu, QM_OPTIMIZE/ROUNDTO=%lu, ROUNDTO=%lu\n",
+			QM_MALLOC_OPTIMIZE, QM_MALLOC_OPTIMIZE / ROUNDTO, ROUNDTO);
+	LM_DBG("QM_HASH_SIZE=%lu, qm_block_size=%lu, qm_block_size %% "
+		   "ROUNDTO=%lu\n",
+			QM_HASH_SIZE, (unsigned long)sizeof(struct qm_block),
+			(unsigned long)sizeof(struct qm_block) % ROUNDTO);
 	LM_DBG("qm_malloc_init(%p, %lu), start=%p\n", address, (unsigned long)size,
 			start);
 	if(size < start - address)
@@ -387,6 +405,8 @@ void *qm_malloc(void *qmp, size_t size)
 	/*malloc(0) should return a valid pointer according to specs*/
 	if(unlikely(size == 0))
 		size = 4;
+	/*add the value of core parameter that can be set for extra safety*/
+	size += ksr_mem_add_size;
 	/*size must be a multiple of 8*/
 	size = ROUNDUP(size);
 	if(size > (qm->size - qm->real_used))
@@ -569,7 +589,7 @@ void qm_free(void *qmp, void *p)
 			qm_detach_free(qm, next);
 			size += next->size + FRAG_OVERHEAD;
 			qm->real_used -= FRAG_OVERHEAD;
-			qm->free_hash[GET_HASH(next->size)].no--; /* FIXME slow */
+			qm->free_hash[GET_HASH(next->size)].no--;
 			qm->ffrags--;
 		}
 
@@ -585,7 +605,7 @@ void qm_free(void *qmp, void *p)
 				qm_detach_free(qm, prev);
 				size += prev->size + FRAG_OVERHEAD;
 				qm->real_used -= FRAG_OVERHEAD;
-				qm->free_hash[GET_HASH(prev->size)].no--; /* FIXME slow */
+				qm->free_hash[GET_HASH(prev->size)].no--;
 				qm->ffrags--;
 				f = prev;
 			}
@@ -664,8 +684,9 @@ void *qm_realloc(void *qmp, void *p, size_t size)
 		abort();
 	}
 #endif
-	/* find first acceptable size */
-	size = ROUNDUP(size);
+	/* find first acceptable size
+	 * - consider the value of core parameter that can be set for extra safety */
+	size = ROUNDUP(size + ksr_mem_add_size);
 	if(f->size > size) {
 		orig_size = f->size;
 		/* shrink */
@@ -697,7 +718,7 @@ void *qm_realloc(void *qmp, void *p, size_t size)
 				&& ((n->size + FRAG_OVERHEAD) >= diff)) {
 			/* join  */
 			qm_detach_free(qm, n);
-			qm->free_hash[GET_HASH(n->size)].no--; /*FIXME: slow*/
+			qm->free_hash[GET_HASH(n->size)].no--;
 			qm->ffrags--;
 			f->size += n->size + FRAG_OVERHEAD;
 			qm->real_used -= FRAG_OVERHEAD;
@@ -715,7 +736,9 @@ void *qm_realloc(void *qmp, void *p, size_t size)
 			qm->real_used += (f->size - orig_size);
 			qm->used += (f->size - orig_size);
 		} else {
-			/* could not join => realloc */
+			/* could not join => realloc
+			 * - qm_malloc adds ksr_mem_add_size */
+			size = ROUNDUP(size - ksr_mem_add_size);
 #ifdef DBG_QM_MALLOC
 			ptr = qm_malloc(qm, size, file, func, line, mname);
 #else
@@ -787,6 +810,30 @@ void *qm_reallocxf(void *qmp, void *p, size_t size)
 	return r;
 }
 
+
+void qm_setfunc(void *qmp, void *p, char *func)
+{
+#ifndef DBG_QM_MALLOC
+	LM_ERR("used with invalid compile options\n");
+	return;
+#else
+	struct qm_block *qm;
+	struct qm_frag *f;
+
+	qm = (struct qm_block *)qmp;
+
+	if((p) && (p > (void *)qm->last_frag_end || p < (void *)qm->first_frag)) {
+		LM_CRIT("BUG: bad pointer %p (out of memory block!) - "
+				"aborting\n",
+				p);
+		abort();
+	}
+	f = (struct qm_frag *)((char *)p - sizeof(struct qm_frag));
+
+	if(f)
+		f->func = func;
+#endif
+}
 
 void qm_check(struct qm_block *qm)
 {
@@ -943,6 +990,126 @@ void qm_status(void *qmp)
 	}
 	LOG_FP(DEFAULT_FACILITY, memlog,
 			"qm_status: ", "-----------------------------\n");
+}
+
+
+#ifdef DBG_QM_MALLOC
+static void *qm_strnstr(const void *b1, int l1, const void *b2, int l2)
+{
+	char *sp = (char *)b1;
+	char *pp = (char *)b2;
+	char *eos = sp + l1 - l2;
+
+	if(!(b1 && b2 && l1 && l2))
+		return NULL;
+
+	while(sp <= eos) {
+		if(*sp == *pp)
+			if(memcmp(sp, pp, l2) == 0)
+				return sp;
+
+		sp++;
+	}
+
+	return NULL;
+}
+#endif
+
+void qm_status_filter(void *qmp, str *fmatch, FILE *fp)
+{
+	struct qm_block *qm;
+	struct qm_frag *f;
+	int i, j;
+	int h;
+	int unused;
+
+	qm = (struct qm_block *)qmp;
+
+	fprintf(fp, "block address: %p\n", qm);
+	if(!qm)
+		return;
+
+	fprintf(fp, "heap size= %lu\n", qm->size);
+	fprintf(fp, "used= %lu, used+overhead=%lu, free=%lu\n", qm->used,
+			qm->real_used, qm->size - qm->real_used);
+	fprintf(fp, "max used (+overhead)= %lu\n", qm->max_real_used);
+
+	fprintf(fp, "--- allocated fragments:\n");
+	for(f = qm->first_frag, i = 0; (char *)f < (char *)qm->last_frag_end;
+			f = FRAG_NEXT(f), i++) {
+		if(!f->u.is_free) {
+#ifdef DBG_QM_MALLOC
+			if((fmatch == NULL) || (fmatch->len == 0)
+					|| ((strlen(f->file) >= fmatch->len)
+							&& (qm_strnstr(f->file, strlen(f->file), fmatch->s,
+										fmatch->len)
+									!= NULL))) {
+				fprintf(fp, "   %3d. %c  address=%p frag=%p size=%lu used=%d\n",
+						i, (f->u.is_free) ? 'A' : 'N',
+						(char *)f + sizeof(struct qm_frag), f, f->size,
+						FRAG_WAS_USED(f));
+				fprintf(fp, "          %s from %s:%ld / %s()\n",
+						(f->u.is_free) ? "freed" : "alloc'd", f->file, f->line,
+						f->func);
+				fprintf(fp, "         start check=%lx, end check= %lx, %lx\n",
+						f->check, FRAG_END(f)->check1, FRAG_END(f)->check2);
+				if(f->check != ST_CHECK_PATTERN) {
+					fprintf(fp, "         * beginning overwritten(%lx)!\n",
+							f->check);
+				}
+				if((FRAG_END(f)->check1 != END_CHECK_PATTERN1)
+						|| (FRAG_END(f)->check2 != END_CHECK_PATTERN2)) {
+					fprintf(fp, "         * end overwritten(%lx, %lx)!\n",
+							FRAG_END(f)->check1, FRAG_END(f)->check2);
+				}
+			}
+#else
+			fprintf(fp, "   %3d. %c  address=%p frag=%p size=%lu used=%d\n", i,
+					(f->u.is_free) ? 'A' : 'N',
+					(char *)f + sizeof(struct qm_frag), f, f->size,
+					FRAG_WAS_USED(f));
+#endif
+		}
+	}
+	fprintf(fp, "\n\n--- dumping free list stats:\n");
+	for(h = 0, i = 0; h < QM_HASH_SIZE; h++) {
+		unused = 0;
+		for(f = qm->free_hash[h].head.u.nxt_free, j = 0;
+				f != &(qm->free_hash[h].head); f = f->u.nxt_free, i++, j++) {
+			if(!FRAG_WAS_USED(f)) {
+				unused++;
+#ifdef DBG_QM_MALLOC
+				if((fmatch == NULL) || (fmatch->len == 0)
+						|| ((strlen(f->file) >= fmatch->len)
+								&& (qm_strnstr(f->file, strlen(f->file),
+											fmatch->s, fmatch->len)
+										!= NULL))) {
+					fprintf(fp,
+							"unused fragm.: hash = %3d, fragment %p,"
+							" address %p size %lu, created from %s:%lu / "
+							"%s()\n",
+							h, f, (char *)f + sizeof(struct qm_frag), f->size,
+							f->file, f->line, f->func);
+				}
+#endif
+			}
+		}
+
+		if(j)
+			fprintf(fp,
+					"hash= %3d. fragments no.: %5d, unused: %5d\n"
+					"\t\t bucket size: %9lu - %9ld (first %9lu)\n",
+					h, j, unused, UN_HASH(h),
+					((h <= QM_MALLOC_OPTIMIZE / ROUNDTO) ? 1 : 2) * UN_HASH(h),
+					qm->free_hash[h].head.u.nxt_free->size);
+		if(j != qm->free_hash[h].no) {
+			LOG(L_CRIT,
+					"--- different free frag. count: %d!=%lu"
+					" for hash %3d\n",
+					j, qm->free_hash[h].no, h);
+		}
+	}
+	fprintf(fp, "\n-----------------------------\n");
 }
 
 
@@ -1233,6 +1400,7 @@ int qm_malloc_init_pkg_manager(void)
 	ma.xrealloc = qm_realloc;
 	ma.xreallocxf = qm_reallocxf;
 	ma.xstatus = qm_status;
+	ma.xstatus_filter = qm_status_filter;
 	ma.xinfo = qm_info;
 	ma.xreport = qm_report;
 	ma.xavailable = qm_available;
@@ -1420,6 +1588,12 @@ void qm_shm_status(void *qmp)
 	qm_status(qmp);
 	qm_shm_unlock();
 }
+void qm_shm_status_filter(void *qmp, str *fmatch, FILE *fp)
+{
+	qm_shm_lock();
+	qm_status_filter(qmp, fmatch, fp);
+	qm_shm_unlock();
+}
 void qm_shm_info(void *qmp, struct mem_info *info)
 {
 	qm_shm_lock();
@@ -1498,6 +1672,7 @@ int qm_malloc_init_shm_manager(void)
 	ma.xreallocxf = qm_shm_reallocxf;
 	ma.xresize = qm_shm_resize;
 	ma.xstatus = qm_shm_status;
+	ma.xstatus_filter = qm_shm_status_filter;
 	ma.xinfo = qm_shm_info;
 	ma.xreport = qm_shm_report;
 	ma.xavailable = qm_shm_available;
@@ -1507,6 +1682,7 @@ int qm_malloc_init_shm_manager(void)
 	ma.xfmodstats = qm_shm_mod_free_stats;
 	ma.xglock = qm_shm_glock;
 	ma.xgunlock = qm_shm_gunlock;
+	ma.xsetfunc = qm_setfunc;
 
 	if(shm_init_api(&ma) < 0) {
 		LM_ERR("cannot initialize the core shm api\n");

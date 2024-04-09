@@ -26,6 +26,7 @@ mailto:s.frings@mail.isis.de
 #include "libsms_sms.h"
 #include "sms_funcs.h"
 
+#define SMS_BUF_SIZE 512
 
 #define set_date(_date, _Pointer)   \
 	{                               \
@@ -131,7 +132,7 @@ static int pdu2binary(char *pdu, char *binary)
 static int fetchsms(struct modem *mdm, int sim, char *pdu)
 {
 	char command[16];
-	char answer[512];
+	char answer[SMS_BUF_SIZE];
 	char *position;
 	char *beginning;
 	char *end;
@@ -160,7 +161,7 @@ static int fetchsms(struct modem *mdm, int sim, char *pdu)
 		}
 	} else {
 		LM_DBG("Trying to get stored message %i\n", sim);
-		clen = sprintf(command, "AT+CMGR=%i\r", sim);
+		clen = snprintf(command, 16, "AT+CMGR=%i\r", sim);
 		put_command(mdm, command, clen, answer, sizeof(answer), 50, 0);
 		/* search for beginning of the answer */
 		position = strstr(answer, "+CMGR:");
@@ -186,7 +187,15 @@ static int fetchsms(struct modem *mdm, int sim, char *pdu)
 		return 0;
 	/* Now we have the end of the PDU or ASCII string */
 	*end = 0;
-	strcpy(pdu, beginning);
+	clen = strlen(beginning);
+	if(clen < SMS_BUF_SIZE) {
+		memcpy(pdu, beginning, clen);
+		pdu[clen] = '\0';
+	} else {
+		/* truncate */
+		memcpy(pdu, beginning, SMS_BUF_SIZE - 1);
+		pdu[SMS_BUF_SIZE - 1] = '\0';
+	}
 
 	return sim;
 }
@@ -200,7 +209,7 @@ static void deletesms(struct modem *mdm, int sim)
 	int clen;
 
 	LM_DBG("Deleting message %i !\n", sim);
-	clen = sprintf(command, "AT+CMGD=%i\r", sim);
+	clen = snprintf(command, 32, "AT+CMGD=%i\r", sim);
 	put_command(mdm, command, clen, answer, sizeof(answer), 50, 0);
 }
 
@@ -270,6 +279,7 @@ static int splitascii(struct modem *mdm, char *source, struct incame_sms *sms)
 	char *end;
 	char tbuf[TIME_LEN + 1];
 	char dbuf[DATE_LEN + 1];
+	int l1 = 0;
 
 	/* the text is after the \r */
 	for(start = source; *start && *start != '\r'; start++)
@@ -277,7 +287,13 @@ static int splitascii(struct modem *mdm, char *source, struct incame_sms *sms)
 	if(!*start)
 		return 1;
 	start++;
-	strcpy(sms->ascii, start);
+	l1 = strlen(start);
+	if(l1 >= SMS_ASCII_LEN) {
+		/* truncate */
+		l1 = SMS_ASCII_LEN - 1;
+	}
+	memcpy(sms->ascii, start, l1);
+	sms->ascii[l1] = '\0';
 	/* get the senders MSISDN */
 	start = strstr(source, "\",\"");
 	if(start == 0) {
@@ -291,7 +307,14 @@ static int splitascii(struct modem *mdm, char *source, struct incame_sms *sms)
 		return 1;
 	}
 	*end = 0;
-	strcpy(sms->sender, start);
+	l1 = strlen(start);
+	if(l1 >= SMS_SENDER_LEN) {
+		/* truncate */
+		l1 = SMS_SENDER_LEN - 1;
+	}
+	memcpy(sms->sender, start, l1);
+	sms->sender[l1] = '\0';
+
 	/* Siemens M20 inserts the senders name between MSISDN and date */
 	start = end + 3;
 	// Workaround for Thomas Stoeckel //
@@ -304,17 +327,23 @@ static int splitascii(struct modem *mdm, char *source, struct incame_sms *sms)
 			return 1;
 		}
 		*end = 0;
-		strcpy(sms->name, start);
+		l1 = strlen(start);
+		if(l1 >= SMS_NAME_LEN) {
+			/* truncate */
+			l1 = SMS_NAME_LEN - 1;
+		}
+		memcpy(sms->name, start, l1);
+		sms->name[l1] = '\0';
 	}
 	/* Get the date */
 	start = end + 3;
-	sprintf(dbuf, "%c%c-%c%c-%c%c", start[3], start[4], start[0], start[1],
-			start[6], start[7]);
+	snprintf(dbuf, DATE_LEN + 1, "%c%c-%c%c-%c%c", start[3], start[4], start[0],
+			start[1], start[6], start[7]);
 	memcpy(sms->date, dbuf, DATE_LEN);
 	/* Get the time */
 	start += 9;
-	sprintf(tbuf, "%c%c:%c%c:%c%c", start[0], start[1], start[3], start[4],
-			start[7], start[7]);
+	snprintf(tbuf, TIME_LEN + 1, "%c%c:%c%c:%c%c", start[0], start[1], start[3],
+			start[4], start[7], start[7]);
 	memcpy(sms->time, tbuf, TIME_LEN);
 	sms->userdatalength = strlen(sms->ascii);
 	return 1;
@@ -480,7 +509,7 @@ static inline int decode_pdu(
 
 int getsms(struct incame_sms *sms, struct modem *mdm, int sim)
 {
-	char pdu[512];
+	char pdu[SMS_BUF_SIZE];
 	int found;
 	int ret;
 
