@@ -78,6 +78,8 @@ upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
 sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 upstream/http_client-Add-parameter-timeout_mode-timeout-in-se.patch
 upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
+upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
+upstream/cfgutils-initialize-the-optional-key.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
@@ -95,7 +97,6 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
-sipwise/cfgutils-expose-optional-second-string-key-for-lock.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
 ### active development
 #
