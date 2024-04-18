@@ -35,6 +35,8 @@ sipwise/sca-add-pai_avp-parameter.patch
 #
 ## upstream master
 upstream/rtpengine_rework_rtpp_flags.patch
+upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
+upstream/cfgutils-initialize-the-optional-key.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
@@ -44,7 +46,6 @@ sipwise/lcr_read_id.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
-sipwise/cfgutils-expose-optional-second-string-key-for-lock.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
 ### active development
 #
