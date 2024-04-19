@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.4-1+0~mr10.5.6.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [4809248] MT#58722 don't execute timers on shutdown phase
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 19 Apr 2024 14:49:06 +0200
+
 ngcp-kamailio (5.6.4-1+0~mr10.5.6.2) unstable; urgency=medium
 
   [ Alessio Garzi ]
