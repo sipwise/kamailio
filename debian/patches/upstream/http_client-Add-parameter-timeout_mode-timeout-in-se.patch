@@ -117,10 +117,10 @@ index 1472da7..dda4721 100644
  			curl, CURLOPT_FOLLOWLOCATION, (long)params->http_follow_redirect);
  	if(params->http_follow_redirect) {
 diff --git a/src/modules/http_client/http_client.c b/src/modules/http_client/http_client.c
-index 430933e..4884424 100644
+index 3cf6628..76c5b44 100644
 --- a/src/modules/http_client/http_client.c
 +++ b/src/modules/http_client/http_client.c
-@@ -76,7 +76,8 @@ MODULE_VERSION
+@@ -79,7 +79,8 @@ MODULE_VERSION
  #define CURL_USER_AGENT_LEN (sizeof(CURL_USER_AGENT) - 1)
  
  /* Module parameter variables */
@@ -130,7 +130,7 @@ index 430933e..4884424 100644
  char *default_tls_cacert =
  		NULL; /*!< File name: Default CA cert to use for curl TLS connection */
  str default_tls_clientcert =
-@@ -195,6 +196,7 @@ static cmd_export_t cmds[] = {
+@@ -198,6 +199,7 @@ static cmd_export_t cmds[] = {
  /* Exported parameters */
  static param_export_t params[] = {
  	{"connection_timeout", PARAM_INT, &default_connection_timeout},
@@ -138,7 +138,7 @@ index 430933e..4884424 100644
  	{"cacert", PARAM_STRING,  &default_tls_cacert },
  	{"client_cert", PARAM_STR, &default_tls_clientcert },
  	{"client_key", PARAM_STR, &default_tls_clientkey },
-@@ -310,10 +312,27 @@ static int mod_init(void)
+@@ -313,10 +315,27 @@ static int mod_init(void)
  		}
  	}
  

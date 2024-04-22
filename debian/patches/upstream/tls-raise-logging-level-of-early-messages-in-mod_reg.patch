@@ -1,0 +1,21 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Tue, 13 Feb 2024 19:10:34 +0800
+Subject: tls: raise logging level of early messages in mod_register
+
+---
+ src/modules/tls/tls_mod.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/tls/tls_mod.c b/src/modules/tls/tls_mod.c
+index 905ca6f..0d8ea3d 100644
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -689,7 +689,7 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+ #if OPENSSL_VERSION_NUMBER >= 0x10100000L \
+ 		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 	if(ksr_tls_threads_mode == 0) {
+-		LM_DBG("setting cryptorand random engine\n");
++		LM_WARN("OpenSSL 1.1.1 setting cryptorand random engine\n");
+ 		RAND_set_rand_method(RAND_ksr_cryptorand_method());
+ 	}
+ #endif
