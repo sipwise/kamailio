@@ -1,0 +1,51 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Thu, 1 Feb 2024 10:07:08 +0800
+Subject: db_unixodbc: init libssl in a thread
+
+From
+- 2611a4670c65dd32fc1daf6b67e37852936ba69c
+- b71ce6e5733ab08b84ff09481ada91e5fca43a33
+---
+ src/modules/db_unixodbc/dbase.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/db_unixodbc/dbase.c b/src/modules/db_unixodbc/dbase.c
+index eb02b29..c4ba64b 100644
+--- a/src/modules/db_unixodbc/dbase.c
++++ b/src/modules/db_unixodbc/dbase.c
+@@ -22,10 +22,10 @@
+  *
+  */
+ 
+-
+ #include "../../core/mem/mem.h"
+ #include "../../core/dprint.h"
+ #include "../../core/async_task.h"
++#include "../../core/rthreads.h"
+ #include "../../lib/srdb1/db_query.h"
+ #include "val.h"
+ #include "connection.h"
+@@ -227,8 +227,10 @@ extern char *db_unixodbc_tquote;
+ /*
+  * Initialize database module
+  * No function should be called before this
++ *
++ * Init libssl in a thread
+  */
+-db1_con_t *db_unixodbc_init(const str *_url)
++static db1_con_t *db_unixodbc_init0(const str *_url)
+ {
+ 	db1_con_t *c;
+ 	c = db_do_init(_url, (void *)db_unixodbc_new_connection);
+@@ -237,6 +239,11 @@ db1_con_t *db_unixodbc_init(const str *_url)
+ 	return c;
+ }
+ 
++db1_con_t *db_unixodbc_init(const str *_url)
++{
++	return run_threadP((_thread_proto)&db_unixodbc_init0, (void *)_url);
++}
++
+ /*
+  * Shut down database module
+  * No function should be called after this

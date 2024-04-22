@@ -1,0 +1,44 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Wed, 14 Feb 2024 14:59:52 +0800
+Subject: db_mysql: update docs for opt_ssl_ca
+
+Cherry-pick from eafd93f057
+---
+ src/modules/db_mysql/doc/db_mysql_admin.xml | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/src/modules/db_mysql/doc/db_mysql_admin.xml b/src/modules/db_mysql/doc/db_mysql_admin.xml
+index 51c9b5b..dceb825 100644
+--- a/src/modules/db_mysql/doc/db_mysql_admin.xml
++++ b/src/modules/db_mysql/doc/db_mysql_admin.xml
+@@ -211,6 +211,30 @@ modparam("db_mysql", "update_affected_found", 1)
+ ...
+ modparam("db_mysql", "opt_ssl_mode", 1)
+ ...
++</programlisting>
++		</example>
++	</section>
++	<section id="db_mysql.p.opt_ssl_ca">
++		<title><varname>opt_ssl_ca</varname> (string)</title>
++		<para>
++		Configures the CA certs used to verify the MySQL server cert when
++		SSL is enabled.
++		</para>
++		<para>
++		Required when opt_ssl_mode = 4 or 5 and db_mysql is built
++		with libmysqlclient.
++		</para>
++		<para>
++		<emphasis>
++			Default value is NULL (NULL - not configured).
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>opt_ssl_ca</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("db_mysql", "opt_ssl_ca", "/etc/ssl/certs/mysql-ca.pem")
++...
+ </programlisting>
+ 		</example>
+ 	</section>

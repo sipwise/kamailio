@@ -1,0 +1,38 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Thu, 8 Feb 2024 12:50:03 +0800
+Subject: db_mysql: libssl thread guard for db_mysql_close
+
+---
+ src/modules/db_mysql/km_dbase.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/db_mysql/km_dbase.c b/src/modules/db_mysql/km_dbase.c
+index e86e4a0..7b65c0a 100644
+--- a/src/modules/db_mysql/km_dbase.c
++++ b/src/modules/db_mysql/km_dbase.c
+@@ -40,6 +40,7 @@
+ #include "../../core/async_task.h"
+ 
+ #define KSR_RTHREAD_NEED_4PP
++#define KSR_RTHREAD_NEED_0P
+ #include "../../core/rthreads.h"
+ #include "../../lib/srdb1/db_query.h"
+ #include "../../lib/srdb1/db_ut.h"
+@@ -228,11 +229,16 @@ db1_con_t *db_mysql_init(const str *_url)
+  * \param _h handle to the closed connection
+  * \return zero on success, negative value on failure
+  */
+-void db_mysql_close(db1_con_t *_h)
++static void db_mysql_close_impl(db1_con_t *_h)
+ {
+ 	db_do_close(_h, db_mysql_free_connection);
+ }
+ 
++void db_mysql_close(db1_con_t *_h)
++{
++	run_thread0P((_thread_proto0P)db_mysql_close_impl, _h);
++}
++
+ 
+ /**
+  * Retrieve a result set
