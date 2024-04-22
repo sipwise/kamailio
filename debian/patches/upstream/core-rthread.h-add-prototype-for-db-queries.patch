@@ -1,0 +1,74 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Tue, 6 Feb 2024 00:22:52 +0800
+Subject: core/rthread.h: add prototype for db queries
+
+(cherry-pick from ba921b2112e87625fba5789d1b049161bb611073)
+---
+ src/core/rthreads.h | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+
+diff --git a/src/core/rthreads.h b/src/core/rthreads.h
+index a5ad767..a416ad2 100644
+--- a/src/core/rthreads.h
++++ b/src/core/rthreads.h
+@@ -98,3 +98,60 @@ static void run_threadV(_thread_protoV fn)
+ 	pthread_join(tid, NULL);
+ }
+ #endif
++
++/*
++ * prototype: int fn(void *, void *) { ... }
++ */
++#ifdef KSR_RTHREAD_NEED_4PP
++typedef int (*_thread_proto4PP)(void *, void *);
++struct _thread_args4PP
++{
++	_thread_proto4PP fn;
++	void *arg1;
++	void *arg2;
++	int *ret;
++};
++static void *run_thread_wrap4PP(struct _thread_args4PP *args)
++{
++	*args->ret = (*args->fn)(args->arg1, args->arg2);
++	return NULL;
++}
++
++static int run_thread4PP(_thread_proto4PP fn, void *arg1, void *arg2)
++{
++	pthread_t tid;
++	int ret;
++
++	pthread_create(&tid, NULL, (_thread_proto)run_thread_wrap4PP,
++			&(struct _thread_args4PP){fn, arg1, arg2, &ret});
++	pthread_join(tid, NULL);
++
++	return ret;
++}
++#endif
++
++/*
++ * prototype: void fn(void *) { ... }
++ */
++#ifdef KSR_RTHREAD_NEED_0P
++typedef void (*_thread_proto0P)(void *);
++struct _thread_args0P
++{
++	_thread_proto0P fn;
++	void *arg1;
++};
++static void *run_thread_wrap0P(struct _thread_args0P *args)
++{
++	(*args->fn)(args->arg1);
++	return NULL;
++}
++
++static void run_thread0P(_thread_proto0P fn, void *arg1)
++{
++	pthread_t tid;
++
++	pthread_create(&tid, NULL, (_thread_proto)run_thread_wrap0P,
++			&(struct _thread_args0P){fn, arg1});
++	pthread_join(tid, NULL);
++}
++#endif

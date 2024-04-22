@@ -1,0 +1,33 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Tue, 27 Feb 2024 05:01:14 +0800
+Subject: http_async_client: libssl thread executor for curl_global_init()
+
+Cherry-pick from 514635dc3e
+---
+ src/modules/http_async_client/http_multi.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/http_async_client/http_multi.c b/src/modules/http_async_client/http_multi.c
+index a57aba9..a0ee1c8 100644
+--- a/src/modules/http_async_client/http_multi.c
++++ b/src/modules/http_async_client/http_multi.c
+@@ -32,6 +32,9 @@
+ #include "../../core/mem/mem.h"
+ #include "../../core/ut.h"
+ #include "../../core/hashes.h"
++#define KSR_RTHREAD_NEED_4L
++#define KSR_RTHREAD_SKIP_P
++#include "../../core/rthreads.h"
+ #include "http_multi.h"
+ 
+ extern int hash_size;
+@@ -389,7 +392,8 @@ void set_curl_mem_callbacks(void)
+ 			break;
+ 		case 1:
+ 			LM_DBG("Initilizing cURL with sys malloc\n");
+-			rc = curl_global_init(CURL_GLOBAL_ALL);
++			rc = run_thread4L(
++					(_thread_proto4L)curl_global_init, CURL_GLOBAL_ALL);
+ 			if(rc != 0) {
+ 				LM_ERR("Cannot initialize cURL: %d\n", rc);
+ 			}
