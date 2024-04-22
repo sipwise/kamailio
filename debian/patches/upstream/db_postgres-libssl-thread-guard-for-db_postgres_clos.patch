@@ -1,0 +1,38 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Thu, 8 Feb 2024 07:18:16 +0800
+Subject: db_postgres: libssl thread guard for db_postgres_close
+
+---
+ src/modules/db_postgres/km_dbase.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/db_postgres/km_dbase.c b/src/modules/db_postgres/km_dbase.c
+index 7948ff0..e8dce6e 100644
+--- a/src/modules/db_postgres/km_dbase.c
++++ b/src/modules/db_postgres/km_dbase.c
+@@ -45,6 +45,7 @@
+ #include "../../core/clist.h"
+ #define KSR_RTHREAD_NEED_PI
+ #define KSR_RTHREAD_NEED_4PP
++#define KSR_RTHREAD_NEED_0P
+ #include "../../core/rthreads.h"
+ #include "km_dbase.h"
+ #include "km_pg_con.h"
+@@ -147,11 +148,16 @@ db1_con_t *db_postgres_init2(const str *_url, db_pooling_t pooling)
+  * \param _h closed connection, as returned from db_postgres_init
+  * \note free all memory and resources
+  */
+-void db_postgres_close(db1_con_t *_h)
++static void db_postgres_close_impl(db1_con_t *_h)
+ {
+ 	db_do_close(_h, db_postgres_free_connection);
+ }
+ 
++void db_postgres_close(db1_con_t *_h)
++{
++	run_thread0P((_thread_proto0P)db_postgres_close_impl, _h);
++}
++
+ 
+ /*!
+  * \brief Submit_query, run a query

@@ -1,0 +1,87 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Tue, 6 Feb 2024 14:24:08 +0100
+Subject: core: added tls_threads_mode global parameter
+
+- control how to execute functions that may be using libssl3 behind
+---
+ src/core/cfg.lex   | 2 ++
+ src/core/cfg.y     | 9 +++++++++
+ src/core/globals.h | 1 +
+ src/main.c         | 5 +++--
+ 4 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/core/cfg.lex b/src/core/cfg.lex
+index 82278d5..d342aa5 100644
+--- a/src/core/cfg.lex
++++ b/src/core/cfg.lex
+@@ -439,6 +439,7 @@ TCP_WAIT_DATA	"tcp_wait_data"
+ TCP_SCRIPT_MODE	"tcp_script_mode"
+ DISABLE_TLS		"disable_tls"|"tls_disable"
+ ENABLE_TLS		"enable_tls"|"tls_enable"
++TLS_THREADS_MODE	"tls_threads_mode"
+ TLSLOG			"tlslog"|"tls_log"
+ TLS_PORT_NO		"tls_port_no"
+ TLS_METHOD		"tls_method"
+@@ -953,6 +954,7 @@ IMPORTFILE      "import_file"
+ <INITIAL>{TCP_SCRIPT_MODE}	{ count(); yylval.strval=yytext; return TCP_SCRIPT_MODE; }
+ <INITIAL>{DISABLE_TLS}	{ count(); yylval.strval=yytext; return DISABLE_TLS; }
+ <INITIAL>{ENABLE_TLS}	{ count(); yylval.strval=yytext; return ENABLE_TLS; }
++<INITIAL>{TLS_THREADS_MODE}	{ count(); yylval.strval=yytext; return TLS_THREADS_MODE; }
+ <INITIAL>{TLSLOG}		{ count(); yylval.strval=yytext; return TLS_PORT_NO; }
+ <INITIAL>{TLS_PORT_NO}	{ count(); yylval.strval=yytext; return TLS_PORT_NO; }
+ <INITIAL>{TLS_METHOD}	{ count(); yylval.strval=yytext; return TLS_METHOD; }
+diff --git a/src/core/cfg.y b/src/core/cfg.y
+index 1f2ad7f..412fe5d 100644
+--- a/src/core/cfg.y
++++ b/src/core/cfg.y
+@@ -469,6 +469,7 @@ extern char *default_routename;
+ %token TCP_SCRIPT_MODE
+ %token DISABLE_TLS
+ %token ENABLE_TLS
++%token TLS_THREADS_MODE
+ %token TLSLOG
+ %token TLS_PORT_NO
+ %token TLS_METHOD
+@@ -1440,6 +1441,14 @@ assign_stm:
+ 		#endif
+ 	}
+ 	| ENABLE_TLS EQUAL error { yyerror("boolean value expected"); }
++	| TLS_THREADS_MODE EQUAL NUMBER {
++		#ifdef USE_TLS
++			ksr_tls_threads_mode = $3;
++		#else
++			warn("tls support not compiled in");
++		#endif
++	}
++	| TLS_THREADS_MODE EQUAL error { yyerror("int value expected"); }
+ 	| TLSLOG EQUAL NUMBER {
+ 		#ifdef CORE_TLS
+ 			tls_log=$3;
+diff --git a/src/core/globals.h b/src/core/globals.h
+index 207205c..0487a31 100644
+--- a/src/core/globals.h
++++ b/src/core/globals.h
+@@ -108,6 +108,7 @@ extern int ksr_tcp_script_mode;
+ #ifdef USE_TLS
+ extern int tls_disable;
+ extern unsigned short tls_port_no;
++extern int ksr_tls_threads_mode;
+ #endif
+ #ifdef USE_SCTP
+ extern int sctp_disable;
+diff --git a/src/main.c b/src/main.c
+index 8e34285..f7cb643 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -326,8 +326,9 @@ int tcp_disable = 0;	 /* 1 if tcp is disabled */
+ int tls_disable = 0; /* tls enabled by default */
+ #else
+ int tls_disable = 1; /* tls disabled by default */
+-#endif /* CORE_TLS */
+-#endif /* USE_TLS */
++#endif						  /* CORE_TLS */
++int ksr_tls_threads_mode = 0; /* threads execution mode for tls with libssl */
++#endif						  /* USE_TLS */
+ #ifdef USE_SCTP
+ int sctp_children_no = 0;
+ int sctp_disable = 2; /* 1 if sctp is disabled, 2 if auto mode, 0 enabled */

@@ -1,0 +1,46 @@
+From: S-P Chan <shihping.chan@gmail.com>
+Date: Thu, 1 Feb 2024 10:05:39 +0800
+Subject: db_mysql: init libssl in a thread
+
+From
+- 5dffb934a2f7f986fdc09e433833991c54612646
+- 733a268114261d49ed11aec83fe39ea8c34a0b69
+---
+ src/modules/db_mysql/km_dbase.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/db_mysql/km_dbase.c b/src/modules/db_mysql/km_dbase.c
+index 577f3dc..9cd238b 100644
+--- a/src/modules/db_mysql/km_dbase.c
++++ b/src/modules/db_mysql/km_dbase.c
+@@ -38,6 +38,7 @@
+ #include "../../core/mem/mem.h"
+ #include "../../core/dprint.h"
+ #include "../../core/async_task.h"
++#include "../../core/rthreads.h"
+ #include "../../lib/srdb1/db_query.h"
+ #include "../../lib/srdb1/db_ut.h"
+ #include "db_mysql.h"
+@@ -197,8 +198,10 @@ static char *db_mysql_tquote = "`";
+  * No function should be called before this
+  * \param _url URL used for initialization
+  * \return zero on success, negative value on failure
++ *
++ * Init libssl in a thread
+  */
+-db1_con_t *db_mysql_init(const str *_url)
++static db1_con_t *db_mysql_init0(const str *_url)
+ {
+ 	db1_con_t *c;
+ 	c = db_do_init(_url, (void *)db_mysql_new_connection);
+@@ -208,6 +211,10 @@ db1_con_t *db_mysql_init(const str *_url)
+ }
+ 
+ 
++db1_con_t *db_mysql_init(const str *_url)
++{
++	return run_threadP((_thread_proto)db_mysql_init0, (void *)_url);
++}
+ /**
+  * Shut down the database module.
+  * No function should be called after this
