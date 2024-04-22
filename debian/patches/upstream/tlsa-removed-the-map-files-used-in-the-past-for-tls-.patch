@@ -1,0 +1,78 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Sat, 2 Mar 2024 08:13:40 +0100
+Subject: tlsa: removed the map files used in the past for tls engine
+
+- sync with code of tls module
+---
+ src/modules/tlsa/tls_map.c | 27 ---------------------------
+ src/modules/tlsa/tls_map.h | 27 ---------------------------
+ 2 files changed, 54 deletions(-)
+ delete mode 100644 src/modules/tlsa/tls_map.c
+ delete mode 100644 src/modules/tlsa/tls_map.h
+
+diff --git a/src/modules/tlsa/tls_map.c b/src/modules/tlsa/tls_map.c
+deleted file mode 100644
+index ad799b5..0000000
+--- a/src/modules/tlsa/tls_map.c
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/**
+- * Copyright (C) 2021 Daniel-Constantin Mierla (asipto.com)
+- *
+- * This file is part of Kamailio, a free SIP server.
+- *
+- * This file is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version
+- *
+- *
+- * This file is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+- *
+- */
+-
+-/**
+- * THIS FILE IS GENERATED - DO NOT MODIFY IT
+- */
+-
+-#include "../tls/tls_map.c"
+diff --git a/src/modules/tlsa/tls_map.h b/src/modules/tlsa/tls_map.h
+deleted file mode 100644
+index 96705a7..0000000
+--- a/src/modules/tlsa/tls_map.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/**
+- * Copyright (C) 2021 Daniel-Constantin Mierla (asipto.com)
+- *
+- * This file is part of Kamailio, a free SIP server.
+- *
+- * This file is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version
+- *
+- *
+- * This file is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+- *
+- */
+-
+-/**
+- * THIS FILE IS GENERATED - DO NOT MODIFY IT
+- */
+-
+-#include "../tls/tls_map.h"
