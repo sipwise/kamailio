@@ -69,20 +69,31 @@ static int tls_mod_preinitialized = 0;
 static int tls_mod_initialized = 0;
 
 extern int ksr_tls_init_mode;
-pthread_mutex_t ksr_tls_lock_shm;
+static pthread_mutex_t *ksr_tls_lock_shm = NULL;
 
 /**
  *
  */
 int ksr_tls_lock_init(void)
 {
-	if(!(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)) {
+	pthread_mutexattr_t attr;
+
+	if(ksr_tls_lock_shm != NULL) {
 		return 0;
 	}
-	if(pthread_mutex_init(&ksr_tls_lock_shm, NULL) != 0) {
+	ksr_tls_lock_shm = (pthread_mutex_t *)shm_mallocxz(sizeof(pthread_mutex_t));
+	if(ksr_tls_lock_shm == NULL) {
+		LM_ERR("mutex allocation failed\n");
+		return -1;
+	}
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+	if(pthread_mutex_init(ksr_tls_lock_shm, &attr) != 0) {
+		pthread_mutexattr_destroy(&attr);
 		LM_ERR("mutex init failed\n");
 		return -1;
 	}
+	pthread_mutexattr_destroy(&attr);
 	return 0;
 }
 
@@ -94,7 +105,8 @@ void ksr_tls_lock_destroy(void)
 	if(!(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)) {
 		return;
 	}
-	pthread_mutex_destroy(&ksr_tls_lock_shm);
+	pthread_mutex_destroy(ksr_tls_lock_shm);
+	shm_free(ksr_tls_lock_shm);
 	return;
 }
 
@@ -247,9 +259,6 @@ static void *ser_malloc(size_t size, const char *file, int line)
 	static ticks_t st = 0;
 #endif
 
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
-
 #ifdef RAND_NULL_MALLOC
 	/* start random null returns only after
 	 * NULL_GRACE_PERIOD from first call */
@@ -277,8 +286,6 @@ static void *ser_malloc(size_t size, const char *file, int line)
 				size, file, line, bt_buf);
 	}
 #endif
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 	return p;
 }
 
@@ -291,9 +298,6 @@ static void *ser_realloc(void *ptr, size_t size, const char *file, int line)
 #ifdef RAND_NULL_MALLOC
 	static ticks_t st = 0;
 #endif
-
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 
 #ifdef RAND_NULL_MALLOC
 	/* start random null returns only after
@@ -323,11 +327,16 @@ static void *ser_realloc(void *ptr, size_t size, const char *file, int line)
 	}
 #endif
 
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
-
 	return p;
 }
+
+static void ser_free(void *ptr, const char *fname, int fline)
+{
+	if(ptr) {
+		shm_free(ptr);
+	}
+}
+
 #endif /* LIBRESSL_VERSION_NUMBER */
 
 #else /*TLS_MALLOC_DBG */
@@ -339,11 +348,7 @@ static void *ser_malloc(size_t size)
 {
 	void *p;
 
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 	p = shm_malloc(size);
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 	return p;
 }
 
@@ -351,22 +356,14 @@ static void *ser_malloc(size_t size)
 static void *ser_realloc(void *ptr, size_t size)
 {
 	void *p;
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 	p = shm_realloc(ptr, size);
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 	return p;
 }
 #else
 static void *ser_malloc(size_t size, const char *fname, int fline)
 {
 	void *p;
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 	p = shm_malloc(size);
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 	return p;
 }
 
@@ -374,11 +371,7 @@ static void *ser_malloc(size_t size, const char *fname, int fline)
 static void *ser_realloc(void *ptr, size_t size, const char *fname, int fline)
 {
 	void *p;
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 	p = shm_realloc(ptr, size);
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 	return p;
 }
 #endif
@@ -395,24 +388,16 @@ static void ser_free(void *ptr)
 	 * As shm_free() aborts on null pointers, we have to check for null pointer
 	 * here in the wrapper function.
 	 */
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 	if(ptr) {
 		shm_free(ptr);
 	}
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 }
 #else
 static void ser_free(void *ptr, const char *fname, int fline)
 {
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_lock(&ksr_tls_lock_shm);
 	if(ptr) {
 		shm_free(ptr);
 	}
-	if(ksr_tls_init_mode & TLS_MODE_PTHREAD_LOCK_SHM)
-		pthread_mutex_unlock(&ksr_tls_lock_shm);
 }
 #endif
 
@@ -699,6 +684,11 @@ int tls_pre_init(void)
 	LM_INFO("libssl linked mode: static\n");
 #endif
 
+	if(ksr_tls_lock_init() < 0) {
+		LM_ERR("failed to init local lock\n");
+		return -1;
+	}
+
 	/*
 	 * this has to be called before any function calling CRYPTO_malloc,
 	 * CRYPTO_malloc will set allow_customize in openssl to 0
@@ -740,61 +730,92 @@ int tls_pre_init(void)
  * tls mod pre-init function
  * - executed before any mod_init()
  */
+#if OPENSSL_VERSION_NUMBER >= 0x030000000L
+/*
+ * With late initialisation it is not necessary to
+ * enable threading on the EVP_RAND_CTX. This function
+ * left here in case more complex requirements arise in
+ * OpenSSL >= 3.2.
+ */
+long tls_h_mod_randctx(void *param)
+{
+    do {
+        OSSL_LIB_CTX *osslglobal = NULL;
+        EVP_RAND_CTX *randctx = NULL;
+
+        LM_DBG("enabling locking for rand ctx\n");
+
+        osslglobal = OSSL_LIB_CTX_get0_global_default();
+        if(osslglobal == NULL) {
+            LM_ERR("failed to get lib ssl global ctx\n");
+            return -1L;
+        }
+
+        randctx = RAND_get0_primary(osslglobal);
+        if(randctx == NULL) {
+            LM_ERR("primary rand ctx is null\n");
+            return -1L;
+        }
+        EVP_RAND_enable_locking(randctx);
+
+        randctx = RAND_get0_public(osslglobal);
+        if(randctx == NULL) {
+            LM_ERR("public rand ctx is null\n");
+            return -1L;
+        }
+        EVP_RAND_enable_locking(randctx);
+
+        randctx = RAND_get0_private(osslglobal);
+        if(randctx == NULL) {
+            LM_ERR("private rand ctx is null\n");
+            return -1L;
+        }
+        EVP_RAND_enable_locking(randctx);
+    } while(0);
+
+    return 0L;
+}
+#endif /* OPENSSL_VERSION_NUMBER */
+
 int tls_h_mod_pre_init_f(void)
 {
 	if(tls_mod_preinitialized == 1) {
 		LM_DBG("already mod pre-initialized\n");
 		return 0;
 	}
+	if(ksr_tls_lock_init() < 0) {
+		LM_ERR("failed to init local lock\n");
+		return -1;
+	}
 	LM_DBG("preparing tls env for modules initialization\n");
 #if OPENSSL_VERSION_NUMBER >= 0x010100000L && !defined(LIBRESSL_VERSION_NUMBER)
 	LM_DBG("preparing tls env for modules initialization (libssl >=1.1)\n");
-#if OPENSSL_VERSION_NUMBER >= 0x010101000L
-	OPENSSL_init_ssl(OPENSSL_INIT_ATFORK, NULL);
-#else
+#if OPENSSL_VERSION_NUMBER < 0x010100000L
 	OPENSSL_init_ssl(0, NULL);
 #endif
 #else
 	LM_DBG("preparing tls env for modules initialization (libssl <=1.0)\n");
 	SSL_library_init();
 #endif
+#if OPENSSL_VERSION_NUMBER < 0x010101000L
 	SSL_load_error_strings();
-
-#if OPENSSL_VERSION_NUMBER >= 0x030000000L
-	do {
-		OSSL_LIB_CTX *osslglobal = NULL;
-		EVP_RAND_CTX *randctx = NULL;
-
-		LM_DBG("enabling locking for rand ctx\n");
-
-		osslglobal = OSSL_LIB_CTX_get0_global_default();
-		if(osslglobal == NULL) {
-			LM_ERR("failed to get lib ssl global ctx\n");
-			return -1;
-		}
-
-		randctx = RAND_get0_primary(osslglobal);
-		if(randctx == NULL) {
-			LM_ERR("primary rand ctx is null\n");
-			return -1;
-		}
-		EVP_RAND_enable_locking(randctx);
-
-		randctx = RAND_get0_public(osslglobal);
-		if(randctx == NULL) {
-			LM_ERR("public rand ctx is null\n");
-			return -1;
-		}
-		EVP_RAND_enable_locking(randctx);
-
-		randctx = RAND_get0_private(osslglobal);
-		if(randctx == NULL) {
-			LM_ERR("private rand ctx is null\n");
-			return -1;
-		}
-		EVP_RAND_enable_locking(randctx);
-	} while(0);
 #endif
+
+#if 0
+#if OPENSSL_VERSION_NUMBER >= 0x030000000L
+        /*
+         * With deferred initialisation it is not necessary to enable threading
+         * on the EVP_RAND_CTX. We leave this block here as an example of how
+         * to do it in case of future requirements.
+         */
+        pthread_t tid;
+        long rl;
+        pthread_create(&tid, NULL, (void *(*)(void *))tls_h_mod_randctx, NULL);
+        pthread_join(tid, (void **)&rl);
+        if ((int)rl)
+            return (int)rl;
+#endif /* OPENSSL_VERSION_NUMBER */
+#endif /* 0 */
 
 	tls_mod_preinitialized = 1;
 	return 0;
