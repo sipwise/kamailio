@@ -1,4 +1,4 @@
-ngcp-kamailio (5.7.3-1+0~mr11.5.2.0) unstable; urgency=medium
+ngcp-kamailio (5.7.4-1+0~mr11.5.2.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
   * MT#58314 Use gw flags as id
@@ -13,8 +13,12 @@ ngcp-kamailio (5.7.3-1+0~mr11.5.2.0) unstable; urgency=medium
   * MT#58795 refresh patches
   * MT#58795 fix sipwise/usrloc_dbro_pinger.patch
   * MT#58722 don't execute timers on shutdown phase
+  * MT#58875 tls fixes from upstream 5.7 branch
+  * MT#58875 tls fixes from upstream 5.7 branch, take two
+  * New upstream version 5.7.4
+  * MT#59178 remove already applied patches
 
- -- Victor Seva <vseva@debian.org>  Tue, 05 Dec 2023 11:42:22 +0100
+ -- Victor Seva <vseva@debian.org>  Wed, 24 Apr 2024 10:11:53 +0200
 
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.0) unstable; urgency=medium
 
