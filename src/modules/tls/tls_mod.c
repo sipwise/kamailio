@@ -402,10 +402,6 @@ static int mod_init(void)
 	if(tls_check_sockets(*tls_domains_cfg) < 0)
 		goto error;
 
-	if(ksr_tls_lock_init() < 0) {
-		goto error;
-	}
-
 	LM_INFO("use OpenSSL version: %08x\n", (uint32_t)(OPENSSL_VERSION_NUMBER));
 #ifndef OPENSSL_NO_ECDH
 	LM_INFO("With ECDH-Support!\n");
@@ -437,14 +433,30 @@ static int tls_engine_init();
 int tls_fix_engine_keys(tls_domains_cfg_t *, tls_domain_t *, tls_domain_t *);
 #endif
 
+/*
+ * OpenSSL 1.1.1+: SSL_CTX is repeated in each worker
+ *
+ * OpenSSL RSA blinding works in single-process multi-threaded mode
+ * and depends on pthread_self() to separate threads. In Kamailio multi-process workers
+ * pthread_self() will not necessarily be unique, this will result in incorrect BN
+ * operations—hence we create a separate SSL_CTX for each worker
+ *
+ * EC operations do not use pthread_self(), so could use shared SSL_CTX
+ */
 static int mod_child(int rank)
 {
 	if(tls_disable || (tls_domains_cfg == 0))
 		return 0;
 
-	/* fix tls config only from the main proc/PROC_INIT., when we know
-	 * the exact process number and before any other process starts*/
-	if(rank == PROC_INIT) {
+#if OPENSSL_VERSION_NUMBER >= 0x010101000L
+        /*
+         * OpenSSL 3.x/1.1.1: create shared SSL_CTX* in worker to avoid init of
+         * libssl in rank 0(thread#1)
+         */
+        if(rank == PROC_SIPINIT) {
+#else
+        if(rank == PROC_INIT) {
+#endif
 		if(cfg_get(tls, tls_cfg, config_file).s) {
 			if(tls_fix_domains_cfg(
 					   *tls_domains_cfg, &srv_defaults, &cli_defaults)
@@ -455,30 +467,8 @@ static int mod_child(int rank)
 					< 0)
 				return -1;
 		}
-#if OPENSSL_VERSION_NUMBER >= 0x010101000L \
-		&& OPENSSL_VERSION_NUMBER < 0x030000000L
-		if(ksr_tls_init_mode & TLS_MODE_FORK_PREPARE) {
-			OPENSSL_fork_prepare();
-		}
-#endif
 		return 0;
 	}
-
-#if OPENSSL_VERSION_NUMBER >= 0x010101000L \
-		&& OPENSSL_VERSION_NUMBER < 0x030000000L
-	if(ksr_tls_init_mode & TLS_MODE_FORK_PREPARE) {
-		if(rank == PROC_POSTCHILDINIT) {
-			/*
-			 * this is called after forking of all child processes
-			 */
-			OPENSSL_fork_parent();
-			return 0;
-		}
-		if(!_ksr_is_main) {
-			OPENSSL_fork_child();
-		}
-	}
-#endif
 
 #ifndef OPENSSL_NO_ENGINE
 	/*
@@ -507,6 +497,11 @@ static void mod_destroy(void)
 	 *   => nothing to do here */
 }
 
+/*
+ * GH #3695: OpenSSL 1.1.1: it is no longer necessary to replace RAND
+ * - early init in rank 0 causes workers to inherit public_drbg/private_drbg
+ *   which are not thread-safe
+ */
 
 int ksr_rand_engine_param(modparam_t type, void *val)
 {
@@ -674,17 +669,19 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 	if(!shm_initialized() && init_shm() < 0)
 		return -1;
 
+	if(ksr_tls_lock_init() < 0) {
+		return -1;
+	}
+
 	if(tls_pre_init() < 0)
 		return -1;
 
 	register_tls_hooks(&tls_h);
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L \
-		&& OPENSSL_VERSION_NUMBER < 0x030000000L
-	LM_DBG("setting cryptorand random engine\n");
-	RAND_set_rand_method(RAND_ksr_cryptorand_method());
-#endif
-
+        /*
+         * GH #3695: OpenSSL 1.1.1 historical note: it is no longer
+         * needed to replace RAND with cryptorand
+         */
 	sr_kemi_modules_add(sr_kemi_tls_exports);
 
 	return 0;

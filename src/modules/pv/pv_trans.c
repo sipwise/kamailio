@@ -1406,7 +1406,7 @@ int tr_eval_string(
 		case TR_S_FMTLINES:
 		case TR_S_FMTLINET:
 			if(tp == NULL || tp->next == NULL) {
-				LM_ERR("substr invalid parameters (cfg line: %d)\n",
+				LM_ERR("fmtline invalid parameters (cfg line: %d)\n",
 						get_cfg_crt_line());
 				return -1;
 			}
@@ -1439,7 +1439,7 @@ int tr_eval_string(
 						get_cfg_crt_line());
 				return -1;
 			}
-			if(n == 0 || m >= val->rs.len) {
+			if(m >= val->rs.len) {
 				if(val->rs.len > TR_BUFFER_SIZE - 2) {
 					LM_ERR("value too large: %d\n", val->rs.len);
 					return -1;
@@ -1595,7 +1595,6 @@ int tr_eval_uri(
 			sv.len++;
 			memcpy(_tr_buffer, sv.s, sv.len);
 			sv.s = _tr_buffer;
-			sv.len++;
 			if((_tr_parsed_uri.user.len > 0) && (subtype != TR_URI_DURI)) {
 				memcpy(sv.s + sv.len, _tr_parsed_uri.user.s,
 						_tr_parsed_uri.user.len);
