@@ -1,3 +1,13 @@
+ngcp-kamailio (5.6.4-1+0~mr10.5.8.0) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [0886819] MT#58982 topos: fix early-dialog b-side UPDATE requests routing
+
+  [ Victor Seva ]
+  * [7a76997] MT#58722 don't execute timers on shutdown phase
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 06 May 2024 14:03:43 +0200
+
 ngcp-kamailio (5.6.4-1+0~mr10.5.7.0) unstable; urgency=medium
 
   [ Victor Seva ]
