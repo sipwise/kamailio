@@ -1531,8 +1531,8 @@ static int ki_set_max_credit(sip_msg_t *msg, str *sclient, str *scredit,
 	}
 
 	if(try_get_call_entry(&msg->callid->body, &call, &hts) == 0) {
-		LM_ERR("call-id[%.*s] already present\n",
-		msg->callid->body.len, msg->callid->body.s);
+		LM_ERR("call-id[%.*s] already present\n", msg->callid->body.len,
+				msg->callid->body.s);
 		return -4;
 	}
 
@@ -1745,8 +1745,8 @@ static int ki_set_max_channels(sip_msg_t *msg, str *sclient, int max_chan)
 	}
 
 	if(try_get_call_entry(&msg->callid->body, &call, &hts) == 0) {
-		LM_ERR("call-id[%.*s] already present\n",
-		msg->callid->body.len, msg->callid->body.s);
+		LM_ERR("call-id[%.*s] already present\n", msg->callid->body.len,
+				msg->callid->body.s);
 		return -4;
 	}
 
@@ -1839,8 +1839,8 @@ static int ki_set_max_time(sip_msg_t *msg, str *sclient, int max_secs)
 	}
 
 	if(try_get_call_entry(&msg->callid->body, &call, &hts) == 0) {
-		LM_ERR("call-id[%.*s] already present\n",
-		msg->callid->body.len, msg->callid->body.s);
+		LM_ERR("call-id[%.*s] already present\n", msg->callid->body.len,
+				msg->callid->body.s);
 		return -4;
 	}
 
@@ -2028,7 +2028,7 @@ static int __pv_get_calls(
 		case CNX_PV_DROPPED:
 			return pv_get_uintval(msg, param, res, _data.stats->dropped);
 		default:
-			LM_ERR("Unknown PV type %d\n", param->pvn.u.isname.name.n);
+			LM_ERR("Unknown PV type %ld\n", param->pvn.u.isname.name.n);
 			break;
 	}
 

@@ -44,7 +44,7 @@ int _cfgt_get_array_avp_vals(struct sip_msg *msg, pv_param_t *param,
 		return -1;
 	}
 	if(name_type == 0 && avp_name.n == 0) {
-		LM_DBG("skip name_type:%d avp_name:%d\n", name_type, avp_name.n);
+		LM_DBG("skip name_type:%d avp_name:%ld\n", name_type, avp_name.n);
 		return 0;
 	}
 	*jobj = srjson_CreateArray(jdoc);
@@ -121,8 +121,8 @@ void _cfgt_get_obj_xavp_val(sr_xavp_t *avp, srjson_doc_t *jdoc, srjson_t **jobj)
 				return;
 			}
 			break;
-		case SR_XTYPE_INT:
-			*jobj = srjson_CreateNumber(jdoc, avp->val.v.i);
+		case SR_XTYPE_LONG:
+			*jobj = srjson_CreateNumber(jdoc, avp->val.v.l);
 			if(*jobj == NULL) {
 				LM_ERR("cannot create json object\n");
 				return;
@@ -138,10 +138,6 @@ void _cfgt_get_obj_xavp_val(sr_xavp_t *avp, srjson_doc_t *jdoc, srjson_t **jobj)
 		case SR_XTYPE_TIME:
 			result = snprintf(
 					_pv_xavp_buf, 128, "%lu", (long unsigned)avp->val.v.t);
-			break;
-		case SR_XTYPE_LONG:
-			result = snprintf(
-					_pv_xavp_buf, 128, "%ld", (long unsigned)avp->val.v.l);
 			break;
 		case SR_XTYPE_LLONG:
 			result = snprintf(_pv_xavp_buf, 128, "%lld", avp->val.v.ll);
@@ -300,12 +296,12 @@ int cfgt_get_json(struct sip_msg *msg, unsigned int mask, srjson_doc_t *jdoc,
 					   || el->spec.type == PVT_XAVP
 					   || el->spec.type == PVT_OTHER)
 					|| !((el->spec.type == PVT_AVP && mask & CFGT_DP_AVP)
-							   || (el->spec.type == PVT_XAVP
-										  && mask & CFGT_DP_XAVP)
-							   || (el->spec.type == PVT_SCRIPTVAR
-										  && mask & CFGT_DP_SCRIPTVAR)
-							   || (el->spec.type == PVT_OTHER
-										  && mask & CFGT_DP_OTHER))
+							|| (el->spec.type == PVT_XAVP
+									&& mask & CFGT_DP_XAVP)
+							|| (el->spec.type == PVT_SCRIPTVAR
+									&& mask & CFGT_DP_SCRIPTVAR)
+							|| (el->spec.type == PVT_OTHER
+									&& mask & CFGT_DP_OTHER))
 					|| (el->spec.trans != NULL)) {
 				el = el->next;
 				continue;
@@ -316,7 +312,7 @@ int cfgt_get_json(struct sip_msg *msg, unsigned int mask, srjson_doc_t *jdoc,
 			if(el->spec.type == PVT_AVP) {
 				if(el->spec.pvp.pvi.type == PV_IDX_ALL
 						|| (el->spec.pvp.pvi.type == PV_IDX_INT
-								   && el->spec.pvp.pvi.u.ival != 0)) {
+								&& el->spec.pvp.pvi.u.ival != 0)) {
 					el = el->next;
 					continue;
 				} else {
@@ -328,8 +324,9 @@ int cfgt_get_json(struct sip_msg *msg, unsigned int mask, srjson_doc_t *jdoc,
 						el = el->next;
 						continue;
 					}
-					if(jobj == NULL || (srjson_GetArraySize(jdoc, jobj) == 0
-							&& !(mask & CFGT_DP_NULL))) {
+					if(jobj == NULL
+							|| (srjson_GetArraySize(jdoc, jobj) == 0
+									&& !(mask & CFGT_DP_NULL))) {
 						el = el->next;
 						continue;
 					}
@@ -362,7 +359,8 @@ int cfgt_get_json(struct sip_msg *msg, unsigned int mask, srjson_doc_t *jdoc,
 					continue;
 				}
 				if(strchr(el->pvname.s + 1, 36) != NULL) {
-					LM_DBG("skip dynamic format [%.*s]\n", el->pvname.len, el->pvname.s);
+					LM_DBG("skip dynamic format [%.*s]\n", el->pvname.len,
+							el->pvname.s);
 					el = el->next;
 					continue;
 				}

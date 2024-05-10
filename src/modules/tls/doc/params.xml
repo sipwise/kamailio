@@ -21,6 +21,18 @@
 	<itemizedlist>
 			<listitem>
 				<para>
+				<emphasis>TLSv1.3+</emphasis> - TLSv1.3 or newer (TLSv1.3, ...)
+				connections are accepted (available starting with openssl/libssl v1.1.1)
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				<emphasis>TLSv1.3</emphasis> - only TLSv1.3 connections are accepted
+				(available starting with openssl/libssl v1.1.1)
+				</para>
+			</listitem>
+			<listitem>
+				<para>
 				<emphasis>TLSv1.2+</emphasis> - TLSv1.2 or newer (TLSv1.3, ...)
 				connections are accepted (available starting with openssl/libssl v1.1.1)
 				</para>
@@ -95,7 +107,7 @@
 		compatibility with older clients SSLv23 is the option, but again, be aware
 		of security concerns, SSLv2/3 being considered very insecure by 2014.
 		For current information about what's considered secure, please consult,
-		IETF BCP 195, currently RFC 7525  - "Recommendations for Secure Use of 
+		IETF BCP 195, currently RFC 7525  - "Recommendations for Secure Use of
 		Transport Layer Security (TLS) and Datagram Transport Layer Security (DTLS)"
 	</para>
 	<example>
@@ -188,7 +200,7 @@ modparam("tls", "private_key", "/usr/local/etc/kamailio/my_pkey.pem")
 		An easy way to create the CA list is to append each trusted trusted CA
 		certificate in the PEM format to one file, e.g.:
 	    <programlisting>
-for f in trusted_cas/*.pem ; do cat "$f" &gt;&gt; ca_list.pem ; done 
+for f in trusted_cas/*.pem ; do cat "$f" &gt;&gt; ca_list.pem ; done
 	    </programlisting>
 	</para>
 	<para>
@@ -307,7 +319,7 @@ modparam("tls", "crl", "/usr/local/etc/kamailio/crl.pem")
 <section id="tls.p.verify_certificate">
 	<title><varname>verify_certificate</varname> (boolean)</title>
 	<para>
-		If enabled it will force certificate verification when connecting to 
+		If enabled it will force certificate verification when connecting to
 		other SIP servers..
 		For more information see the
 		<ulink url="https://www.openssl.org/docs/manmaster/man1/verify.html">verify(1)</ulink>
@@ -455,10 +467,10 @@ modparam("tls", "connection_timeout", 60)
 	<title><varname>tls_disable_compression</varname> (boolean)</title>
 	<para>
 		If set compression over TLS will be disabled.
-		Note that compression uses a lot of memory (about 10x more then with
+		Note that compression uses a lot of memory (about 10x more than with
 		the compression disabled), so if you want to minimize
-		memory usage is a good idea to disable it. TLS compression also 
-		expose you for the 
+		memory usage is a good idea to disable it. TLS compression also
+		expose you for the
  		<ulink url="https://en.wikipedia.org/wiki/CRIME_(security_exploit)">
 		CRIME</ulink> security vulnerability.
 	</para>
@@ -556,9 +568,9 @@ modparam("tls", "ssl_freelist_max_len", 0)
 		allow a successful handshake (try minimum 1024).
 	</para>
 	<para>
-		Lower values would lead to less memory usage, but values lower then
+		Lower values would lead to less memory usage, but values lower than
 		the typical &kamailio; write size would incur a slight performance
-		penalty. Good values are bigger then the  size of the biggest
+		penalty. Good values are bigger than the size of the biggest
 		SIP packet one normally expects to forward. For example in most
 		setups 2048 would be a good value.
 	</para>
@@ -567,7 +579,7 @@ modparam("tls", "ssl_freelist_max_len", 0)
 			Values on the lower side, even if valid (> 512), might not allow
 			for a successful initial handshake. This happens if the
 			certificate does not fit inside one send fragment.
-			Values lower then 1024 should not be used.
+			Values lower than 1024 should not be used.
 			Even with higher values, if the handshake fails,
 			try increasing the value.
 		</para>
@@ -826,7 +838,7 @@ modparam("tls", "tls_debug", 10)
 		new TLS connections will start to fail. The value is expressed in KB.
 	</para>
 	<para>
-		The default value depends on whether the OpenSSL library used handles 
+		The default value depends on whether the OpenSSL library used handles
 		low memory situations in a good way (openssl bug #1491).
 		As of this writing this is not true for any OpenSSL version (including 0.9.8e).
 	</para>
@@ -946,7 +958,7 @@ modparam("tls", "low_mem_threshold2", -1)
 		<listitem>
 			<para>
 				the OpenSSL library used at compile time and the one used at
-				runtime have different Kerberos options 
+				runtime have different Kerberos options
 			</para>
 		</listitem>
 	</itemizedlist>
@@ -1015,6 +1027,39 @@ modparam("tls", "session_id", "my-session-id-context")
 		<programlisting>
 ...
 modparam("tls", "renegotiation", 1)
+...
+	</programlisting>
+	</example>
+	</section>
+
+	<section id="tls.p.init_mode">
+	<title><varname>init_mode</varname> (int)</title>
+	<para>
+		Allow setting flags that control how the module is initialized and works
+		at runtime. Many flags (bits) can be set at the same time (set the
+		parameter to the sum of corresponding values). The flags are refered
+		with 0-indexing.
+	</para>
+	<para>
+		If flag (bit) at index 0 is set (value 1), the memory management operations
+		registered for TLS are wrapped within a pthread mutex lock. It can be useful
+		with newer versions of libssl and libcrypto, which have a more pthread
+		multi-threading oriented design.
+	</para>
+	<para>
+		If flag (bit) at index 1 is set (value 2), the module executes openssl fork
+		prepare API functions (see
+		<ulink url="https://www.openssl.org/docs/man1.1.1/man3/OPENSSL_fork_prepare.html">https://www.openssl.org/docs/man1.1.1/man3/OPENSSL_fork_prepare.html</ulink>). It is done only for openssl version greater or equal
+		with 1.1.1.
+	</para>
+	<para>
+		Default value is 0.
+	</para>
+	<example>
+		<title>Set <varname>init_mode</varname> parameter</title>
+		<programlisting>
+...
+modparam("tls", "init_mode", 1)
 ...
 	</programlisting>
 	</example>
@@ -1164,7 +1209,7 @@ server_name_mode = 1
 	</programlisting>
 	</example>
 	<para>
-		For a more complete example check the <emphasis>tls.cfg</emphasis> distributed 
+		For a more complete example check the <emphasis>tls.cfg</emphasis> distributed
 		with the &kamailio; source (kamailio/modules/tls/tls.cfg).
 	</para>
 	<example>
@@ -1267,7 +1312,7 @@ end
 		the PRNG engine is set to "cryptorand".
 	</para>
 	<para>
-		The following options are avaialble:
+		The following options are available:
 	</para>
 	<itemizedlist>
 		<listitem><para>krand - use internal kam_rand() function</para></listitem>

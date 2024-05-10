@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2018 Daniel-Constantin Mierla (asipto.com)
+/*
+ * Copyright (C) 2009 Sippy Software, Inc., http://www.sippysoft.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -10,34 +10,32 @@
  *
  * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- */
+*/
 
-/**
- * this file is generated - do not edit
- */
+#ifndef _PYTHON_SUPPORT_H
+#define _PYTHON_SUPPORT_H
 
-#ifndef __APP_RUBY_KEMI_EXPORT_H__
-#define __APP_RUBY_KEMI_EXPORT_H__
+#include <Python.h>
+#include <stdarg.h>
 
-#include <ruby.h>
+extern PyObject *_sr_apy3s_format_exc_obj;
 
-#include "../../core/kemi.h"
+void apy3s_handle_exception(const char *, ...);
 
-#define SR_KEMI_RUBY_EXPORT_SIZE	1536
-
-typedef struct sr_kemi_ruby_export {
-	app_ruby_function pfunc;
-	sr_kemi_t *ket;
-} sr_kemi_ruby_export_t;
-
-sr_kemi_t *sr_kemi_ruby_export_get(int idx);
-app_ruby_function sr_kemi_ruby_export_associate(sr_kemi_t *ket);
+PyObject *InitTracebackModule(void);
+#if PY_VERSION_HEX >= 0x03070000
+const char *get_class_name(PyObject *);
+const char *get_instance_class_name(PyObject *);
+#else
+char *get_class_name(PyObject *);
+char *get_instance_class_name(PyObject *);
+#endif
 
 #endif

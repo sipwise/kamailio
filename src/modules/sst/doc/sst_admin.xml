@@ -26,7 +26,7 @@
 		<para>The sst module provides a way to update the
 		dialog expiry timer based on the SIP INVITE/200 OK
 		Session-Expires header value. You can use the sst
-		module in an &kamailio; proxy to allow freeing of local
+		module in a &kamailio; proxy to allow freeing of local
 		resources of dead calls.</para>
 
 		<para>You can also use the sst module to validate the
@@ -41,7 +41,7 @@
 
 	<para>The sst module uses the <quote>dialog module</quote> to be notified of
 	any new or updated dialogs. It will then look for and extract
-	the session-expire: header value (if there is one) and
+	the Session-Expires: header value (if there is one) and
 	override the dialog expire timer value for the current context
 	dialog by setting the avp value.</para>
 
@@ -156,7 +156,7 @@
 		<title><varname>enable_stats</varname> (integer)</title>
 
 		<para>If the statistics support should be enabled or
-		not. Via statistic variables, the module provide
+		not. Via statistic variables, the module provides
 		information about the dialog processing. Set it to zero to
 		disable or to non-zero to enable it.</para>
 
@@ -250,14 +250,14 @@ request_route {
 		<title><varname>reject_to_small</varname> (integer)</title>
 
 		<para>In the initial INVITE if the UAC has requested a
-		Session-Expire: and it's value is smaller than our
+		Session-Expires: and its value is smaller than our
 		local policies Min-SE (see min_se above), then the
 		proxy has the right to reject the call by replying to
 		the message with a <quote>422 Session Timer Too Small</quote> and
 		state our local Min-SE: value. The INVITE is NOT
 		forwarded on through the proxy.</para>
 
-		<para>If this flag is true, the SST module to
+		<para>If this flag is true, the SST module will
 		reject the INVITE with a 422 response. If false, the
 		INVITE is forwarded through the PROXY without any
 		modifications.</para>
@@ -311,7 +311,7 @@ route {
   ...
   if (method=="INVITE") {
     setflag(5); # set the dialog flag
-    setflag(6); # Set the sst flag
+    setflag(6); # set the sst flag
   }
   ...
 }
@@ -404,7 +404,7 @@ route {
 
     <section>
 	<title>Installation and Running</title>
-	<para>Just load the module and remember to set the timeout_avp value.</para>
+	<para>Just load the module and remember to set the timeout_avp and sst_flag values.</para>
 	</section>
 </chapter>
 

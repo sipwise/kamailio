@@ -79,7 +79,7 @@ void _cfgt_remove_report(const str *scen)
 	DIR *folder = NULL;
 	struct dirent *next_file = NULL;
 
-	if(_cfgt_get_filename(0, *scen, &dest, &dir) < 0) {
+	if(_cfgt_get_filename(0, *scen, &dest, &dir) < 0 || dest.s == NULL) {
 		LM_ERR("can't build filename for uuid: %.*s\n", scen->len, scen->s);
 		return;
 	}
@@ -104,7 +104,7 @@ void _cfgt_remove_report(const str *scen)
 				}
 			}
 			snprintf(filepath.s, dest.len + 1, "%s/%s", dest.s,
-				next_file->d_name);
+					next_file->d_name);
 			if(remove(filepath.s) < 0) {
 				LM_ERR("failed removing file: %s\n", strerror(errno));
 			} else {
@@ -124,10 +124,11 @@ void _cfgt_remove_report(const str *scen)
 	}
 
 end:
-	if(filepath.s)
+	if(filepath.s) {
 		pkg_free(filepath.s);
-	if(dest.s)
-		pkg_free(dest.s);
+	}
+
+	pkg_free(dest.s);
 }
 
 int _cfgt_remove_uuid(const str *uuid, int remove_report)
@@ -778,7 +779,7 @@ int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
 			}
 			res = _cfgt_get_uuid_id(_cfgt_node);
 			LM_INFO("*** node uuid:[%.*s] id:[%d] created ***\n",
-				STR_FMT(&_cfgt_node->uuid), _cfgt_node->msgid);
+					STR_FMT(&_cfgt_node->uuid), _cfgt_node->msgid);
 			return res;
 		} else {
 			LM_DBG("_cfgt_node->uuid:[%.*s]\n", _cfgt_node->uuid.len,

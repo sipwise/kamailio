@@ -132,7 +132,7 @@ Chapter 1. Admin Guide
        %{[$avp_alias[index]}
 
    The full list of available pseudo-variables in Kamailio is available
-   at: https://www.kamailio.org/wiki/
+   at: https://www.kamailio.org/wikidocs/
 
 3. Dependencies
 
@@ -266,7 +266,7 @@ kamcmd cfg.set_now_int xlog methods_filter 15
 
    Example 1.8. Set methods_filter parameter
 ...
-modparam("xlog", "long_format", 1)
+modparam("xlog", "methods_filter", 15)
 ...
 
 5. Functions

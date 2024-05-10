@@ -42,7 +42,9 @@ static int check_version(void)
 		return -1;
 	}
 
-	if (db_check_table_version(&db_funcs, db_handle, &secf_table_name, mod_version) < 0) {
+	if(db_check_table_version(
+			   &db_funcs, db_handle, &secf_table_name, mod_version)
+			< 0) {
 		DB_TABLE_VERSION_ERROR(secf_table_name);
 		db_funcs.close(db_handle);
 		return -1;
@@ -113,11 +115,11 @@ int secf_append_rule(int action, int type, str *value)
 	}
 
 	if(action == 1) {
-		ini = &secf_data->wl;
-		last = &secf_data->wl_last;
+		ini = &(*secf_data)->wl;
+		last = &(*secf_data)->wl_last;
 	} else {
-		ini = &secf_data->bl;
-		last = &secf_data->bl_last;
+		ini = &(*secf_data)->bl;
+		last = &(*secf_data)->bl_last;
 	}
 
 	switch(type) {
@@ -196,6 +198,14 @@ int secf_load_db(void)
 		return -1;
 	}
 
+	/* Choose new hash table and free its old contents */
+	if(*secf_data == secf_data_1) {
+		*secf_data = secf_data_2;
+	} else {
+		*secf_data = secf_data_1;
+	}
+	secf_free_data(*secf_data);
+
 	/* Prepare the data for the query */
 	db_cols[0] = &secf_action_col;
 	db_cols[1] = &secf_type_col;
@@ -221,7 +231,7 @@ int secf_load_db(void)
 		goto clean;
 	}
 
-	lock_get(&secf_data->lock);
+	lock_get(&(*secf_data)->lock);
 	for(i = 0; i < rows; i++) {
 		action = (int)RES_ROWS(db_res)[i].values[0].val.int_val;
 		type = (int)RES_ROWS(db_res)[i].values[1].val.int_val;
@@ -233,11 +243,11 @@ int secf_load_db(void)
 		if(secf_append_rule(action, type, &str_data) < 0) {
 			LM_ERR("Can't append_rule with action:%d type:%d\n", action, type);
 			res = -1;
-			lock_release(&secf_data->lock);
+			lock_release(&(*secf_data)->lock);
 			goto clean;
 		}
 	}
-	lock_release(&secf_data->lock);
+	lock_release(&(*secf_data)->lock);
 
 clean:
 	if(db_res) {
