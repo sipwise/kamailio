@@ -27,14 +27,12 @@
 #ifndef _TLS_INIT_H
 #define _TLS_INIT_H
 
-#include <wolfssl/options.h>
-#include <wolfssl/ssl.h>
 #include "../../core/ip_addr.h"
 #include "tls_domain.h"
 
 typedef struct sr_tls_methods_s
 {
-	const SSL_METHOD *TLSMethod;
+	const WOLFSSL_METHOD *TLSMethod;
 	int TLSMethodMin;
 	int TLSMethodMax;
 } sr_tls_methods_t;

@@ -26,11 +26,9 @@
 #ifndef _TLS_UTIL_H
 #define _TLS_UTIL_H
 
-#include <wolfssl/options.h>
-#include <wolfssl/ssl.h>
-
 #include "../../core/dprint.h"
 #include "../../core/str.h"
+#include "tls_cfg.h"
 #include "tls_domain.h"
 
 static inline int tls_err_ret(
@@ -47,8 +45,8 @@ static inline int tls_err_ret(
 		}
 		while((err = ERR_get_error())) {
 			ret = 1;
-			ERR("%s%s (sni: %s)\n", s ? s : "", wolfSSL_ERR_error_string(err, 0),
-					(sn) ? sn : "unknown");
+			ERR("%s%s (sni: %s)\n", s ? s : "",
+					wolfSSL_ERR_error_string(err, 0), (sn) ? sn : "unknown");
 		}
 	}
 	return ret;
@@ -82,5 +80,7 @@ int shm_asciiz_dup(char **dest, char *val);
  * Delete old TLS configuration that is not needed anymore
  */
 void collect_garbage(void);
+
+void tls_dump_verification_failure(long verification_result);
 
 #endif /* _TLS_UTIL_H */
