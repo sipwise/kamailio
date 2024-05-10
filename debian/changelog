@@ -1,4 +1,4 @@
-ngcp-kamailio (5.7.4-1+0~mr11.5.2.0) unstable; urgency=medium
+ngcp-kamailio (5.7.5-1+0~mr11.5.2.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
   * MT#58314 Use gw flags as id
@@ -17,8 +17,11 @@ ngcp-kamailio (5.7.4-1+0~mr11.5.2.0) unstable; urgency=medium
   * MT#58875 tls fixes from upstream 5.7 branch, take two
   * New upstream version 5.7.4
   * MT#59178 remove already applied patches
+  * MT#59890 backport patches from 5.7
+  * New upstream version 5.7.5
+  * MT#60077 remove already applied patches from 5.7 branch
 
- -- Victor Seva <vseva@debian.org>  Wed, 24 Apr 2024 10:11:53 +0200
+ -- Victor Seva <vseva@debian.org>  Fri, 10 May 2024 08:52:58 +0200
 
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.0) unstable; urgency=medium
 
