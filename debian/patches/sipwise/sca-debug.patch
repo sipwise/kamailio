@@ -9,7 +9,7 @@ Subject: sca-debug
  3 files changed, 59 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/sca/sca_appearance.c b/src/modules/sca/sca_appearance.c
-index 78ee5d8..dca2421 100644
+index c467137..c141a6e 100644
 --- a/src/modules/sca/sca_appearance.c
 +++ b/src/modules/sca/sca_appearance.c
 @@ -911,8 +911,10 @@ int sca_appearance_update_index(sca_mod *scam, str *aor, int idx, int state,
@@ -47,7 +47,7 @@ index 78ee5d8..dca2421 100644
  		}
  	}
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 419df8c..2eb035e 100644
+index abca7d4..6b02041 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -975,6 +975,8 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,

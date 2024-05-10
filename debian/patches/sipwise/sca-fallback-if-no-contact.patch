@@ -7,7 +7,7 @@ Subject: sca-fallback-if-no-contact
  1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 0617cea..d83fe48 100644
+index 414536d..2ded7fc 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -1978,9 +1978,6 @@ int sca_call_info_update(

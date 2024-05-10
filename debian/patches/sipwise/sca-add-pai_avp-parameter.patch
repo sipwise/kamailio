@@ -12,7 +12,7 @@ values from Headers. If no value, skip header creation.
  4 files changed, 44 insertions(+), 13 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index c0042b9..bdcc2ab 100644
+index 2c0dc32..dc1e806 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -70,6 +70,8 @@ unsigned short from_uri_avp_type;
@@ -97,7 +97,7 @@ index 3d08921..44b354e 100644
  
  #endif // SCA_H
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index d01ab86..1517a35 100644
+index e4c9b11..43153ee 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -1138,20 +1138,32 @@ static int sca_call_info_insert_asserted_identity(

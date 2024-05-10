@@ -11,10 +11,10 @@ Subject: add_tcap_module
  create mode 100644 src/modules/tcap/tcap_mod.c
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 4837390..6b9e3b5 100644
+index c419f7d..b85c1c5 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -214,6 +214,9 @@ mod_list_erlang=erlang
+@@ -217,6 +217,9 @@ mod_list_erlang=erlang
  # - modules depending on systemd library
  mod_list_systemd=log_systemd systemdops
  
@@ -24,7 +24,7 @@ index 4837390..6b9e3b5 100644
  # - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
  mod_list_nsq=nsq
  
-@@ -344,6 +347,9 @@ module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all
+@@ -348,6 +351,9 @@ module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all
  # pkg lcrrate module
  module_group_klcrrate=$(mod_list_lcrrate)
  

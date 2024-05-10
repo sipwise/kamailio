@@ -9,7 +9,7 @@ Subject: cfgt: skip_unknown
  3 files changed, 36 insertions(+)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 489fdfe..4eda949 100644
+index 2509b3e..ed2204b 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -43,6 +43,7 @@ cfgt_hash_p _cfgt_uuid = NULL;
@@ -20,7 +20,7 @@ index 489fdfe..4eda949 100644
  int not_sip = 0;
  
  int _cfgt_get_filename(int msgid, str uuid, str *dest, int *dir);
-@@ -384,6 +385,10 @@ void cfgt_save_node(cfgt_node_p node)
+@@ -385,6 +386,10 @@ void cfgt_save_node(cfgt_node_p node)
  	str dest = STR_NULL;
  	int dir = 0;
  	struct stat sb;
@@ -31,7 +31,7 @@ index 489fdfe..4eda949 100644
  	if(_cfgt_get_filename(node->msgid, node->uuid, &dest, &dir) < 0) {
  		LM_ERR("can't build filename\n");
  		return;
-@@ -657,6 +662,9 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
+@@ -658,6 +663,9 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
  		LM_ERR("node empty\n");
  		return -1;
  	}
@@ -41,7 +41,7 @@ index 489fdfe..4eda949 100644
  	if(a->rname == NULL) {
  		LM_DBG("no routename. type:%d\n", a->type);
  		return 0;
-@@ -805,6 +813,9 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
+@@ -806,6 +814,9 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
  	str flowname = STR_NULL;
  
  	if(_cfgt_node) {
@@ -51,7 +51,7 @@ index 489fdfe..4eda949 100644
  		LM_DBG("dump last flow\n");
  		if(_cfgt_node->route == NULL
  				&& strncmp(_cfgt_node->uuid.s, "unknown", 7) == 0)
-@@ -843,6 +854,9 @@ int cfgt_msgout(sr_event_param_t *evp)
+@@ -844,6 +855,9 @@ int cfgt_msgout(sr_event_param_t *evp)
  	}
  
  	if(_cfgt_node) {
@@ -62,7 +62,7 @@ index 489fdfe..4eda949 100644
  		if(jobj == NULL) {
  			LM_ERR("cannot create json object\n");
 diff --git a/src/modules/cfgt/cfgt_mod.c b/src/modules/cfgt/cfgt_mod.c
-index 8806d0c..10b0889 100644
+index 728d228..7dec36a 100644
 --- a/src/modules/cfgt/cfgt_mod.c
 +++ b/src/modules/cfgt/cfgt_mod.c
 @@ -42,6 +42,7 @@ unsigned int init_flag = 0;
@@ -82,7 +82,7 @@ index 8806d0c..10b0889 100644
  };
  
 diff --git a/src/modules/cfgt/doc/cfgt_admin.xml b/src/modules/cfgt/doc/cfgt_admin.xml
-index 2a2b158..84d3df6 100644
+index 920b1bf..b3af2de 100644
 --- a/src/modules/cfgt/doc/cfgt_admin.xml
 +++ b/src/modules/cfgt/doc/cfgt_admin.xml
 @@ -143,6 +143,26 @@ modparam("cfgt", "mask", 12)

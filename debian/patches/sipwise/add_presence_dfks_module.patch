@@ -11,8 +11,8 @@ Subject: add_presence_dfks_module
  src/modules/presence_dfks/presence_dfks.c | 138 ++++++++++++++
  src/modules/presence_dfks/presence_dfks.h |  18 ++
  src/modules/pua/add_events.c              |  13 ++
- src/modules/pua/add_events.h              |   1 +
- src/modules/pua/hash.h                    |   7 +
+ src/modules/pua/add_events.h              |   2 +
+ src/modules/pua/hash.h                    |   6 +
  10 files changed, 543 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/presence_dfks/Makefile
  create mode 100644 src/modules/presence_dfks/README.md
@@ -22,10 +22,10 @@ Subject: add_presence_dfks_module
  create mode 100644 src/modules/presence_dfks/presence_dfks.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 6b9e3b5..b357a3f 100644
+index b85c1c5..f61bcec 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -118,7 +118,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
+@@ -121,7 +121,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_xml \
  					   pua pua_bla pua_dialoginfo pua_reginfo \
  					   pua_rpc pua_usrloc pua_xmpp \
@@ -592,10 +592,10 @@ index 0000000..d58301b
 +
 +#endif
 diff --git a/src/modules/pua/add_events.c b/src/modules/pua/add_events.c
-index 5c0e73b..582fc8c 100644
+index e2fc78b..8e07a84 100644
 --- a/src/modules/pua/add_events.c
 +++ b/src/modules/pua/add_events.c
-@@ -103,6 +103,13 @@ int pua_add_events(void)
+@@ -107,6 +107,13 @@ int pua_add_events(void)
  		return -1;
  	}
  
@@ -607,58 +607,58 @@ index 5c0e73b..582fc8c 100644
 +	}
 +
  	return 0;
- 
  }
-@@ -399,3 +406,9 @@ int dlg_process_body(publ_info_t* publ, str** fin_body, int ver, str** tuple)
+ 
+@@ -380,3 +387,9 @@ int dlg_process_body(publ_info_t *publ, str **fin_body, int ver, str **tuple)
+ 	*fin_body = publ->body;
  	return 0;
  }
- 
-+int dfks_process_body(publ_info_t* publ, str** fin_body, int ver, str** tuple)
++
++int dfks_process_body(publ_info_t *publ, str **fin_body, int ver, str **tuple)
 +{
-+	*fin_body= publ->body;
++	*fin_body = publ->body;
 +	return 0;
 +}
-+
 diff --git a/src/modules/pua/add_events.h b/src/modules/pua/add_events.h
-index 5dbf5e0..1f0d0f4 100644
+index 25a17ac..d0cfb63 100644
 --- a/src/modules/pua/add_events.h
 +++ b/src/modules/pua/add_events.h
-@@ -37,5 +37,6 @@ int bla_process_body (struct publ_info* publ, str** fin_body, int ver, str** tup
- int mwi_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
- int dlg_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
- int reginfo_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
-+int dfks_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
+@@ -42,5 +42,7 @@ int dlg_process_body(
+ 		struct publ_info *publ, str **fin_body, int ver, str **tuple);
+ int reginfo_process_body(
+ 		struct publ_info *publ, str **fin_body, int ver, str **tuple);
++int dfks_process_body(
++		struct publ_info *publ, str **fin_body, int ver, str **tuple);
  
  #endif
 diff --git a/src/modules/pua/hash.h b/src/modules/pua/hash.h
-index 454e4bb..9be6f81 100644
+index 933d246..25799c7 100644
 --- a/src/modules/pua/hash.h
 +++ b/src/modules/pua/hash.h
 @@ -41,6 +41,7 @@
- #define DIALOG_EVENT        1<<5
- #define REGINFO_EVENT       1<<6
- #define XCAPDIFF_EVENT      1<<7
-+#define DFKS_EVENT          1<<8
+ #define DIALOG_EVENT 1 << 5
+ #define REGINFO_EVENT 1 << 6
+ #define XCAPDIFF_EVENT 1 << 7
++#define DFKS_EVENT 1<<8
  
- #define UL_PUBLISH          1<<0
- #define BLA_PUBLISH         1<<1
+ #define UL_PUBLISH 1 << 0
+ #define BLA_PUBLISH 1 << 1
 @@ -58,6 +59,8 @@
- #define REGINFO_SUBSCRIBE   1<<13
- #define XCAPDIFF_PUBLISH    1<<14
- #define XCAPDIFF_SUBSCRIBE  1<<15
-+#define DFKS_PUBLISH        1<<16
-+#define DFKS_SUBSCRIBE      1<<17
+ #define REGINFO_SUBSCRIBE 1 << 13
+ #define XCAPDIFF_PUBLISH 1 << 14
+ #define XCAPDIFF_SUBSCRIBE 1 << 15
++#define DFKS_PUBLISH 1<<16
++#define DFKS_SUBSCRIBE 1<<17
  
- #define NO_UPDATEDB_FLAG    1<<0
- #define UPDATEDB_FLAG       1<<1
-@@ -172,6 +175,10 @@ static inline int get_event_flag(str* event)
-         case 15:
-             if (strncmp(event->s, "message-summary", 15) == 0)
-                 return MSGSUM_EVENT;
-+            break;
-+        case 16:
-+            if (strncmp(event->s, "as-feature-event", 16) == 0)
-+                return DFKS_EVENT;
-     }
+ #define NO_UPDATEDB_FLAG 1 << 0
+ #define UPDATEDB_FLAG 1 << 1
+@@ -173,6 +176,9 @@ static inline int get_event_flag(str *event)
+ 		case 15:
+ 			if(strncmp(event->s, "message-summary", 15) == 0)
+ 				return MSGSUM_EVENT;
++		case 16:
++			if(strncmp(event->s, "as-feature-event", 16) == 0)
++				return DFKS_EVENT;
+ 	}
  
-     LM_ERR("Unknown event string\n");
+ 	LM_ERR("Unknown event string\n");

@@ -3,21 +3,20 @@ Date: Thu, 26 Mar 2020 10:06:46 +0100
 Subject: pv_trans_eval_uri
 
 ---
- src/modules/pv/pv_trans.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ src/modules/pv/pv_trans.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/pv/pv_trans.c b/src/modules/pv/pv_trans.c
-index a2b546d..3264c7d 100644
+index e4754e7..07a3957 100644
 --- a/src/modules/pv/pv_trans.c
 +++ b/src/modules/pv/pv_trans.c
-@@ -1594,8 +1594,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
+@@ -1542,7 +1542,8 @@ int tr_eval_uri(
+ 		}
  		/* parse uri -- params only when requested */
- 		if(parse_uri(_tr_uri.s, _tr_uri.len - dlen, &_tr_parsed_uri)!=0)
- 		{
--			LM_ERR("invalid uri [%.*s]\n", val->rs.len,
--					val->rs.s);
-+			LM_DBG("invalid uri [%.*s] (%s:%d)\n", val->rs.len,
-+					val->rs.s, ZSW(get_cfg_crt_file_name()), get_cfg_crt_line());
- 			if(_tr_uri_params != NULL)
- 			{
+ 		if(parse_uri(_tr_uri.s, _tr_uri.len - dlen, &_tr_parsed_uri) != 0) {
+-			LM_ERR("invalid uri [%.*s]\n", val->rs.len, val->rs.s);
++			LM_ERR("invalid uri [%.*s] (%s:%d)\n", val->rs.len, val->rs.s,
++					ZSW(get_cfg_crt_file_name()), get_cfg_crt_line());
+ 			if(_tr_uri_params != NULL) {
  				free_params(_tr_uri_params);
+ 				_tr_uri_params = 0;

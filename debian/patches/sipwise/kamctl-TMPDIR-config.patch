@@ -13,11 +13,11 @@ Subject: kamctl: TMPDIR config
  5 files changed, 23 insertions(+), 13 deletions(-)
 
 diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
-index b4b8617..ee1b9f3 100755
+index 7eea9be..1fff779 100755
 --- a/utils/kamctl/kamctl
 +++ b/utils/kamctl/kamctl
-@@ -73,6 +73,10 @@ if [ -z "$MYLIBDIR" ] ; then
- 	fi
+@@ -77,6 +77,10 @@ if [ -z "$STARTUP_CONFIG_FILE" ]; then
+ 	STARTUP_CONFIG_FILE="kamailio.cfg"
  fi
  
 +if [ -z "$TMPDIR" ]; then
@@ -27,7 +27,7 @@ index b4b8617..ee1b9f3 100755
  ##### ------------------------------------------------ #####
  ### load base functions
  #
-@@ -2936,7 +2940,7 @@ kamailio_trap() {
+@@ -2940,7 +2944,7 @@ kamailio_trap() {
  		exit
  	fi
  	DATE=`/bin/date +%Y%m%d_%H%M%S`
@@ -36,7 +36,7 @@ index b4b8617..ee1b9f3 100755
  	minfo "Trap file: $LOG_FILE"
  	ctl_cmd_run core.psx > $LOG_FILE
  	echo -n "Trapping Kamailio with gdb: "
-@@ -2963,7 +2967,7 @@ kamailio_pstrap() {
+@@ -2967,7 +2971,7 @@ kamailio_pstrap() {
  		exit
  	fi
  	DATE=`/bin/date +%Y%m%d_%H%M%S`
@@ -46,7 +46,7 @@ index b4b8617..ee1b9f3 100755
  	ps axw | grep kamailio | grep -v grep | grep -v kamctl | sort > $LOG_FILE
  	echo "" >> $LOG_FILE
 diff --git a/utils/kamctl/kamctl.rpcfifo b/utils/kamctl/kamctl.rpcfifo
-index c8e5329..a538a3c 100644
+index f7408b5..478864a 100644
 --- a/utils/kamctl/kamctl.rpcfifo
 +++ b/utils/kamctl/kamctl.rpcfifo
 @@ -30,6 +30,10 @@ if [ -z "$RPCFIFOPATH" ]; then
@@ -79,7 +79,7 @@ index c8e5329..a538a3c 100644
  	fi
  
  	PARAMEVAL="no"
-@@ -183,7 +188,7 @@ CTLCMDPRINT=rpc_cmd_print
+@@ -189,7 +194,7 @@ CTLCMDPRINT=rpc_cmd_print
  
  rpc_kamailio_monitor() {
  	name=kamailio_receiver_$$
@@ -88,7 +88,7 @@ index c8e5329..a538a3c 100644
  	# delete existing fifo file with same name
  	if test -p $path; then
  		rm -f $path
-@@ -199,7 +204,8 @@ rpc_kamailio_monitor() {
+@@ -205,7 +210,8 @@ rpc_kamailio_monitor() {
  			merr "monitor - error opening read fifo $path"
  			exit 1
  		fi
@@ -99,7 +99,7 @@ index c8e5329..a538a3c 100644
  	trap "rm $path;  clear; echo monitor ^C-ed; exit 1" 2
  	attempt=0
 diff --git a/utils/kamctl/kamdbctl b/utils/kamctl/kamdbctl
-index 60c20f2..50cd70c 100755
+index 5a89a95..19a50c5 100755
 --- a/utils/kamctl/kamdbctl
 +++ b/utils/kamctl/kamdbctl
 @@ -303,7 +303,7 @@ case $1 in
