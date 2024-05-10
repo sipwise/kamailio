@@ -16,7 +16,7 @@ Subject: sca-line-seize
  10 files changed, 410 insertions(+), 201 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index 07dac39..c2347bb 100644
+index c856a2a..0298610 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -64,6 +64,12 @@ db_func_t dbf;		 // db api
@@ -211,7 +211,7 @@ index bd94e14..6ce3112 100644
  enum
  {
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index c443f23..0617cea 100644
+index 838feca..414536d 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -842,44 +842,46 @@ static int sca_call_info_is_line_seize_reinvite(sip_msg_t *msg,

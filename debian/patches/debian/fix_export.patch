@@ -7,7 +7,7 @@ Subject: fix_export
  1 file changed, 2 insertions(+)
 
 diff --git a/src/Makefile b/src/Makefile
-index f2fa93c..b111153 100644
+index 7c78f6c..eb1a8c6 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -139,6 +139,8 @@ endif

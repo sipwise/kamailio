@@ -34,22 +34,15 @@ sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
 #
 ## upstream master
-upstream/dialog-dlg_get_var-ci-ft-tt-key-dst_var.patch
-upstream/dialog-dlg_set_var-callid-ft-tt-key-value.patch
-upstream/dialog-reworked-kemi-export-for-dlg_get_var.patch
-upstream/dialog-fix-ki_dlg_get_var-introduced-previously.patch
-upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
-upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
-sipwise/dialog-dlg_get_var-changes-in-API.patch
-upstream/presence-No-autocommit-rollback-if-no-active-watcher.patch
+sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
+upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
+sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 ### relevant for upstream
-sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
-sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
-sipwise/pua_dialoginfo-local_identity_dlg_var.patch
-sipwise/pua_dialoginfo-use-dlg_api.get_dlg_varval.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
+sipwise/cfgt-skip_duplicate_dump.patch
+sipwise/cfgt-route-log.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
@@ -57,14 +50,7 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
-sipwise/dialog-dlg_set_var-support-empty-totag-param.patch
-sipwise/pv_headers-pvh_xavi_get_child-fix-fallback-logic.patch
 ### active development
-upstream/tm-new-inter-module-API-function-t_find.patch
-upstream/pv_headers-use-tm.t_find-API.patch
-upstream/tm-added-t_unset-intermodule-API-function.patch
-upstream/pv_headers-use-t_unset-based-on-vref-instead-of-rese.patch
-sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
@@ -82,4 +68,3 @@ sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
-
