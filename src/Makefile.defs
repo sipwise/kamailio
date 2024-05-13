@@ -105,8 +105,8 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 
 # version number
 VERSION = 5
-PATCHLEVEL = 6
-SUBLEVEL =  4
+PATCHLEVEL = 7
+SUBLEVEL = 5
 EXTRAVERSION = 
 
 # memory manager switcher
@@ -181,7 +181,7 @@ LD_EXTRA_OPTS ?=
 
 
 # enable workaround for libssl 1.1+ to set shared mutex attribute
-LIBSSL_SET_MUTEX_SHARED ?=
+LIBSSL_SET_MUTEX_SHARED ?= 1
 ifneq ($(LIBSSL_SET_MUTEX_SHARED), 1)
 
 ifeq ($(CROSS_COMPILE),)
@@ -1741,7 +1741,11 @@ endif
 	# -andrei
 
 ifeq ($(CC_NAME), clang)
+ifeq ($(OS), darwin)
+	LDFLAGS+=-Wl,-E $(PROFILE)
+else
 	LDFLAGS+=-Wl,-O2 -Wl,-E $(PROFILE)
+endif
 	MOD_LDFLAGS:=-shared $(LDFLAGS)
 	LIB_LDFLAGS:=-shared $(LDFLAGS)
 	LIB_SONAME=-Wl,-soname,
@@ -1883,7 +1887,7 @@ ifeq ($(OS), linux)
 	# check for >= 2.2.0
 	ifeq ($(shell [ $(OSREL_N) -ge 2002000 ] && echo has_sigio), has_sigio)
 		ifeq ($(NO_SIGIO),)
-			C_DEFS+=-DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND
+			C_DEFS+=-DHAVE_SIGIO_RT -DSIGINFO64_WORKAROUND
 		endif
 	endif
 	# check for >= 2.5.70

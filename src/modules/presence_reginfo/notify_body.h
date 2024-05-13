@@ -1,8 +1,9 @@
 /*
- * IMS IPSEC PCSCF module
+ * presence_dialoginfo module
  *
- * Copyright (C) 2018 Tsvetomir Dimitrov
- * Copyright (C) 2019 Aleksandar Yosifov
+ * Copyright (C) 2006 Voice Sistem S.R.L.
+ * Copyright (C) 2008 Klaus Darilion, IPCom
+ * Copyright (C) 2022 Matteo Brancaleoni, VoiSmart
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -22,20 +23,21 @@
  *
  */
 
-#ifndef _SPI_GEN_H_
+/*! \file
+ * \brief Kamailio presence reginfo  ::
+ * \ref notify_body.c
+ * \ingroup presence_reginfo
+ */
 
-#include <stdint.h>
 
-//
-// PORT GEN is based on SPI list, because the logics of the SPI gen and PORT gen are basically the same.
-// It is used as an unique port generator for the TCP client and server ports.
+#ifndef _NBODY_H_
+#define _NBODY_H_
 
-int init_port_gen(uint32_t sport_start_val, uint32_t cport_start_val, uint32_t range);
-int clean_port_lists();
-int destroy_port_gen();
-uint32_t acquire_sport(); // acquare server port
-uint32_t acquire_cport(); // acquare client port
-int release_sport(uint32_t port); // release server port
-int release_cport(uint32_t port); // release client port
+str *reginfo_agg_nbody(str *pres_user, str *pres_domain, str **body_array,
+		int n, int off_index);
 
-#endif /*  _SPI_GEN_H_ */
+str *reginfo_body_setversion(subs_t *subs, str *body);
+
+void free_xml_body(char *body);
+
+#endif

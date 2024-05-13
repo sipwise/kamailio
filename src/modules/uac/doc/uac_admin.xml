@@ -671,7 +671,7 @@ end
 		<title>Functions</title>
 		<section id="uac.f.uac_replace_from">
 			<title>
-				<function moreinfo="none">uac_replace_from(display,uri)</function>
+				<function moreinfo="none">uac_replace_from(display, uri)</function>
 			</title>
 			<para>
 			Replace in FROM header the <emphasis>display</emphasis> name and
@@ -684,8 +684,8 @@ end
 			<para>
 			This function can be used from REQUEST_ROUTE and from BRANCH_ROUTE.
 			</para>
-			<para>NOTE: Previous versions of this function added double quotes automatically to 
-			display variable. That is no longer the case, if you expect that behavior, you will 
+			<para>NOTE: Previous versions of this function added double quotes automatically to
+			display variable. That is no longer the case, if you expect that behavior, you will
 			have to add the quotes by yourself.
 			</para>
 			<para>
@@ -706,7 +706,7 @@ end
 				The other one uses the dialog module to store the original and new URI.
 				If you already use dialog module in your configuration, this is the advisable mode.
 				All you need to do to use this is to call dlg_manage() before calling uac_replace_from().
-				It works by storing the URIs as dialog variables and registering callbacks in dialog 
+				It works by storing the URIs as dialog variables and registering callbacks in dialog
 				module for in dialog requests.
 			</para>
 			<example>
@@ -772,7 +772,7 @@ uac_restore_from();
 		</section>
 		<section id="uac.f.uac_replace_to">
 		<title>
-				<function moreinfo="none">uac_replace_to(display,uri)</function>
+				<function moreinfo="none">uac_replace_to(display, uri)</function>
 			</title>
 			<para>
 			Replace in TO header the <emphasis>display</emphasis> name and
@@ -785,8 +785,8 @@ uac_restore_from();
 			<para>
 			This function can be used from REQUEST_ROUTE and from BRANCH_ROUTE.
 			</para>
-			<para>NOTE: Previous versions of this function added double quotes automatically to 
-			display variable. That is no longer the case, if you expect that behavior, you will 
+			<para>NOTE: Previous versions of this function added double quotes automatically to
+			display variable. That is no longer the case, if you expect that behavior, you will
 			have to add the quotes by yourself.
 			</para>
 			<example>
@@ -838,7 +838,7 @@ uac_replace_to("","");
 				The other one uses the dialog module to store the original and new URI.
 				If you already use dialog module in your configuration, this is the advisable mode.
 				All you need to do to use this is to call dlg_manage() before calling uac_replace_to().
-				It works by storing the URIs as dialog variables and registering callbacks in dialog 
+				It works by storing the URIs as dialog variables and registering callbacks in dialog
 				module for in dialog requests.
 			</para>
 
@@ -886,7 +886,7 @@ uac_restore_to();
 			The parameter can be a static integer or a variable holding an integer value.
 			</para>
 			<para>
-			This function can be used from FAILURE_ROUTE.
+			This function can be used from FAILURE_ROUTE and BRANCH_FAILURE_ROUTE event route.
 			</para>
 			<example>
 				<title><function>uac_auth</function> usage</title>
@@ -938,7 +938,7 @@ failure_route[TRUNKAUTH] {
 			The parameter can be a static integer or a variable holding an integer value.
 			</para>
 			<para>
-			This function can be used from FAILURE_ROUTE.
+			This function can be used from FAILURE_ROUTE and BRANCH_FAILURE_ROUTE event route.
 			</para>
 			<example>
 				<title><function>uac_auth_mode</function> usage</title>
@@ -1508,7 +1508,7 @@ event_route[uac:reply] {
 		</itemizedlist>
 		</para>
 		<para>
-			Use a dot (.) if no value should be set for auth_password, auth_ha1,
+			Use a dot (.) if no value should be set for realm, auth_password, auth_ha1, socket
 			or contact_addr.
 		</para>
 

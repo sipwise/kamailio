@@ -13,8 +13,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
@@ -22,24 +22,17 @@
 #define _DTM_H_
 
 
-
-
 #include "common.h"
-
-
 
 
 typedef int32_t dtm_node_index_t;
 
 
-
-
-struct dtm_node_t {
+struct dtm_node_t
+{
 	dtm_node_index_t child[10];
 	carrier_t carrier;
-} __attribute__ ((packed));
-
-
+} __attribute__((packed));
 
 
 /*
@@ -53,9 +46,8 @@ struct dtm_node_t *dtm_load(char *filename);
  Return the number of matched digits.
  In case no match is found, return -1.
 */
-int dtm_longest_match(struct dtm_node_t *mroot, const char *number, int numberlen, carrier_t *carrier);
-
-
+int dtm_longest_match(struct dtm_node_t *mroot, const char *number,
+		int numberlen, carrier_t *carrier);
 
 
 #endif

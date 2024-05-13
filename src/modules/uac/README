@@ -58,10 +58,10 @@ Ramona-Elena Modroiu
 
         4. Functions
 
-              4.1. uac_replace_from(display,uri)
+              4.1. uac_replace_from(display, uri)
               4.2. uac_replace_from(uri)
               4.3. uac_restore_from()
-              4.4. uac_replace_to(display,uri)
+              4.4. uac_replace_to(display, uri)
               4.5. uac_replace_to(uri)
               4.6. uac_restore_to()
               4.7. uac_auth([mode])
@@ -190,10 +190,10 @@ Chapter 1. Admin Guide
 
    4. Functions
 
-        4.1. uac_replace_from(display,uri)
+        4.1. uac_replace_from(display, uri)
         4.2. uac_replace_from(uri)
         4.3. uac_restore_from()
-        4.4. uac_replace_to(display,uri)
+        4.4. uac_replace_to(display, uri)
         4.5. uac_replace_to(uri)
         4.6. uac_restore_to()
         4.7. uac_auth([mode])
@@ -663,10 +663,10 @@ end
 
 4. Functions
 
-   4.1. uac_replace_from(display,uri)
+   4.1. uac_replace_from(display, uri)
    4.2. uac_replace_from(uri)
    4.3. uac_restore_from()
-   4.4. uac_replace_to(display,uri)
+   4.4. uac_replace_to(display, uri)
    4.5. uac_replace_to(uri)
    4.6. uac_restore_to()
    4.7. uac_auth([mode])
@@ -680,7 +680,7 @@ end
    4.15. uac_reg_disable(attr, val)
    4.16. uac_reg_refresh(luuid)
 
-4.1.  uac_replace_from(display,uri)
+4.1.  uac_replace_from(display, uri)
 
    Replace in FROM header the display name and the URI part.
 
@@ -749,7 +749,7 @@ uac_replace_from("sip:batman@gotham.org");
 uac_restore_from();
 ...
 
-4.4.  uac_replace_to(display,uri)
+4.4.  uac_replace_to(display, uri)
 
    Replace in TO header the display name and the URI part.
 
@@ -828,7 +828,8 @@ uac_restore_to();
    format. The parameter can be a static integer or a variable holding an
    integer value.
 
-   This function can be used from FAILURE_ROUTE.
+   This function can be used from FAILURE_ROUTE and BRANCH_FAILURE_ROUTE
+   event route.
 
    Example 1.31. uac_auth usage
 ...
@@ -872,7 +873,8 @@ failure_route[TRUNKAUTH] {
    format. The parameter can be a static integer or a variable holding an
    integer value.
 
-   This function can be used from FAILURE_ROUTE.
+   This function can be used from FAILURE_ROUTE and BRANCH_FAILURE_ROUTE
+   event route.
 
    Example 1.32. uac_auth_mode usage
 ...
@@ -1059,7 +1061,7 @@ failure_route[REMOTE_AUTH] {
      * $uac_req(key)
 
    Exported pseudo-variables are documented at
-   https://www.kamailio.org/wiki/.
+   https://www.kamailio.org/wikidocs/.
 
 6. Event Routes
 
@@ -1246,8 +1248,8 @@ event_route[uac:reply] {
      * socket
      * contact_addr
 
-   Use a dot (.) if no value should be set for auth_password, auth_ha1, or
-   contact_addr.
+   Use a dot (.) if no value should be set for realm, auth_password,
+   auth_ha1, socket or contact_addr.
 
    Example 1.50. uac.reg_add usage
 ...

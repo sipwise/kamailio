@@ -194,7 +194,7 @@ static int mod_init(void)
 		goto error;
 	}
 
-	if(register_module_stats(exports.name, stats) != 0) {
+	if(register_module_stats("websocket", stats) != 0) {
 		LM_ERR("registering core statistics\n");
 		goto error;
 	}
@@ -301,20 +301,19 @@ static int child_init(int rank)
 		if(ws_keepalive_mechanism != KEEPALIVE_MECHANISM_NONE) {
 			for(i = 0; i < ws_keepalive_processes; i++) {
 				if(fork_sync_timer(PROC_TIMER, "WEBSOCKET KEEPALIVE", 1,
-						   ws_keepalive, (void*)(long)i, ws_keepalive_interval)
+						   ws_keepalive, (void *)(long)i, ws_keepalive_interval)
 						< 0) {
 					LM_ERR("starting keepalive process\n");
 					return -1;
 				}
 			}
 		}
-		if(fork_sync_timer(PROC_TIMER, "WEBSOCKET TIMER", 1,
-			   ws_timer, NULL, ws_timer_interval)
-					< 0) {
-				LM_ERR("starting timer process\n");
-				return -1;
+		if(fork_sync_timer(PROC_TIMER, "WEBSOCKET TIMER", 1, ws_timer, NULL,
+				   ws_timer_interval)
+				< 0) {
+			LM_ERR("starting timer process\n");
+			return -1;
 		}
-
 	}
 
 	return 0;

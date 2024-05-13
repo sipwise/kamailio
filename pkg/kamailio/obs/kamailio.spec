@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.6.4
+%define ver 5.7.5
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -261,8 +261,8 @@ Release:    %rel
 Packager:   Sergey Safarov <s.safarov@gmail.com>
 License:    GPL-2.0
 Group:      %{PKGGROUP}
-Source:     http://kamailio.org/pub/kamailio/%{ver}/src/%{name}-%{ver}_src.tar.gz
-URL:        http://kamailio.org/
+Source:     https://kamailio.org/pub/kamailio/%{ver}/src/%{name}-%{ver}_src.tar.gz
+URL:        https://kamailio.org/
 Vendor:     kamailio.org
 BuildRoot:  %{_tmppath}/%{name}-%{ver}-buildroot
 Conflicts:  kamailio-acc_json < %ver
@@ -544,7 +544,7 @@ BuildRequires:  libcurl-devel
 %endif
 
 %description   http_async_client
-This module implements protocol functions that use the libcurl to communicate with HTTP servers in asyncronous way.
+This module implements protocol functions that use the libcurl to communicate with HTTP servers in asynchronous way.
 %endif
 
 %package    http_client
@@ -1570,6 +1570,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.kex
 %doc %{_docdir}/kamailio/modules/README.lrkproxy
 %doc %{_docdir}/kamailio/modules/README.mangler
+%doc %{_docdir}/kamailio/modules/README.math
 %doc %{_docdir}/kamailio/modules/README.matrix
 %doc %{_docdir}/kamailio/modules/README.maxfwd
 %doc %{_docdir}/kamailio/modules/README.mediaproxy
@@ -1731,6 +1732,7 @@ fi
 %{_libdir}/kamailio/modules/kex.so
 %{_libdir}/kamailio/modules/lrkproxy.so
 %{_libdir}/kamailio/modules/mangler.so
+%{_libdir}/kamailio/modules/math.so
 %{_libdir}/kamailio/modules/matrix.so
 %{_libdir}/kamailio/modules/maxfwd.so
 %{_libdir}/kamailio/modules/mediaproxy.so
@@ -2215,7 +2217,9 @@ fi
 %endif
 %if %{with python3}
 %doc %{_docdir}/kamailio/modules/README.app_python3
+%doc %{_docdir}/kamailio/modules/README.app_python3s
 %{_libdir}/kamailio/modules/app_python3.so
+%{_libdir}/kamailio/modules/app_python3s.so
 %endif
 
 
@@ -2283,7 +2287,9 @@ fi
 %files      ruby
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_ruby
+%doc %{_docdir}/kamailio/modules/README.app_ruby_proc
 %{_libdir}/kamailio/modules/app_ruby.so
+%{_libdir}/kamailio/modules/app_ruby_proc.so
 %endif
 
 

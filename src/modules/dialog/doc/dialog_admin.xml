@@ -63,7 +63,7 @@
 	<title>Dialog states</title>
 	<para>
 	Dialogs have states that are shown in the RPC interface as well as stored
-	in the database. 
+	in the database.
 	</para>
 	<itemizedlist>
 		<listitem>
@@ -92,7 +92,7 @@
 	Dialog profiling is a mechanism that helps in classifying, sorting and
 	keeping track of certain types of dialogs.  The classification criteria
 	can be any attributes desired by the administrator;  it can be SIP message
-	attributes, other pseudo-variables, custom values, etc.  
+	attributes, other pseudo-variables, custom values, etc.
 	Dialogs can be dynamically added into one or more profile
 	tables.  Logically, each profile table can have a special meaning (like
 	dialogs outside the domain, dialogs terminated to the PSTN, etc.).
@@ -103,8 +103,8 @@
 		<listitem>
 		<para>
 			<emphasis>with no value</emphasis> - a dialog simply belongs
-			to a profile (for instance, an outbound calls profile). There is 
-			no other additional information to describe the dialog beyond 
+			to a profile (for instance, an outbound calls profile). There is
+			no other additional information to describe the dialog beyond
 			its membership in the profile per se.
 		</para>
 		</listitem>
@@ -115,7 +115,7 @@
 			is the caller ID). The membership of the dialog in the profile is
 			strictly related to the value.  For example, if the account ID
 			of the caller is stored in the pseudo-variable $var(account_id),
-			you can use $var(account_id) as a value/key by which to group 
+			you can use $var(account_id) as a value/key by which to group
 			dialogs so that you can count the number of open dialogs for
 			each account, enforce concurrent call limits as necessary, etc.
 		</para>
@@ -182,7 +182,7 @@
 		<title><varname>enable_stats</varname> (integer)</title>
 		<para>
 		If statistics support should be enabled or not. Via statistics
-		variables, the module provide information about the dialog processing.
+		variables, the module provides information about the dialog processing.
 		Set it to zero to disable or to non-zero to enable it.
 		</para>
 		<para>
@@ -254,7 +254,7 @@ modparam("dialog", "rr_param", "xyz")
 		<title><varname>dlg_flag</varname> (integer)</title>
 		<para>
 		Flag to be used for marking if a dialog should be constructed for the
-		current request (this make sense only for initial requests).
+		current request (this makes sense only for initial requests).
 		</para>
 		<para>
 		Note: it is not needed to set this parameter and its corresponding flag
@@ -345,7 +345,7 @@ modparam("dialog", "early_timeout", 180)
 		<title><varname>noack_timeout</varname> (integer)</title>
 		<para>
 		The timeout (in seconds) after which the dialogs which were answered
-		with 200ok but didn't receive the ACK are marked for termination (the
+		with 200 OK but didn't receive the ACK are marked for termination (the
 		lifetime is set to 10 more seconds).
 		</para>
 		<para>
@@ -416,8 +416,8 @@ modparam("dialog", "dlg_extra_hdrs", "Hint: credit expired\r\n")
 		<para>
 		Note: DID-based matching does not replace callid/fromtag/totag comparison. It will speed
 		up dialog matching by not iterating over the whole dialog list for callid/fromtag/totag comparison, but
-		instead it uses a hash table to find the respective dialog and then doing only one callid/fromtag/totag 
-		comparison. Thus, there is no security 
+		instead it uses a hash table to find the respective dialog and then doing only one callid/fromtag/totag
+		comparison. Thus, there is no security
 		issue when using DID based matching. Use DID_FALLBACK for maximum interoperability or use DID_ONLY to
 		reject buggy clients or hacking attempts. DID_NONE is only useful, when you want to hide dialog-tracking
 		from the users (preventing the DID Record-Route cookie).
@@ -549,7 +549,7 @@ modparam("dialog", "db_mode", 1)
 		<para>
 			The interval (seconds) at which to update dialogs' information,
 			if the server is configured to store the dialog information at a given interval.
-			Too short an interval will generate intensive database operations,
+			A too short interval will generate intensive database operations,
 			while an excessively long one will miss dialogs with a short lifetime.
 		</para>
 		<para>
@@ -570,11 +570,11 @@ modparam("dialog", "db_update_period", 120)
 	<section id="dialog.p.db_fetch_rows">
 		<title><varname>db_fetch_rows</varname> (integer)</title>
 		<para>
-			The number of the rows to be fetched at once from database 
+			The number of the rows to be fetched at once from database
 			when loading the dialog records at startup from the database.
-			This value can be used to tune the load time at startup. 
+			This value can be used to tune the load time at startup.
 			For 1MB of private memory (default), it should be below 400.
-			The database driver must support the fetch_result() capability. 
+			The database driver must support the fetch_result() capability.
 			A value of 0 means the database fetch is not limited.
 		</para>
 		<para>
@@ -1138,7 +1138,7 @@ modparam("dialog", "vars_key_column", "vars_key_name")
 	<section id="dialog.p.vars_value_column">
 		<title><varname>vars_value_column</varname> (string)</title>
 		<para>
-			The column name in the database to store the values of a 
+			The column name in the database to store the values of a
 			dialog variable.
 		</para>
 		<para>
@@ -1180,7 +1180,7 @@ modparam("dialog", "profiles_with_value", "caller ; my_profile")
 	<section id="dialog.p.profiles_no_value">
 		<title><varname>profiles_no_value</varname> (string)</title>
 		<para>
-			List of names for profiles without values, separated	
+			List of names for profiles without values, separated
 			with semi-colon ";".
 		</para>
 		<para>
@@ -1449,7 +1449,7 @@ modparam("dialog", "timeout_noreset", 1)
 	<section id="dialog.p.timer_procs">
 		<title><varname>timer_procs</varname> (int)</title>
 		<para>
-			If set to 1, the dialog module will start a separate 
+			If set to 1, the dialog module will start a separate
 			dialog timer process to execute dialog timeout tasks.
 			The default is to use the core timer process.
 		</para>
@@ -1468,7 +1468,7 @@ modparam("dialog", "timer_procs", 1)
 		</example>
 	</section>
 
-	<section>
+	<section id="dialog.p.enable_dmq">
 		<title><varname>enable_dmq</varname> (int)</title>
 		<para>
 			If set to 1, the dialog will be synced via dmq.
@@ -1666,13 +1666,102 @@ modparam("dialog", "keep_proxy_rr", 1)
 </programlisting>
 		</example>
 	</section>
+
+	<section id="dialog.p.bye_early_code">
+		<title><varname>bye_early_code</varname> (int)</title>
+		<para>
+			This parameter defines the reply-code being used for
+			dialogs being terminated in early stage (e.g. before
+			200 OK/ACK).
+		</para>
+		<emphasis>
+			Default value is <quote>480</quote>.
+		</emphasis>
+		<example>
+		<title>Set <varname>bye_early_code</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "bye_early_code", 503)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="dialog.p.bye_early_reason">
+		<title><varname>bye_early_reason</varname> (string)</title>
+		<para>
+			This parameter defines the reply-reason being used for
+			dialogs being terminated in early stage (e.g. before
+			200 OK/ACK).
+		</para>
+		<emphasis>
+			Default value is <quote>Temporarily Unavailable</quote>.
+		</emphasis>
+		<example>
+		<title>Set <varname>bye_early_reason</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "bye_early_reason", "Call terminated")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="dialog.p.dlg_ctxiuid_mode">
+		<title><varname>dlg_ctxiuid_mode</varname> (int)</title>
+		<para>
+			Set dialog context iuid mode, which can specify additional cases
+			when the internal unique id should be set:
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>1</emphasis> - set it when processing CANCEL requests.
+			</para></listitem>
+		</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>dlg_ctxiuid_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "dlg_ctxiuid_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="dialog.p.debug_variables">
+		<title><varname>debug_variables</varname> (int)</title>
+		<para>
+			Activate additional debugging for printing internal lists for dialog variables.
+			This output is only visible at debug log level and should only be used for
+			debugging. By default it is deactivated.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>debug_variables</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "debug_variables", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
 	</section>
 
 	<section>
 	<title>Functions</title>
 	<section id="dialog.f.set_dlg_profile">
 		<title>
-		<function moreinfo="none">set_dlg_profile(profile,[value])</function>
+		<function moreinfo="none">set_dlg_profile(profile[, value])</function>
 		</title>
 		<para>
 		Inserts the current dialog into a profile. Note that if the profile does
@@ -1711,7 +1800,7 @@ set_dlg_profile("caller","$fu");
 
 	<section id="dialog.f.unset_dlg_profile">
 		<title>
-		<function moreinfo="none">unset_dlg_profile(profile,[value])</function>
+		<function moreinfo="none">unset_dlg_profile(profile[, value])</function>
 		</title>
 		<para>
 		Removes the current dialog from a profile.
@@ -1749,7 +1838,7 @@ unset_dlg_profile("caller","$fu");
 
 	<section id="dialog.f.is_in_profile">
 		<title>
-		<function moreinfo="none">is_in_profile(profile,[value])</function>
+		<function moreinfo="none">is_in_profile(profile[, value])</function>
 		</title>
 		<para>
 		Checks if the current dialog belongs to a profile. If the profile
@@ -1795,7 +1884,7 @@ if (is_in_profile("caller","XX")) {
 
 	<section id="dialog.f.get_profile_size">
 		<title>
-		<function moreinfo="none">get_profile_size(profile,[value],size)</function>
+		<function moreinfo="none">get_profile_size(profile[, value], size)</function>
 		</title>
 		<para>
 		Returns the number of dialogs belonging to a profile. If the profile
@@ -1925,7 +2014,7 @@ dlg_setflag("1");
 		<title><function>dlg_resetflag</function> usage</title>
 		<programlisting format="linespecific">
 ...
-redlg_setflag("1");
+dlg_resetflag("1");
 ...
 </programlisting>
 		</example>
@@ -1936,7 +2025,9 @@ redlg_setflag("1");
 		<function moreinfo="none">dlg_bye(side)</function>
 		</title>
 		<para>
-		Send BYE to both parties of a dialog.
+		Send BYE to parties of a dialog or - if in early stage - a CANCEL to the
+		B-Party and a SIP response to the A-Party (as defined in bye_early_code /
+		bye_early_reason).
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -2103,6 +2194,107 @@ if(dlg_get("abcdef", "123", "456"))
 		</example>
 	</section>
 
+	<section id="dialog.f.dlg_get_var">
+		<title>
+		<function moreinfo="none">dlg_get_var(callid, ftag, ttag, name, dst)</function>
+		</title>
+		<para>
+			Get dlg_var of another dialog value based on Call-ID, From-Tag and To-Tag
+			parameters.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>callid</emphasis> - SIP call-id.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>ftag</emphasis> - SIP From tag.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>ttag</emphasis> - SIP To tag. Use "" value to indicate early dialog.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>name</emphasis> - key name of the $dlg_var.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>dst</emphasis> - pv to store the value of $dlg_var(name).
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from BRANCH_ROUTE,
+			REQUEST_ROUTE, ONREPLY_ROUTE and FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_get_var</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(dlg_get_var("$var(ci)", "$var(ft)", "456", "test", "$var(tmp)"))
+{
+	xdbg("$$dlg_var(test):$var(tmp)\n");
+}
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="dialog.f.dlg_set_var">
+		<title>
+		<function moreinfo="none">dlg_set_var(callid, ftag, ttag, name, value)</function>
+		</title>
+		<para>
+			Set dlg_var of another dialog value based on Call-ID, From-Tag and To-Tag
+			parameters.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>callid</emphasis> - SIP call-id.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>ftag</emphasis> - SIP From tag.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>ttag</emphasis> - SIP To tag. Use "" value to indicate early dialog.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>name</emphasis> - key name of the $dlg_var.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>value</emphasis> - string value to store at $dlg_var(name).
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from BRANCH_ROUTE,
+			REQUEST_ROUTE, ONREPLY_ROUTE and FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_set_var</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(dlg_set_var("$var(ci)", "$var(ft)", "456", "test", "$var(tmp)"))
+{
+	xdbg("set $$dlg_var(test):$var(tmp)\n");
+}
+# you can set vars in early dialog too
+if(dlg_set_var("$var(ci)", "$var(ft)", "", "test", "$var(tmp)"))
+{
+	xdbg("set $$dlg_var(test):$var(tmp)\n");
+}
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="dialog.f.is_known_dlg">
 		<title>
 		<function moreinfo="none">is_known_dlg()</function>
@@ -2162,7 +2354,7 @@ if(!uri == myself) {
 			</para>
 		</listitem>
 		<listitem>
-			<para><emphasis>h_id</emphasis> - h_id valye if the internal dialog
+			<para><emphasis>h_id</emphasis> - h_id value if the internal dialog
 				identifier.
 			</para>
 		</listitem>
@@ -2445,6 +2637,67 @@ dlg_reset_property("timeout-noreset");
 </programlisting>
 		</example>
 	</section>
+
+	<section id="dialog.f.dlg_req_within">
+		<title>
+		<function moreinfo="none">dlg_req_within(side, method, [headers], [content_type, content])</function>
+		</title>
+		<para>
+		Sends an in-dialog SIP Request with method to a party of a dialog indicated by the side parameter.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>side</emphasis> - where to send the request. It can be:
+				'caller', 'callee', or 'all' (send to both sides).
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>method</emphasis> - Method of the request
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>headers</emphasis> (optional) - additional headers to be added to the request.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>content_type</emphasis> (optional) - Content-Type of the request body - will
+				be added as Content-Type Header.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>content</emphasis> (optional) - Content to be sent as body.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_req_within</function> usage</title>
+		<programlisting format="linespecific">
+...
+	# Send a simple request:
+	dlg_req_within("all", "OPTIONS");
+...
+	# Send a simple request with extra headers:
+	dlg_req_within("caller", "OPTIONS", "X-Info: Bandwidth granted\r\nX-Info-2: Go ahead\r\n");
+...
+	# Send a simple request with body:
+	dlg_req_within("caller", "UPDATE", "application/sdp", "...some SDP...");
+...
+	# Send a simple request with extra headers and body:
+	dlg_req_within("callee", "INFO", "X-Info: Bandwidth granted\r\n", "application/sdp", "...some SDP...");
+...
+		</programlisting>
+		</example>
+	</section>
+
 	</section>
 
 
@@ -2682,7 +2935,7 @@ dlg_reset_property("timeout-noreset");
 			</para></listitem>
 		</itemizedlist>
 		<para>
-		The values for the h_entry and h_id can be get via the dlg_list
+		The values for the h_entry and h_id can be obtained via the dlg_list
 		RPC command.
 		</para>
 		<para>RPC Command Format:</para>
@@ -2853,7 +3106,7 @@ dlg_reset_property("timeout-noreset");
 				and rining or 1xx has been received.
 			</para></listitem>
 			<listitem><para>
-				<emphasis>answering</emphasis> - initial INVITE received 200ok,
+				<emphasis>answering</emphasis> - initial INVITE received 200 OK,
 				but ACK was not handled yet.
 			</para></listitem>
 			<listitem><para>
@@ -2914,7 +3167,7 @@ dlg_reset_property("timeout-noreset");
 		<itemizedlist>
 			<listitem><para>
 			<emphasis>attrs</emphasis> - (optional) a list of characters (flags)
-			representing the fields to be added to the response. If is missing,
+			representing the fields to be added to the response. If it is missing,
 			its default value is 'ftcFT' (note the characters are case sensitive).
 			</para>
 			<para>

@@ -65,7 +65,8 @@ static void mod_destroy(void);
 static int mod_init(void);
 
 static void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params);
-static int handle_msg_failed_cb(struct sip_msg *msg, unsigned int flags, void *cb);
+static int handle_msg_failed_cb(
+		struct sip_msg *msg, unsigned int flags, void *cb);
 static int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb);
 static int handle_msg_branch_cb(
 		struct sip_msg *msg, unsigned int flags, void *cb);
@@ -206,8 +207,7 @@ static int w_pvh_remove_header(
 	return pvh_remove_header(msg, &hname, indx);
 }
 
-static int w_pvh_header_param_exists(
-		struct sip_msg *msg, char *p1, char *p2)
+static int w_pvh_header_param_exists(struct sip_msg *msg, char *p1, char *p2)
 {
 	str hname = STR_NULL;
 	str value = STR_NULL;
@@ -221,17 +221,19 @@ static int w_pvh_header_param_exists(
 	return pvh_header_param_exists(msg, &hname, &value);
 }
 
-static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRemove)
+static int ki_pvh_remove_header_param(
+		struct sip_msg *msg, str *hname, str *toRemove)
 {
 	int idx;
 	int new_size;
 	str dst = STR_NULL;
 	sr_xavp_t *avi = pvh_xavi_get_child(msg, &xavi_name, hname);
 
-	for(idx=0; avi != NULL; avi = xavi_get_next(avi)) {
-		if (avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL) {
+	for(idx = 0; avi != NULL; avi = xavi_get_next(avi)) {
+		if(avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL) {
 			if(str_casesearch(&avi->val.v.s, toRemove) != NULL) {
-				new_size = pvh_remove_header_param_helper(&avi->val.v.s, toRemove, &dst);
+				new_size = pvh_remove_header_param_helper(
+						&avi->val.v.s, toRemove, &dst);
 				if(dst.len == 0) {
 					LM_DBG("nothing left in the header:%.*s, remove it[%d]\n",
 							STR_FMT(hname), idx);
@@ -239,11 +241,13 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
 						return -1;
 				} else if(dst.len < 0 || new_size == avi->val.v.s.len) {
 					LM_DBG("'%.*s' not found at '%.*s'\n", STR_FMT(toRemove),
-						STR_FMT(&avi->val.v.s));
+							STR_FMT(&avi->val.v.s));
 				} else {
 					LM_DBG("old_value:'%.*s' new_value:'%.*s'\n",
-						STR_FMT(&avi->val.v.s), STR_FMT(&dst));
-					if(pvh_set_xavi(msg, &xavi_name, hname, &dst, SR_XTYPE_STR, idx, 0) < 0) {
+							STR_FMT(&avi->val.v.s), STR_FMT(&dst));
+					if(pvh_set_xavi(msg, &xavi_name, hname, &dst, SR_XTYPE_STR,
+							   idx, 0)
+							< 0) {
 						LM_ERR("can't set new value\n");
 						return -1;
 					}
@@ -360,7 +364,7 @@ int mod_init(void)
 
 	if(load_uac_api(&uac) < 0) {
 		LM_NOTICE("could not bind to the 'uac' module, From/To headers will "
-				  "not be modifed\n");
+				  "not be modified\n");
 	}
 
 	if(load_tm_api(&tmb) < 0) {
@@ -571,6 +575,7 @@ int handle_msg_branch_cb(struct sip_msg *msg, unsigned int flags, void *cb)
 
 int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
 {
+	int vref = 0;
 	tm_cell_t *t = NULL;
 	sr_xavp_t **backup_xavis = NULL;
 	sr_xavp_t **list = NULL;
@@ -583,18 +588,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
 	LM_DBG("msg:%p previous branch:%d\n", msg, _branch);
 	print_cb_flags(flags);
 
-	if(tmb.t_check(msg, &_branch) == -1) {
-		LM_ERR("failed find UAC branch\n");
-	} else {
-		t = tmb.t_gett();
-		if(t == NULL || t == T_UNDEFINED) {
-			LM_DBG("cannot lookup the transaction\n");
-		} else {
-			LM_DBG("T:%p t_check-branch:%d xavi_list:%p branches:%d\n", t,
-					_branch, &t->xavis_list, t->nr_of_outgoings);
-			list = &t->xavis_list;
-			backup_xavis = xavi_set_list(&t->xavis_list);
-		}
+	t = tmb.t_find(msg, &_branch, &vref);
+	if(t != NULL && t != T_UNDEFINED) {
+		LM_DBG("T:%p t_check-branch:%d xavi_list:%p branches:%d\n", t, _branch,
+				&t->xavis_list, t->nr_of_outgoings);
+		list = &t->xavis_list;
+		backup_xavis = xavi_set_list(&t->xavis_list);
 	}
 
 	pvh_get_branch_index(msg, &_branch);
@@ -609,12 +608,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
 		xavi_set_list(backup_xavis);
 		LM_DBG("restored backup_xavis:%p\n", *backup_xavis);
 	}
-	if(t) {
-		tmb.unref_cell(t);
+	if(t != NULL && t != T_UNDEFINED && vref != 0) {
+		/*  t_find() above has the side effect of setting T and
+			REFerencing T => we must unref and unset it */
+		tmb.t_unset();
 		LM_DBG("T:%p unref\n", t);
 	}
-	tmb.t_sett(T_UNDEFINED, T_BR_UNDEFINED);
-	LM_DBG("reset tm\n");
 
 	return 1;
 }
