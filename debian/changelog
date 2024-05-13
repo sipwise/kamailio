@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.5-1+0~mr10.5.7.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [f204ab6] MT#60077 merge debian changes from mr11.5
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 13 May 2024 09:47:32 +0200
+
 ngcp-kamailio (5.7.5-1+0~mr10.5.7.1) unstable; urgency=medium
 
   * New upstream version 5.7.0
