@@ -128,10 +128,6 @@ int tls_run_event_routes(struct tcp_connection *c);
 #endif /* __SUNPRO_c */
 #endif /* TLS_RD_DEBUG */
 
-#if OPENSSL_VERSION_NUMBER >= 0x030000000L
-#define OPENSSL_NO_ENGINE
-#endif
-
 extern str sr_tls_xavp_cfg;
 
 static str _ksr_tls_connect_server_id = STR_NULL;
@@ -426,11 +422,6 @@ static void tls_dump_cert_info(char *s, X509 *cert)
 	}
 }
 
-
-#ifndef OPENSSL_NO_ENGINE
-// lookup HSM keys in process-local memory
-EVP_PKEY *tls_lookup_private_key(SSL_CTX *);
-#endif
 /** wrapper around SSL_accept, usin SSL return convention.
  * It will also log critical errors and certificate debugging info.
  * @param c - tcp connection with tls (extra_data must be a filled
@@ -461,12 +452,7 @@ int tls_accept(struct tcp_connection *c, int *error)
 		BUG("Invalid connection state %d (bug in TLS code)\n", tls_c->state);
 		goto err;
 	}
-#ifndef OPENSSL_NO_ENGINE
-	/* check if we have a HSM key */
-	EVP_PKEY *pkey = tls_lookup_private_key(SSL_get_SSL_CTX(ssl));
-	if(pkey)
-		SSL_use_PrivateKey(ssl, pkey);
-#endif
+
 	tls_openssl_clear_errors();
 	ret = SSL_accept(ssl);
 	if(unlikely(ret == 1)) {
@@ -531,13 +517,7 @@ int tls_connect(struct tcp_connection *c, int *error)
 		BUG("Invalid connection state %d (bug in TLS code)\n", tls_c->state);
 		goto err;
 	}
-#ifndef OPENSSL_NO_ENGINE
-	// lookup HSM private key in process-local memory
-	EVP_PKEY *pkey = tls_lookup_private_key(SSL_get_SSL_CTX(ssl));
-	if(pkey) {
-		SSL_use_PrivateKey(ssl, pkey);
-	}
-#endif
+
 	tls_openssl_clear_errors();
 	ret = SSL_connect(ssl);
 	if(unlikely(ret == 1)) {
