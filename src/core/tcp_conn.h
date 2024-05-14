@@ -407,7 +407,8 @@ struct tcp_connection *tcpconn_get(int id, struct ip_addr *ip, int port,
 		union sockaddr_union *local_addr, ticks_t timeout);
 
 struct tcp_connection *tcpconn_lookup(int id, struct ip_addr *ip, int port,
-		union sockaddr_union *local_addr, int try_local_port, ticks_t timeout);
+		union sockaddr_union *local_addr, int try_local_port, ticks_t timeout,
+		sip_protos_t proto);
 
 typedef struct tcp_event_info
 {
@@ -421,6 +422,7 @@ typedef struct tcp_event_info
 typedef struct tcp_closed_event_info
 {
 	enum tcp_closed_reason reason;
+	int id;
 	struct tcp_connection *con;
 } tcp_closed_event_info_t;
 
@@ -431,5 +433,7 @@ typedef struct ws_event_info
 	unsigned int len;
 	int id;
 } ws_event_info_t;
+
+tcp_connection_t *ksr_tcpcon_evcb_get(void);
 
 #endif
