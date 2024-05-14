@@ -1,8 +1,13 @@
-ngcp-kamailio (5.7.4-1+0~mr12.3.2.0) unstable; urgency=medium
+ngcp-kamailio (5.7.5-1+0~mr12.3.2.0) unstable; urgency=medium
 
-  * New release.
+  * MT#59890 backport patches from 5.7
+  * MT#59738 cfgtutils: expose second optional str for locks
+  * MT#59738 cfgtutils: fix optional key initialization
+  * New upstream version 5.7.5
+  * MT#60077 remove already applied patches from 5.7
+  * MT#60077 refresh patches
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Mar 2024 10:56:11 +0100
+ -- Victor Seva <vseva@debian.org>  Tue, 14 May 2024 11:01:28 +0200
 
 ngcp-kamailio (5.7.4-1+0~mr12.3.1.0) unstable; urgency=medium
 
