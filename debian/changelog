@@ -1,3 +1,15 @@
+ngcp-kamailio (5.8.1-1+0~mr12.5.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [cd16fca] MT#59833 pcre3 => pcre2 migration
+  * [a770a9a] MT#59738 cfgtutils: expose second optional str for locks
+  * [a530d04] MT#59738 cfgtutils: fix optional key initialization
+
+  [ Donat Zenichev ]
+  * [dc673fe] MT#57764 permissions: add func `allow_register_include_port()`
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 22 May 2024 14:30:54 +0200
+
 ngcp-kamailio (5.8.1-1+0~mr12.4.0.0) unstable; urgency=medium
 
   [ Donat Zenichev ]
