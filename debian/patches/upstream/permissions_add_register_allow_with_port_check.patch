@@ -1,0 +1,370 @@
+From 534a35956b1a79598dcd2436248c5d7ce4e92da8 Mon Sep 17 00:00:00 2001
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Fri, 10 May 2024 09:43:28 +0200
+Subject: [PATCH] permissions: introduce func `allow_register_include_port()`
+
+Introduce new function: `allow_register_include_port()`
+to be able to check the whole Contact header including port.
+
+Example, register.deny content is:
+	ALL : "^sip:.*192.168.0.101:5062"
+
+If the Contact is: "Contact: <sip:testuser1004@192.168.0.101:5062>"
+then this will check the Contact hf including port of it.
+
+Otherwise if usual `allow_register()` function is used,
+then only the "testuser1004@192.168.0.101" will be taken into
+account, which will lead the regex to be failing and letting
+the check to pass through.
+
+The func `allow_register_include_port()` works similarly
+as `allow_register()` except it checks Contact's port.
+
+Full backwards compatibility is kept in place,
+no need for users of the module to change anything in
+their configuration or kamailio script itself.
+---
+ src/modules/permissions/doc/permissions.xml   |   7 +
+ .../permissions/doc/permissions_admin.xml     | 142 ++++++++++++++++++
+ src/modules/permissions/permissions.c         |  63 ++++++--
+ 3 files changed, 200 insertions(+), 12 deletions(-)
+
+diff --git a/src/modules/permissions/doc/permissions.xml b/src/modules/permissions/doc/permissions.xml
+index 10b16ae1e9..a8adfdf944 100644
+--- a/src/modules/permissions/doc/permissions.xml
++++ b/src/modules/permissions/doc/permissions.xml
+@@ -48,6 +48,13 @@
+ 			<email>eschmidbauer@voipxswitch.com</email>
+ 		</address>
+ 		</editor>
++		<editor>
++		<firstname>Donat</firstname>
++		<surname>Zenichev</surname>
++		<address>
++			<email>dzenichev@sipwise.com</email>
++		</address>
++		</editor>
+ 	</authorgroup>
+ 	<copyright>
+ 		<year>2003</year>
+diff --git a/src/modules/permissions/doc/permissions_admin.xml b/src/modules/permissions/doc/permissions_admin.xml
+index 4ddde99d62..494a7ecc0f 100644
+--- a/src/modules/permissions/doc/permissions_admin.xml
++++ b/src/modules/permissions/doc/permissions_admin.xml
+@@ -121,6 +121,8 @@
+ 		similar to the algorithm described in
+ 		<xref linkend="sec-call-routing"/>. The only difference is in the way
+ 		how pairs are created.
++		Additionally one can use <function moreinfo="none">allow_register_include_port</function>
++		function in order to include the port value of the Contact into the check.
+ 		</para>
+ 		<para>
+ 		Instead of the From header field the function uses the To header field because
+@@ -384,6 +386,7 @@ modparam("permissions", "check_all_branches", 0)
+ 		Suffix to be appended to basename to create filename of the allow
+ 		file when version with one parameter of either
+ 		<function moreinfo="none">allow_routing</function> or
++		<function moreinfo="none">allow_register_include_port</function> or
+ 		<function moreinfo="none">allow_register</function> is used.
+ 		</para>
+ 		<note>
+@@ -411,6 +414,7 @@ modparam("permissions", "allow_suffix", ".allow")
+ 		Suffix to be appended to basename to create filename of the deny file
+ 		when version with one parameter of either
+ 		<function moreinfo="none">allow_routing</function> or
++		<function moreinfo="none">allow_register_include_port</function> or
+ 		<function moreinfo="none">allow_register</function> is used.
+ 		</para>
+ 		<note>
+@@ -1094,6 +1098,98 @@ if (method=="REGISTER") {
+ 	};
+ };
+ ...
++</programlisting>
++		</example>
++	</section>
++	<section id ="permissions.f.allow_register_include_port">
++		<title>
++		<function moreinfo="none">allow_register_include_port(basename)</function>
++		</title>
++		<para>
++		The function does exacty the same thing as <function>allow_register(basename)</function>
++		apart that it tells the module to include the port value of Contact into the check.
++		No additional function parameters required.
++		</para>
++		<para>Meaning of the parameters is as follows:</para>
++		<itemizedlist>
++		<listitem>
++			<para><emphasis>basename</emphasis> - Basename from which allow
++			and deny filenames will be created by appending contents of
++			<varname>allow_suffix</varname> and <varname>deny_suffix</varname>
++			parameters.
++			</para>
++			<para>
++			If the parameter doesn't contain full pathname then the function
++			expects the file to be located in the same directory as the main
++			configuration file of the server.
++			</para>
++		</listitem>
++		</itemizedlist>
++		<para>
++		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
++		</para>
++		<example>
++		<title><function>allow_register_include_port(basename)</function> usage</title>
++		<programlisting format="linespecific">
++...
++if (method=="REGISTER") {
++	if (allow_register_include_port("register")) {
++		save("location");
++		exit;
++	} else {
++		sl_send_reply("403", "Forbidden");
++	};
++};
++...
++</programlisting>
++		</example>
++	</section>
++	<section id ="permissions.f.allow_register_include_port_fileargs">
++		<title>
++		<function moreinfo="none">allow_register_include_port(allow_file, deny_file)</function>
++		</title>
++		<para>
++		The function does exacty the same thing as <function>allow_register(allow_file, deny_file)</function>
++		apart that it tells the module to include the port value of Contact into the check.
++		No additional function parameters required.
++		</para>
++		<para>Meaning of the parameters is as follows:</para>
++		<itemizedlist>
++		<listitem>
++			<para><emphasis>allow_file</emphasis> - File containing allow rules.
++			</para>
++			<para>
++			If the parameter doesn't contain full pathname then the function
++			expects the file to be located in the same directory as the main
++			configuration file of the server.
++			</para>
++		</listitem>
++		<listitem>
++			<para><emphasis>deny_file</emphasis> - File containing deny rules.
++			</para>
++			<para>
++			If the parameter doesn't contain full pathname then the function
++			expects the file to be located in the same directory as the main
++			configuration file of the server.
++			</para>
++		</listitem>
++		</itemizedlist>
++		<para>
++		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
++		</para>
++		<example>
++		<title><function>allow_register_include_port(allow_file, deny_file)</function> usage</title>
++		<programlisting format="linespecific">
++...
++if (method=="REGISTER") {
++	if (allow_register_include_port("register.allow", "register.deny")) {
++		save("location");
++		exit;
++	} else {
++		sl_send_reply("403", "Forbidden");
++	};
++};
++...
+ </programlisting>
+ 		</example>
+ 	</section>
+@@ -1492,4 +1588,50 @@ if (allow_trusted("$si", "any", "$ai")) {
+ 
+ 	</section> <!-- Address File Format -->
+ 
++	<section>
++		<title>Register File Format</title>
++		<para>
++		It is a text file with one record per line. Lines starting with '#' are
++		considered comments and ignored. Comments can be also at the end of
++		records, by using '#' to start the comment part of the line.
++		</para>
++		<para>
++		Each record line has the format:
++		</para>
++		<programlisting format="linespecific">
++...
++(from_list,str) (req_uri_list,str)
++...
++</programlisting>
++		<para>
++		The 'str' indicates that the value has to be a string compatible with
++		POSIX Extended Regular Expressions.
++		</para>
++		<example>
++		<title>Register File Sample</title>
++		<programlisting format="linespecific">
++...
++# Syntax:
++#	from_list [EXCEPT from_list] : req_uri_list [EXCEPT req_uri_list]
++#
++# 	from_list and req_uri_list are comma separated expressions
++# 	Expressions are treated as case insensitive POSIX Extended Regular Expressions.
++# 	Keyword ALL matches any expression.
++#
++# Examples (requires a usage of allow_register() function):
++#	ALL : "^sip:361[0-9]*@abc\.com$" EXCEPT "^sip:361[0-9]*3@abc\.com$", "^sip:361[0-9]*4@abc\.com$"
++#
++#	"^sip:3677[0-9]*@abc\.com$" :  "^sip:361[0-9]*@abc\.com$"
++#
++#	All : ALL
++#
++# Examples including port check (requires a usage of allow_register_include_port() function):
++#
++# ALL : "^sip:.*@192.168.0.1:5062"
++...
++</programlisting>
++		</example>
++
++	</section> <!-- Register File Format -->
++
+ </chapter>
+diff --git a/src/modules/permissions/permissions.c b/src/modules/permissions/permissions.c
+index 2b860b81b2..f91f1a0f11 100644
+--- a/src/modules/permissions/permissions.c
++++ b/src/modules/permissions/permissions.c
+@@ -123,6 +123,10 @@ static int allow_routing_2(
+ static int allow_register_1(struct sip_msg *msg, char *basename, char *s);
+ static int allow_register_2(
+ 		struct sip_msg *msg, char *allow_file, char *deny_file);
++static int allow_register_include_port_1(
++		struct sip_msg *msg, char *basename, char *s);
++static int allow_register_include_port_2(
++		struct sip_msg *msg, char *allow_file, char *deny_file);
+ static int allow_uri(struct sip_msg *msg, char *basename, char *uri);
+ 
+ static int mod_init(void);
+@@ -142,6 +146,12 @@ static cmd_export_t cmds[] = {
+ 				REQUEST_ROUTE | FAILURE_ROUTE},
+ 		{"allow_register", (cmd_function)allow_register_2, 2, load_fixup, 0,
+ 				REQUEST_ROUTE | FAILURE_ROUTE},
++		{"allow_register_include_port",
++				(cmd_function)allow_register_include_port_1, 1, single_fixup, 0,
++				REQUEST_ROUTE | FAILURE_ROUTE},
++		{"allow_register_include_port",
++				(cmd_function)allow_register_include_port_2, 2, load_fixup, 0,
++				REQUEST_ROUTE | FAILURE_ROUTE},
+ 		{"allow_trusted", (cmd_function)allow_trusted_0, 0, 0, 0, ANY_ROUTE},
+ 		{"allow_trusted", (cmd_function)allow_trusted_2, 2, fixup_spve_spve,
+ 				fixup_free_spve_spve, ANY_ROUTE},
+@@ -285,7 +295,7 @@ static int find_index(rule_file_t *array, char *pathname)
+  * sip:username@domain, resulting buffer is statically allocated and
+  * zero terminated
+  */
+-static char *get_plain_uri(const str *uri)
++static char *get_plain_uri(const str *uri, int check_port)
+ {
+ 	static char buffer[EXPRESSION_LENGTH + 1];
+ 	struct sip_uri puri;
+@@ -300,9 +310,14 @@ static char *get_plain_uri(const str *uri)
+ 	}
+ 
+ 	if(puri.user.len) {
+-		len = puri.user.len + puri.host.len + 5;
++		len = puri.user.len + puri.host.len + 5; /* +5 is 'sip:' and '@' */
+ 	} else {
+-		len = puri.host.len + 4;
++		len = puri.host.len + 4; /* +4 is 'sip:' */
++	}
++
++	if(check_port && puri.port.len) {
++		LM_DBG("Port number will also be used to check the Contact value\n");
++		len += (puri.port.len + 1); /* +1 is ':' */
+ 	}
+ 
+ 	if(len > EXPRESSION_LENGTH) {
+@@ -312,11 +327,22 @@ static char *get_plain_uri(const str *uri)
+ 
+ 	strcpy(buffer, "sip:");
+ 	if(puri.user.len) {
+-		memcpy(buffer + 4, puri.user.s, puri.user.len);
++		memcpy(buffer + 4, puri.user.s, puri.user.len); /* +4 is 'sip:' */
+ 		buffer[puri.user.len + 4] = '@';
+-		memcpy(buffer + puri.user.len + 5, puri.host.s, puri.host.len);
++		memcpy(buffer + puri.user.len + 5, puri.host.s,
++				puri.host.len); /* +5 is 'sip:' and '@' */
++		if(check_port && puri.port.len) {
++			buffer[puri.user.len + puri.host.len + 5] = ':';
++			memcpy(buffer + puri.user.len + puri.host.len + 6, puri.port.s,
++					puri.port.len); /* +6 is 'sip:', '@' and ':' */
++		}
+ 	} else {
+ 		memcpy(buffer + 4, puri.host.s, puri.host.len);
++		if(check_port && puri.port.len) {
++			buffer[puri.host.len + 4] = ':';
++			memcpy(buffer + puri.host.len + 5, puri.port.s,
++					puri.port.len); /* +5 is 'sip:' and ':' */
++		}
+ 	}
+ 
+ 	buffer[len] = '\0';
+@@ -416,7 +442,7 @@ check_branches:
+ 							 br_idx, &branch.len, &q, 0, 0, 0, 0, 0, 0, 0))
+ 					!= 0;
+ 			br_idx++) {
+-		uri_str = get_plain_uri(&branch);
++		uri_str = get_plain_uri(&branch, 0);
+ 		if(!uri_str) {
+ 			LM_ERR("failed to extract plain URI\n");
+ 			return -1;
+@@ -755,9 +781,11 @@ int allow_routing_2(struct sip_msg *msg, char *allow_file, char *deny_file)
+  * against rules in allow and deny files passed as parameters. The function
+  * iterates over all Contacts and creates a pair with To for each contact
+  * found. That allows to restrict what IPs may be used in registrations, for
+- * example
++ * example.
++ *
++ * If check_port is 0, then port isn't taken into account.
+  */
+-static int check_register(struct sip_msg *msg, int idx)
++static int check_register(struct sip_msg *msg, int idx, int check_port)
+ {
+ 	int len;
+ 	static char to_str[EXPRESSION_LENGTH + 1];
+@@ -821,7 +849,8 @@ static int check_register(struct sip_msg *msg, int idx)
+ 	}
+ 
+ 	while(c) {
+-		contact_str = get_plain_uri(&c->uri);
++		/* if check_port = 1, then port is included into regex check */
++		contact_str = get_plain_uri(&c->uri, check_port);
+ 		if(!contact_str) {
+ 			LM_ERR("can't extract plain Contact URI\n");
+ 			return -1;
+@@ -854,13 +883,23 @@ static int check_register(struct sip_msg *msg, int idx)
+ 
+ int allow_register_1(struct sip_msg *msg, char *basename, char *s)
+ {
+-	return check_register(msg, (int)(long)basename);
++	return check_register(msg, (int)(long)basename, 0);
+ }
+ 
+-
+ int allow_register_2(struct sip_msg *msg, char *allow_file, char *deny_file)
+ {
+-	return check_register(msg, (int)(long)allow_file);
++	return check_register(msg, (int)(long)allow_file, 0);
++}
++
++int allow_register_include_port_1(struct sip_msg *msg, char *basename, char *s)
++{
++	return check_register(msg, (int)(long)basename, 1);
++}
++
++int allow_register_include_port_2(
++		struct sip_msg *msg, char *allow_file, char *deny_file)
++{
++	return check_register(msg, (int)(long)allow_file, 1);
+ }
+ 
+ 
+-- 
+2.34.1
+
