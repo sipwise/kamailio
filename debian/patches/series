@@ -39,6 +39,7 @@ upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
 upstream/cfgutils-initialize-the-optional-key.patch
 upstream/permissions_add_register_allow_with_port_check.patch
 upstream/dialplan-don-t-call-free-on-empty-pcre-pointer.patch
+upstream/multipart-sdp.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch

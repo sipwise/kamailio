@@ -1,0 +1,57 @@
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -4693,28 +4693,13 @@
+ 			pkg_free(newbody.s);
+ 
+ 		} else {
+-			if(cl_field.len) {
+-				anchor = del_lump(msg, cl_field.s - msg->buf, cl_field.len, 0);
+-				cl_repl.s = pkg_malloc(10);
+-				if(!cl_repl.s) {
+-					LM_ERR("pkg_malloc for Content-Length failed\n");
+-					goto error_free;
+-				}
+-				cl_repl.len = snprintf(cl_repl.s, 10, "%i", (int)newbody.len);
+-				if(!insert_new_lump_after(anchor, cl_repl.s, cl_repl.len, 0)) {
+-					LM_ERR("insert_new_lump_after failed\n");
+-					goto error_free;
+-				}
+-				cl_repl.s = NULL;
+-			}
+-
+ 			if(read_sdp_pvar_str.len > 0) {
+ 				/* get the body from the message as body ptr may have changed
+ 				 * when using read_sdp_pv */
+-				cur_body.len = 0;
+-				cur_body.s = get_body(msg);
+-				cur_body.len = msg->buf + msg->len - cur_body.s;
+-
++				if(extract_body(msg, &cur_body, &cl_field) == -1) {
++					LM_ERR("failed to extract body from message");
++					goto error_free;
++				}
+ 				anchor = del_lump(msg, cur_body.s - msg->buf, cur_body.len, 0);
+ 			} else {
+ 				anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
+@@ -4727,6 +4712,21 @@
+ 				LM_ERR("insert_new_lump_after failed\n");
+ 				goto error_free;
+ 			}
++
++			if(cl_field.len) {
++				anchor = del_lump(msg, cl_field.s - msg->buf, cl_field.len, 0);
++				cl_repl.s = pkg_malloc(10);
++				if(!cl_repl.s) {
++					LM_ERR("pkg_malloc for Content-Length failed\n");
++					goto error_free;
++				}
++				cl_repl.len = snprintf(cl_repl.s, 10, "%i", (int)newbody.len);
++				if(!insert_new_lump_after(anchor, cl_repl.s, cl_repl.len, 0)) {
++					LM_ERR("insert_new_lump_after failed\n");
++					goto error_free;
++				}
++				cl_repl.s = NULL;
++			}
+ 		}
+ 	}
+ 
