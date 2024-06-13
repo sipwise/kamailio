@@ -1153,15 +1153,13 @@ static int ki_handle_ruri_alias_mode(struct sip_msg *msg, int mode)
 	}
 	start = NULL;
 	/* locate last alias parameter */
-	while(rest_len > _ksr_contact_alias.len + 4) {
+	while(rest_len > _ksr_contact_alias.len) {
 		if(strncmp(rest, _ksr_contact_alias.s, _ksr_contact_alias.len) == 0) {
 			start = rest;
 			if(mode == 0) {
 				/* use first alias parameter */
 				break;
 			}
-			rest = rest + _ksr_contact_alias.len;
-			rest_len = rest_len - _ksr_contact_alias.len;
 		}
 		sep = memchr(rest, 59 /* ; */, rest_len);
 		if(sep == NULL) {

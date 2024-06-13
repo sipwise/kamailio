@@ -491,13 +491,21 @@ int db_delete_urecord(urecord_t *_r)
 	vals[0].val.str_val.len = _r->aor.len;
 
 	if(ul_use_domain) {
-		dom = memchr(_r->aor.s, '@', _r->aor.len);
-		vals[0].val.str_val.len = dom - _r->aor.s;
-
 		vals[1].type = DB1_STR;
 		vals[1].nul = 0;
-		vals[1].val.str_val.s = dom + 1;
-		vals[1].val.str_val.len = _r->aor.s + _r->aor.len - dom - 1;
+		dom = memchr(_r->aor.s, '@', _r->aor.len);
+		if(dom == 0) {
+			vals[0].val.str_val.len = 0;
+			vals[1].val.str_val = _r->aor;
+		} else {
+			vals[0].val.str_val.len = dom - _r->aor.s;
+			vals[1].val.str_val.s = dom + 1;
+			vals[1].val.str_val.len = _r->aor.s + _r->aor.len - dom - 1;
+		}
+		uldb_delete_attrs(
+				_r->domain, &vals[0].val.str_val, &vals[1].val.str_val, NULL);
+	} else {
+		uldb_delete_attrs(_r->domain, &vals[0].val.str_val, NULL, NULL);
 	}
 
 	if(ul_dbf.use_table(ul_dbh, _r->domain) < 0) {

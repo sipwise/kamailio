@@ -68,7 +68,7 @@ gen_lock_t *reload_lock;
 /*
  * Module exported parameter variables
  */
-static char *file;
+static char *file = NULL;
 static int max_groups = MAX_GROUPS;
 static int group_max_size = GROUP_MAX_SIZE;
 static int pcre_caseless = 0;
@@ -83,9 +83,9 @@ static int pcre_extended = 0;
 static pcre2_general_context *pcres_gctx = NULL;
 static pcre2_match_context *pcres_mctx = NULL;
 static pcre2_compile_context *pcres_ctx = NULL;
-static pcre2_code **pcres;
-static pcre2_code ***pcres_addr;
-static int *num_pcres;
+static pcre2_code **pcres = NULL;
+static pcre2_code ***pcres_addr = NULL;
+static int *num_pcres = NULL;
 static int pcre_options = 0x00000000;
 
 
@@ -113,48 +113,54 @@ static int w_pcre_match_group(struct sip_msg *_msg, char *_s1, char *_s2);
 /*
  * Exported functions
  */
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"pcre_match", (cmd_function)w_pcre_match, 2, fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
-						| LOCAL_ROUTE},
-		{"pcre_match_group", (cmd_function)w_pcre_match_group, 2,
-				fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
-						| LOCAL_ROUTE},
-		{"pcre_match_group", (cmd_function)w_pcre_match_group, 1,
-				fixup_spve_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
-						| LOCAL_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"pcre_match", (cmd_function)w_pcre_match, 2, fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
+					| LOCAL_ROUTE},
+	{"pcre_match_group", (cmd_function)w_pcre_match_group, 2,
+			fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
+					| LOCAL_ROUTE},
+	{"pcre_match_group", (cmd_function)w_pcre_match_group, 1,
+			fixup_spve_null, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
+					| LOCAL_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 
 /*
  * Exported parameters
  */
-static param_export_t params[] = {{"file", PARAM_STRING, &file},
-		{"max_groups", INT_PARAM, &max_groups},
-		{"group_max_size", INT_PARAM, &group_max_size},
-		{"pcre_caseless", INT_PARAM, &pcre_caseless},
-		{"pcre_multiline", INT_PARAM, &pcre_multiline},
-		{"pcre_dotall", INT_PARAM, &pcre_dotall},
-		{"pcre_extended", INT_PARAM, &pcre_extended}, {0, 0, 0}};
+static param_export_t params[] = {
+	{"file", PARAM_STRING, &file},
+	{"max_groups", INT_PARAM, &max_groups},
+	{"group_max_size", INT_PARAM, &group_max_size},
+	{"pcre_caseless", INT_PARAM, &pcre_caseless},
+	{"pcre_multiline", INT_PARAM, &pcre_multiline},
+	{"pcre_dotall", INT_PARAM, &pcre_dotall},
+	{"pcre_extended", INT_PARAM, &pcre_extended},
+	{0, 0, 0}
+};
 
 
 /*
  * Module interface
  */
 struct module_exports exports = {
-		"regex",		 /*!< module name */
-		DEFAULT_DLFLAGS, /*!< dlopen flags */
-		cmds,			 /*!< exported functions */
-		params,			 /*!< exported parameters */
-		0,				 /*!< exported RPC functions */
-		0,				 /*!< exported pseudo-variables */
-		0,				 /*!< response handling function */
-		mod_init,		 /*!< module initialization function */
-		0,				 /*!< per-child init function */
-		destroy			 /*!< destroy function */
+	"regex",		 /*!< module name */
+	DEFAULT_DLFLAGS, /*!< dlopen flags */
+	cmds,			 /*!< exported functions */
+	params,			 /*!< exported parameters */
+	0,				 /*!< exported RPC functions */
+	0,				 /*!< exported pseudo-variables */
+	0,				 /*!< response handling function */
+	mod_init,		 /*!< module initialization function */
+	0,				 /*!< per-child init function */
+	destroy			 /*!< destroy function */
 };
+/* clang-format on */
 
 
 static void *pcre2_malloc(size_t size, void *ext)
@@ -421,7 +427,7 @@ static int load_pcres(int action)
 	}
 
 	/* Temporal pointer of pcres */
-	if((pcres_tmp = pkg_malloc(sizeof(pcre2_code *) * num_pcres_tmp)) == 0) {
+	if((pcres_tmp = shm_malloc(sizeof(pcre2_code *) * num_pcres_tmp)) == 0) {
 		LM_ERR("no more memory for pcres_tmp\n");
 		goto err;
 	}
@@ -462,11 +468,11 @@ static int load_pcres(int action)
 		}
 		shm_free(pcres);
 	}
+
 	*num_pcres = num_pcres_tmp;
-	*pcres = *pcres_tmp;
+	pcres = pcres_tmp;
 	*pcres_addr = pcres;
 
-	pkg_free(pcres_tmp);
 	/* Free allocated slots for unused patterns */
 	for(i = num_pcres_tmp; i < max_groups; i++) {
 		pkg_free(patterns[i]);

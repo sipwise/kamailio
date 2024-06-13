@@ -2206,8 +2206,10 @@ static int mod_init(void)
 			}
 		}
 
-		register_procs(1);
-		cfg_register_child(1);
+		if(rtpengine_dtmf_event_sock.len > 0) {
+			register_procs(1);
+			cfg_register_child(1);
+		}
 	}
 
 	return 0;
@@ -3517,6 +3519,7 @@ static char *send_rtpp_command(
 
 		len = _rtpe_lwscb.request(&node->rn_url, (str *)&rtpe_proto, &request,
 				&response, rtpengine_tout_ms * 1000);
+		pkg_free(request.s);
 
 		if(len < 0) {
 			LM_ERR("failed to do websocket request\n");
