@@ -1,4 +1,3 @@
-From 534a35956b1a79598dcd2436248c5d7ce4e92da8 Mon Sep 17 00:00:00 2001
 From: Donat Zenichev <dzenichev@sipwise.com>
 Date: Fri, 10 May 2024 09:43:28 +0200
 Subject: [PATCH] permissions: introduce func `allow_register_include_port()`
@@ -24,13 +23,13 @@ Full backwards compatibility is kept in place,
 no need for users of the module to change anything in
 their configuration or kamailio script itself.
 ---
- src/modules/permissions/doc/permissions.xml   |   7 +
- .../permissions/doc/permissions_admin.xml     | 142 ++++++++++++++++++
- src/modules/permissions/permissions.c         |  63 ++++++--
+ src/modules/permissions/doc/permissions.xml       |   7 ++
+ src/modules/permissions/doc/permissions_admin.xml | 142 ++++++++++++++++++++++
+ src/modules/permissions/permissions.c             |  63 ++++++++--
  3 files changed, 200 insertions(+), 12 deletions(-)
 
 diff --git a/src/modules/permissions/doc/permissions.xml b/src/modules/permissions/doc/permissions.xml
-index 10b16ae1e9..a8adfdf944 100644
+index 10b16ae..a8adfdf 100644
 --- a/src/modules/permissions/doc/permissions.xml
 +++ b/src/modules/permissions/doc/permissions.xml
 @@ -48,6 +48,13 @@
@@ -48,7 +47,7 @@ index 10b16ae1e9..a8adfdf944 100644
  	<copyright>
  		<year>2003</year>
 diff --git a/src/modules/permissions/doc/permissions_admin.xml b/src/modules/permissions/doc/permissions_admin.xml
-index 4ddde99d62..494a7ecc0f 100644
+index 4ddde99..494a7ec 100644
 --- a/src/modules/permissions/doc/permissions_admin.xml
 +++ b/src/modules/permissions/doc/permissions_admin.xml
 @@ -121,6 +121,8 @@
@@ -227,7 +226,7 @@ index 4ddde99d62..494a7ecc0f 100644
 +
  </chapter>
 diff --git a/src/modules/permissions/permissions.c b/src/modules/permissions/permissions.c
-index 2b860b81b2..f91f1a0f11 100644
+index 2b860b8..f91f1a0 100644
 --- a/src/modules/permissions/permissions.c
 +++ b/src/modules/permissions/permissions.c
 @@ -123,6 +123,10 @@ static int allow_routing_2(
@@ -365,6 +364,3 @@ index 2b860b81b2..f91f1a0f11 100644
  }
  
  
--- 
-2.34.1
-

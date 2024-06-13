@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 13 Jun 2024 09:18:18 +0200
+Subject: multipart-sdp
+
+---
+ src/modules/rtpengine/rtpengine.c | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 84df238..e26d533 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -4693,28 +4693,13 @@
+@@ -4696,28 +4696,13 @@ static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
  			pkg_free(newbody.s);
  
  		} else {
@@ -33,7 +43,7 @@
  				anchor = del_lump(msg, cur_body.s - msg->buf, cur_body.len, 0);
  			} else {
  				anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
-@@ -4727,6 +4712,21 @@
+@@ -4730,6 +4715,21 @@ static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
  				LM_ERR("insert_new_lump_after failed\n");
  				goto error_free;
  			}
