@@ -780,7 +780,7 @@ int tel2sip2(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
 		return 1;
 
 	/* reserve memory for clean tel uri */
-	tel_uri.s = pkg_malloc(uri.len + 1);
+	tel_uri.s = pkg_mallocxz(uri.len + 1);
 	if(tel_uri.s == 0) {
 		LM_ERR("no more pkg memory\n");
 		return -1;
@@ -839,7 +839,7 @@ int tel2sip2(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
 
 	/* reserve memory for resulting sip uri */
 	sip_uri.len = 4 + tel_uri.len - 4 + 1 + hostpart.len + 1 + 10;
-	sip_uri.s = pkg_malloc(sip_uri.len + 1);
+	sip_uri.s = pkg_mallocxz(sip_uri.len + 1);
 	if(sip_uri.s == 0) {
 		LM_ERR("no more pkg memory\n");
 		pkg_free(tel_uri.s);
@@ -872,6 +872,8 @@ int tel2sip2(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
 
 	/* tel_uri is not needed anymore */
 	pkg_free(tel_uri.s);
+
+	sip_uri.len = strlen(sip_uri.s);
 
 	/* set result pv value and write sip uri to result pv */
 	res_val.rs = sip_uri;
@@ -1163,6 +1165,7 @@ int get_uri_param(struct sip_msg *_msg, char *_param, char *_value)
 	pv_value_t val;
 
 	param_hooks_t hooks;
+	param_t *plist = NULL;
 	param_t *params;
 
 	param = (str *)_param;
@@ -1175,11 +1178,12 @@ int get_uri_param(struct sip_msg *_msg, char *_param, char *_value)
 
 	t = _msg->parsed_uri.params;
 
-	if(parse_params(&t, CLASS_ANY, &hooks, &params) < 0) {
+	if(parse_params(&t, CLASS_ANY, &hooks, &plist) < 0) {
 		LM_ERR("ruri parameter parsing failed\n");
 		return -1;
 	}
 
+	params = plist;
 	while(params) {
 		if((params->name.len == param->len)
 				&& (strncmp(params->name.s, param->s, param->len) == 0)) {
@@ -1194,11 +1198,11 @@ int get_uri_param(struct sip_msg *_msg, char *_param, char *_value)
 		}
 	}
 
-	free_params(params);
+	free_params(plist);
 	return -1;
 
 found:
-	free_params(params);
+	free_params(plist);
 	return 1;
 }
 
