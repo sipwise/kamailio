@@ -37,6 +37,7 @@ sipwise/sca-add-pai_avp-parameter.patch
 upstream/rtpengine_rework_rtpp_flags.patch
 upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
 upstream/cfgutils-initialize-the-optional-key.patch
+upstream/dialog-don-t-complain-if-dst_var-doesn-t-exist.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
