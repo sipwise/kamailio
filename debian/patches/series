@@ -41,6 +41,7 @@ upstream/http_client-Add-parameter-timeout_mode-timeout-in-se.patch
 upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
 upstream/cfgutils-initialize-the-optional-key.patch
+upstream/dialog-don-t-complain-if-dst_var-doesn-t-exist.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
