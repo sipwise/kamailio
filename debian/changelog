@@ -1,4 +1,4 @@
-ngcp-kamailio (5.7.5-1+0~mr11.5.2.0) unstable; urgency=medium
+ngcp-kamailio (5.7.6-1+0~mr11.5.2.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
   * MT#58314 Use gw flags as id
@@ -20,8 +20,10 @@ ngcp-kamailio (5.7.5-1+0~mr11.5.2.0) unstable; urgency=medium
   * MT#59890 backport patches from 5.7
   * New upstream version 5.7.5
   * MT#60077 remove already applied patches from 5.7 branch
+  * New upstream version 5.7.6
+  * MT#60440 refresh patches
 
- -- Victor Seva <vseva@debian.org>  Fri, 10 May 2024 08:52:58 +0200
+ -- Victor Seva <vseva@debian.org>  Wed, 03 Jul 2024 12:22:51 +0200
 
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.0) unstable; urgency=medium
 
