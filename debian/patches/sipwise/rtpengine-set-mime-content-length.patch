@@ -9,7 +9,7 @@ Subject: rtpengine-set-mime-content-length
  3 files changed, 38 insertions(+), 17 deletions(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 442df8d..1c7da31 100644
+index d5c796b..966b95b 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -2550,7 +2550,7 @@ error:
@@ -53,7 +53,7 @@ index 442df8d..1c7da31 100644
  	if(!ret)
  		return NULL;
  
-@@ -3804,7 +3804,7 @@ static int rtpengine_delete(struct sip_msg *msg, const char *flags)
+@@ -3805,7 +3805,7 @@ static int rtpengine_delete(struct sip_msg *msg, const char *flags)
  {
  	bencode_buffer_t bencbuf;
  	bencode_item_t *ret =
@@ -62,7 +62,7 @@ index 442df8d..1c7da31 100644
  	if(!ret)
  		return -1;
  	parse_call_stats(ret, msg);
-@@ -3816,7 +3816,7 @@ static int rtpengine_query(struct sip_msg *msg, const char *flags)
+@@ -3817,7 +3817,7 @@ static int rtpengine_query(struct sip_msg *msg, const char *flags)
  {
  	bencode_buffer_t bencbuf;
  	bencode_item_t *ret =
@@ -71,7 +71,7 @@ index 442df8d..1c7da31 100644
  	if(!ret)
  		return -1;
  	parse_call_stats(ret, msg);
-@@ -4097,9 +4097,11 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
+@@ -4098,9 +4098,11 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  	str body, newbody;
  	struct lump *anchor;
  	pv_value_t pv_val;
@@ -85,7 +85,7 @@ index 442df8d..1c7da31 100644
  	if(!dict)
  		return -1;
  
-@@ -4129,6 +4131,21 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
+@@ -4130,6 +4132,21 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  			pkg_free(newbody.s);
  
  		} else {
@@ -107,7 +107,7 @@ index 442df8d..1c7da31 100644
  			if(read_sdp_pvar_str.len > 0) {
  				/* get the body from the message as body ptr may have changed
  				 * when using read_sdp_pv */
-@@ -4156,6 +4173,8 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
+@@ -4157,6 +4174,8 @@ static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
  
  error_free:
  	pkg_free(newbody.s);
@@ -116,7 +116,7 @@ index 442df8d..1c7da31 100644
  error:
  	bencode_buffer_free(&bencbuf);
  	return -1;
-@@ -4219,7 +4238,7 @@ static int rtpengine_play_media(
+@@ -4220,7 +4239,7 @@ static int rtpengine_play_media(
  	pv_value_t val;
  	int retval = 1;
  
@@ -125,7 +125,7 @@ index 442df8d..1c7da31 100644
  	if(!ret)
  		return -1;
  	if(media_duration_pvar) {
-@@ -4283,7 +4302,7 @@ static int rtpengine_rtpstat_wrap(
+@@ -4284,7 +4303,7 @@ static int rtpengine_rtpstat_wrap(
  	param = parms[0];
  	res = parms[1];
  
@@ -134,7 +134,7 @@ index 442df8d..1c7da31 100644
  	if(!dict)
  		return -1;
  
-@@ -4452,7 +4471,7 @@ static int rtpengine_query_v_wrap(
+@@ -4453,7 +4472,7 @@ static int rtpengine_query_v_wrap(
  	fmt = parms[0];
  	dst = parms[1];
  
