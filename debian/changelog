@@ -1,4 +1,4 @@
-ngcp-kamailio (5.7.5-1+0~mr10.5.8.0) unstable; urgency=medium
+ngcp-kamailio (5.7.6-1+0~mr10.5.8.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
   * [0886819] MT#58982 topos: fix early-dialog b-side UPDATE requests routing
@@ -14,8 +14,10 @@ ngcp-kamailio (5.7.5-1+0~mr10.5.8.0) unstable; urgency=medium
   * MT#56518 debian/rules: fix build process
   * MT#60077 remove patches from 5.6
   * MT#60077 merge debian changes from mr11.5
+  * New upstream version 5.7.6
+  * MT#60440 refresh patches
 
- -- Victor Seva <vseva@sipwise.com>  Fri, 10 May 2024 09:27:38 +0200
+ -- Victor Seva <vseva@debian.org>  Wed, 03 Jul 2024 12:33:36 +0200
 
 ngcp-kamailio (5.6.4-1+0~mr10.5.7.0) unstable; urgency=medium
 
