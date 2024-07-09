@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.1-1+0~mr12.4.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [f683cd4] MT#60394 dialog: be less verbose on error at dlg_get_var()
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 09 Jul 2024 11:45:08 +0200
+
 ngcp-kamailio (5.8.1-1+0~mr12.4.1.1) unstable; urgency=medium
 
   * New release.
