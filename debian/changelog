@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.1-1+0~mr12.4.1.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [dd535e8] MT#58547 lcr_rate: use gw_id field from gw_uri_avp for load_peers()
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 18 Jul 2024 14:41:23 +0200
+
 ngcp-kamailio (5.8.1-1+0~mr12.4.1.2) unstable; urgency=medium
 
   [ Victor Seva ]
