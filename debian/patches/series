@@ -11,7 +11,6 @@ sipwise/parallel_build.patch
 ## New Modules
 sipwise/add_pcem_module.patch
 sipwise/add_lcr_rate_module.patch
-sipwise/fix_lcr_rate_wrong_id.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
