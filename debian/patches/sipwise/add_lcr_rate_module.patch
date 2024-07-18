@@ -7,8 +7,8 @@ Subject: add_lcr_rate_module
  src/core/mod_fix.c                  |   3 +
  src/core/mod_fix.h                  |   2 +
  src/modules/lcr_rate/Makefile       |   9 +
- src/modules/lcr_rate/lcr_rate_mod.c | 473 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 494 insertions(+), 2 deletions(-)
+ src/modules/lcr_rate/lcr_rate_mod.c | 517 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 538 insertions(+), 2 deletions(-)
  create mode 100644 src/modules/lcr_rate/Makefile
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
@@ -97,10 +97,10 @@ index 0000000..9a3cee1
 +include ../../Makefile.modules
 diff --git a/src/modules/lcr_rate/lcr_rate_mod.c b/src/modules/lcr_rate/lcr_rate_mod.c
 new file mode 100644
-index 0000000..f3a9ab2
+index 0000000..5670871
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
-@@ -0,0 +1,473 @@
+@@ -0,0 +1,517 @@
 +/*
 + * call rating for least cost routing module
 + *
@@ -138,7 +138,8 @@ index 0000000..f3a9ab2
 +
 +MODULE_VERSION
 +
-+struct peer {
++struct peer
++{
 +	int valid;
 +	unsigned int id;
 +	double cost;
@@ -151,10 +152,25 @@ index 0000000..f3a9ab2
 +static int child_init(int rank);
 +
 +static int lcr_rate(sip_msg_t *msg, char *su, char *sq);
-+static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid, char *avp, char *avp2);
++static int lcr_get_prepaid_from_uuid(
++		sip_msg_t *msg, char *uuid, char *avp, char *avp2);
 +static int lcr_get_prepaid_from_uuid2(sip_msg_t *msg, char *uuid, char *avp);
 +static int lcr_get_profile_id_from_uuid(sip_msg_t *msg, char *uuid, char *avp);
 +
++static char *gw_uri_avp_param;
++static int gw_uri_avp_type;
++static int_str gw_uri_avp;
++
++static char *db_host;
++static unsigned int db_port;
++static char *db_user;
++static char *db_pass;
++static char *db_db;
++
++static int swrate_done;
++static SWRATE *swrate_ptr;
++
++/* clang-format off */
 +static cmd_export_t cmds[] = {
 +	{"lcr_rate", lcr_rate, 2, fixup_spve_spve, 0,
 +	REQUEST_ROUTE | FAILURE_ROUTE},
@@ -167,16 +183,6 @@ index 0000000..f3a9ab2
 +	{0,}
 +};
 +
-+static char *gw_uri_avp_param;
-+static int gw_uri_avp_type;
-+static int_str gw_uri_avp;
-+
-+static char *db_host;
-+static unsigned int db_port;
-+static char *db_user;
-+static char *db_pass;
-+static char *db_db;
-+
 +static param_export_t params[] = {
 +	{"gw_uri_avp",		STR_PARAM, &gw_uri_avp_param},
 +	{"db_host",		STR_PARAM, &db_host},
@@ -186,9 +192,6 @@ index 0000000..f3a9ab2
 +	{"db_db",		STR_PARAM, &db_db},
 +	{0,},
 +};
-+
-+static int swrate_done;
-+static SWRATE *swrate_ptr;
 +
 +struct module_exports exports = {
 +    "lcr_rate",      /* module name */
@@ -202,13 +205,15 @@ index 0000000..f3a9ab2
 +    child_init,      /* per-child init function */
 +    mod_destroy      /* module destroy function */
 +};
++/* clang-format on */
 +
-+static int mod_init() {
++static int mod_init()
++{
 +	pv_spec_t avp_spec;
 +	str s;
 +	unsigned short avp_flags;
 +
-+	if (!gw_uri_avp_param || !*gw_uri_avp_param) {
++	if(!gw_uri_avp_param || !*gw_uri_avp_param) {
 +		LM_ERR("gw_uri_avp not set\n");
 +		return -1;
 +	}
@@ -216,12 +221,12 @@ index 0000000..f3a9ab2
 +	s.s = gw_uri_avp_param;
 +	s.len = strlen(s.s);
 +
-+	if (!pv_parse_spec(&s, &avp_spec) || avp_spec.type != PVT_AVP) {
++	if(!pv_parse_spec(&s, &avp_spec) || avp_spec.type != PVT_AVP) {
 +		LM_ERR("malformed or non AVP definition <%s>\n", gw_uri_avp_param);
 +		return -1;
 +	}
 +
-+	if (pv_get_avp_name(0, &(avp_spec.pvp), &gw_uri_avp, &avp_flags)) {
++	if(pv_get_avp_name(0, &(avp_spec.pvp), &gw_uri_avp, &avp_flags)) {
 +		LM_ERR("invalid AVP definition <%s>\n", gw_uri_avp_param);
 +		return -1;
 +	}
@@ -230,21 +235,25 @@ index 0000000..f3a9ab2
 +	return 0;
 +}
 +
-+static int child_init(int rank) {
++static int child_init(int rank)
++{
 +	return 0;
 +}
 +
-+static void mod_destroy() {
-+	;
++static void mod_destroy()
++{
++	return;
 +}
 +
-+static int check_swrate_init() {
-+	if (swrate_done)
++static int check_swrate_init()
++{
++	if(swrate_done)
 +		return 0;
-+	swrate_ptr = swrate_new(db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0);
-+	if (!swrate_ptr || !swrate_new_ok(swrate_ptr)) {
++	swrate_ptr = swrate_new(
++			db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0);
++	if(!swrate_ptr || !swrate_new_ok(swrate_ptr)) {
 +		LM_ERR("failed to initialized libswrate\n");
-+		if (swrate_ptr)
++		if(swrate_ptr)
 +			swrate_free(swrate_ptr);
 +		return -1;
 +	}
@@ -252,37 +261,39 @@ index 0000000..f3a9ab2
 +	return 0;
 +}
 +
-+static struct peer *load_peers(int *num, char *src_user, char *src_domain, char *dst_user, char *dst_domain) {
++static struct peer *load_peers(int *num, char *src_user, char *src_domain,
++		char *dst_user, char *dst_domain)
++{
 +	struct usr_avp *avp;
 +	int_str val;
 +	struct peer *ret, *j;
-+	int len, i;
++	int len, i, k;
 +	char *c;
 +	str s;
 +	swr_rate_t rate;
 +	time_t now;
 +
-+	LM_DBG("loading peers for user <%s>@<%s> -> <%s>@<%s> from avp\n",
-+		src_user, src_domain, dst_user, dst_domain);
++	LM_DBG("loading peers for user <%s>@<%s> -> <%s>@<%s> from avp\n", src_user,
++			src_domain, dst_user, dst_domain);
 +
 +	len = 4;
 +	ret = pkg_malloc(len * sizeof(*ret));
-+	if (!ret) {
++	if(!ret) {
 +		LM_ERR("out of pkg memory\n");
 +		return NULL;
 +	}
 +	i = 0;
 +	time(&now);
 +
-+	while (1) {
++	while(1) {
 +		avp = search_first_avp(gw_uri_avp_type, gw_uri_avp, &val, 0);
-+		if (!avp)
++		if(!avp)
 +			break;
 +
-+		if (i == len) {
++		if(i == len) {
 +			len <<= 1;
 +			j = pkg_realloc(ret, len * sizeof(*ret));
-+			if (!j) {
++			if(!j) {
 +				pkg_free(ret);
 +				LM_ERR("out of pkg memory\n");
 +				return NULL;
@@ -295,22 +306,47 @@ index 0000000..f3a9ab2
 +
 +		j->s.len = val.s.len;
 +		j->s.s = pkg_malloc(val.s.len);
-+		if (!j->s.s) {
++		if(!j->s.s) {
 +			pkg_free(ret);
 +			LM_ERR("out of pkg memory\n");
 +			return NULL;
 +		}
 +		memcpy(j->s.s, val.s.s, val.s.len);
-+		c = memrchr(j->s.s, '|', val.s.len);
-+		if (!c) {
-+			LM_ERR("separator not found in string <%.*s>\n", val.s.len, j->s.s);
-+			goto next;
++
++		/* lcr gw fields:
++		 *  0: gw index
++		 *  1: scheme
++		 *  2: strip
++		 *  3: prefix
++		 *  4: tag
++		 *  5: ip adr
++		 *  6: hostname
++		 *  7: port
++		 *  8: params
++		 *  9: transport
++		 * 10: flags
++		 * 11: rule id
++		 * 12: gw id
++		 */
++		c = j->s.s;
++		for(k = 0; k < 12; k++) {
++			c = memchr(c, '|', val.s.len - (c - j->s.s));
++			if(!c) {
++				LM_ERR("separator not found in string <%.*s> (field #%i)\n",
++						val.s.len, j->s.s, k);
++				goto next;
++			}
++			c++;
 +		}
 +
-+		c++;
 +		s.s = c;
-+		s.len = val.s.len - (c - j->s.s);
-+		if (str2int(&s, &j->id)) {
++
++		/* find terminator */
++		c = memchr(c, '|', val.s.len - (c - j->s.s));
++		if(!c)
++			c = j->s.s + val.s.len;
++		s.len = c - s.s;
++		if(str2int(&s, &j->id)) {
 +			LM_ERR("could not convert string <%.*s> to int\n", s.len, s.s);
 +			goto next;
 +		}
@@ -318,17 +354,18 @@ index 0000000..f3a9ab2
 +		LM_DBG("finding rate for peer %u\n", j->id);
 +		j->weight = i;
 +
-+		if (swrate_get_peer_ab_rate(&rate, swrate_ptr, j->id, src_user,
-+					src_domain, dst_user, dst_domain, now)) {
-+			LM_ERR("failed to get rate for call, peer id %u, user <%s>@<%s> -> <%s>@<%s>\n",
-+				j->id, src_user, src_domain, dst_user, dst_domain);
++		if(swrate_get_peer_ab_rate(&rate, swrate_ptr, j->id, src_user,
++				   src_domain, dst_user, dst_domain, now)) {
++			LM_ERR("failed to get rate for call, peer id %u, user <%s>@<%s> -> "
++				   "<%s>@<%s>\n",
++					j->id, src_user, src_domain, dst_user, dst_domain);
 +			goto next;
 +		}
 +		j->cost = rate.init_rate;
 +		j->valid = 1;
 +		LM_DBG("cost is %f\n", j->cost);
 +
-+next:
++	next:
 +		destroy_avp(avp);
 +		i++;
 +	}
@@ -337,37 +374,39 @@ index 0000000..f3a9ab2
 +	return ret;
 +}
 +
-+static int peers_cmp(const void *aa, const void *bb) {
++static int peers_cmp(const void *aa, const void *bb)
++{
 +	const struct peer *a = aa, *b = bb;
 +
-+	if (a->valid && !b->valid)
++	if(a->valid && !b->valid)
 +		return 1;
-+	if (!a->valid && b->valid)
++	if(!a->valid && b->valid)
 +		return -1;
-+	if (!a->valid && !b->valid)
++	if(!a->valid && !b->valid)
 +		return 0;
 +
-+	if (a->cost < b->cost)
++	if(a->cost < b->cost)
 +		return 1;
-+	if (a->cost > b->cost)
++	if(a->cost > b->cost)
 +		return -1;
 +
-+	if (a->weight < b->weight)
++	if(a->weight < b->weight)
 +		return 1;
-+	if (a->weight > b->weight)
++	if(a->weight > b->weight)
 +		return -1;
 +
 +	return 0;
 +}
 +
-+static int save_peers(struct peer *peers, int num) {
++static int save_peers(struct peer *peers, int num)
++{
 +	int i;
 +	int_str val;
 +
-+	for (i = 0; i < num; i++) {
++	for(i = 0; i < num; i++) {
 +		LM_DBG("adding back peer %u\n", peers[i].id);
 +		val.s = peers[i].s;
-+		if (add_avp(gw_uri_avp_type|AVP_VAL_STR, gw_uri_avp, val))
++		if(add_avp(gw_uri_avp_type | AVP_VAL_STR, gw_uri_avp, val))
 +			LM_ERR("add_avp failed\n");
 +		pkg_free(val.s.s);
 +	}
@@ -376,35 +415,37 @@ index 0000000..f3a9ab2
 +	return 0;
 +}
 +
-+static void extract_ud(str *s, char **user, char **at, char **domain) {
++static void extract_ud(str *s, char **user, char **at, char **domain)
++{
 +	*user = *at = *domain = NULL;
-+	if (!s || !s->s || !*s->s)
++	if(!s || !s->s || !*s->s)
 +		return;
 +	*user = s->s;
 +	*at = strchr(*user, '@');
-+	if (!*at)
++	if(!*at)
 +		return;
 +	**at = '\0';
 +	*domain = *at + 1;
-+	if (!**domain)
++	if(!**domain)
 +		*domain = NULL;
 +}
 +
-+static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
++static int lcr_rate(sip_msg_t *msg, char *su, char *sq)
++{
 +	struct peer *peers;
 +	int num_peers, ret;
 +	str src, dst;
 +	char *src_user, *src_at, *src_domain;
 +	char *dst_user, *dst_at, *dst_domain;
 +
-+	if (check_swrate_init())
++	if(check_swrate_init())
 +		return -1;
 +
-+	if (fixup_get_svalue(msg, (gparam_t *) su, &src)) {
++	if(fixup_get_svalue(msg, (gparam_t *)su, &src)) {
 +		LM_ERR("failed to get user parameter\n");
 +		return -1;
 +	}
-+	if (fixup_get_svalue(msg, (gparam_t *) sq, &dst)) {
++	if(fixup_get_svalue(msg, (gparam_t *)sq, &dst)) {
 +		LM_ERR("failed to get domain parameter\n");
 +		return -1;
 +	}
@@ -414,17 +455,17 @@ index 0000000..f3a9ab2
 +
 +	peers = load_peers(&num_peers, src_user, src_domain, dst_user, dst_domain);
 +
-+	if (*src_at)
++	if(*src_at)
 +		*src_at = '@';
-+	if (*dst_at)
++	if(*dst_at)
 +		*dst_at = '@';
 +
-+	if (!peers)
++	if(!peers)
 +		return -1;
 +	qsort(peers, num_peers, sizeof(*peers), peers_cmp);
 +
 +	ret = 1;
-+	if (!num_peers || (!peers[0].valid && !peers[num_peers - 1].valid)) {
++	if(!num_peers || (!peers[0].valid && !peers[num_peers - 1].valid)) {
 +		LM_ERR("no peers with valid ratings found\n");
 +		ret = -1;
 +	}
@@ -434,26 +475,24 @@ index 0000000..f3a9ab2
 +	return ret;
 +}
 +
-+static int get_avp(unsigned short *avp_type, int_str *avp_name, char *avp_s) {
++static int get_avp(unsigned short *avp_type, int_str *avp_name, char *avp_s)
++{
 +	pv_spec_t *avp_spec = NULL;
 +	str *avp;
 +
-+	avp = (str *) avp_s;
++	avp = (str *)avp_s;
 +
-+	if (pv_locate_name(avp) != avp->len)
-+	{
++	if(pv_locate_name(avp) != avp->len) {
 +		LM_ERR("invalid AVP parameter\n");
 +		return -1;
 +	}
 +
-+	if (((avp_spec = pv_cache_get(avp)) == NULL)
-+			|| avp_spec->type!=PVT_AVP) {
++	if(((avp_spec = pv_cache_get(avp)) == NULL) || avp_spec->type != PVT_AVP) {
 +		LM_ERR("malformed or non AVP %s AVP definition\n", avp->s);
 +		return -1;
 +	}
 +
-+	if(pv_get_avp_name(0, &avp_spec->pvp, avp_name, avp_type)!=0)
-+	{
++	if(pv_get_avp_name(0, &avp_spec->pvp, avp_name, avp_type) != 0) {
 +		LM_ERR("[%s]- invalid AVP definition\n", avp->s);
 +		return -1;
 +	}
@@ -461,21 +500,23 @@ index 0000000..f3a9ab2
 +	return 0;
 +}
 +
-+static int get_profile_from_uuid(swr_profile_t *prof, sip_msg_t *msg, char *uuid_s) {
++static int get_profile_from_uuid(
++		swr_profile_t *prof, sip_msg_t *msg, char *uuid_s)
++{
 +	char *pc, *ip;
 +	str uuid;
 +
-+	if (check_swrate_init())
++	if(check_swrate_init())
 +		return -1;
 +
 +	// validate parameters
 +
-+	if (get_str_fparam(&uuid, msg, (fparam_t *) uuid_s)) {
++	if(get_str_fparam(&uuid, msg, (fparam_t *)uuid_s)) {
 +		LM_ERR("unable to extract uuid parameter\n");
 +		return -1;
 +	}
 +
-+	if (!uuid.s || !*uuid.s) {
++	if(!uuid.s || !*uuid.s) {
 +		LM_ERR("empty uuid parameter\n");
 +		return -1;
 +	}
@@ -483,14 +524,15 @@ index 0000000..f3a9ab2
 +	// split up "uuid;ip"
 +
 +	pc = strchr(uuid.s, ';');
-+	if (!pc)
++	if(!pc)
 +		ip = NULL;
 +	else {
 +		*pc = 0;
-+		ip = pc+1;
++		ip = pc + 1;
 +	}
 +
-+	if (swrate_get_subscriber_billing_profile(prof, swrate_ptr, time(NULL), uuid.s, ip)) {
++	if(swrate_get_subscriber_billing_profile(
++			   prof, swrate_ptr, time(NULL), uuid.s, ip)) {
 +		LM_ERR("swrate call returned error\n");
 +		return -1;
 +	}
@@ -498,11 +540,14 @@ index 0000000..f3a9ab2
 +	return 0;
 +}
 +
-+static int lcr_get_prepaid_from_uuid2(sip_msg_t *msg, char *uuid_s, char *avp_s) {
++static int lcr_get_prepaid_from_uuid2(sip_msg_t *msg, char *uuid_s, char *avp_s)
++{
 +	return lcr_get_prepaid_from_uuid(msg, uuid_s, avp_s, NULL);
 +}
 +
-+static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s, char *avp2_s) {
++static int lcr_get_prepaid_from_uuid(
++		sip_msg_t *msg, char *uuid_s, char *avp_s, char *avp2_s)
++{
 +	swr_profile_t *prof;
 +	unsigned short avp_type = 0;
 +	int_str avp_val;
@@ -512,33 +557,31 @@ index 0000000..f3a9ab2
 +	int_str avp2_name;
 +
 +	prof = swrate_profile_new();
-+	if (!prof)
++	if(!prof)
 +		return -1;
 +
-+	if (get_profile_from_uuid(prof, msg, uuid_s))
++	if(get_profile_from_uuid(prof, msg, uuid_s))
 +		goto err;
-+	if (get_avp(&avp_type, &avp_name, avp_s))
++	if(get_avp(&avp_type, &avp_name, avp_s))
 +		goto err;
-+	if (avp2_s) {
-+		if (get_avp(&avp2_type, &avp2_name, avp2_s))
++	if(avp2_s) {
++		if(get_avp(&avp2_type, &avp2_name, avp2_s))
 +			goto err;
 +	}
 +
 +	avp_val.s.s = prof->prepaid ? "1" : "0";
 +	avp_val.s.len = 1;
 +
-+	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
-+	{
++	if(add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0) {
 +		LM_ERR("Failed to add result avp");
 +		goto err;
 +	}
 +
-+	if (avp2_s) {
++	if(avp2_s) {
 +		avp2_val.s.s = prof->prepaid_library;
 +		avp2_val.s.len = strlen(prof->prepaid_library);
 +
-+		if (add_avp(AVP_VAL_STR | avp2_type, avp2_name, avp2_val) != 0)
-+		{
++		if(add_avp(AVP_VAL_STR | avp2_type, avp2_name, avp2_val) != 0) {
 +			LM_ERR("Failed to add result avp");
 +			goto err;
 +		}
@@ -553,21 +596,22 @@ index 0000000..f3a9ab2
 +	return -1;
 +}
 +
-+static int lcr_get_profile_id_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s) {
++static int lcr_get_profile_id_from_uuid(
++		sip_msg_t *msg, char *uuid_s, char *avp_s)
++{
 +	swr_profile_t prof;
 +	unsigned short avp_type = 0;
 +	int_str avp_val;
 +	int_str avp_name;
 +
-+	if (get_profile_from_uuid(&prof, msg, uuid_s))
++	if(get_profile_from_uuid(&prof, msg, uuid_s))
 +		return -1;
-+	if (get_avp(&avp_type, &avp_name, avp_s))
++	if(get_avp(&avp_type, &avp_name, avp_s))
 +		return -1;
 +
 +	avp_val.s.s = int2str(prof.profile_id, &avp_val.s.len);
 +
-+	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
-+	{
++	if(add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0) {
 +		LM_ERR("Failed to add result avp");
 +		return -1;
 +	}
