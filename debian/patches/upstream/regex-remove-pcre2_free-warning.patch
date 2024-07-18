@@ -1,0 +1,28 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 18 Jul 2024 13:36:09 +0200
+Subject: regex: remove pcre2_free() warning
+
+related to #3851
+
+(cherry picked from commit b86030cfbd66ba95f33f312595edae29e2b5cde0)
+---
+ src/modules/regex/regex_mod.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/regex/regex_mod.c b/src/modules/regex/regex_mod.c
+index 52ed60b..f4e93e4 100644
+--- a/src/modules/regex/regex_mod.c
++++ b/src/modules/regex/regex_mod.c
+@@ -170,8 +170,10 @@ static void *pcre2_malloc(size_t size, void *ext)
+ 
+ static void pcre2_free(void *ptr, void *ext)
+ {
+-	shm_free(ptr);
+-	ptr = NULL;
++	if(ptr) {
++		shm_free(ptr);
++		ptr = NULL;
++	}
+ }
+ 
+ /*! \brief

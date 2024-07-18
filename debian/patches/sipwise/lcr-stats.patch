@@ -9,7 +9,7 @@ Subject: lcr: add stats per gw
  3 files changed, 828 insertions(+)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index c6f64d2..67b071d 100644
+index bbfe3df..2ef49e2 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -66,6 +66,7 @@
@@ -59,8 +59,8 @@ index c6f64d2..67b071d 100644
      {0, 0, 0}
  };
  
-@@ -442,6 +454,181 @@ static void pcre2_free(void *ptr, void *ext)
- 	ptr = NULL;
+@@ -444,6 +456,181 @@ static void pcre2_free(void *ptr, void *ext)
+ 	}
  }
  
 +// stats request callback function
@@ -241,7 +241,7 @@ index c6f64d2..67b071d 100644
  /*
   * Module initialization function that is called before the main process forks
   */
-@@ -453,6 +640,28 @@ static int mod_init(void)
+@@ -455,6 +642,28 @@ static int mod_init(void)
  	unsigned int i;
  	char *at, *past, *sep;
  
@@ -270,7 +270,7 @@ index c6f64d2..67b071d 100644
  	/* Register RPC commands */
  	if(rpc_register_array(lcr_rpc) != 0) {
  		LM_ERR("failed to register RPC commands\n");
-@@ -1054,6 +1263,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
+@@ -1056,6 +1265,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
  		append_str(at, transport, transport_len);
  	}
  	gws[i].uri_len = at - &(gws[i].uri[0]);
@@ -281,7 +281,7 @@ index c6f64d2..67b071d 100644
  	LM_DBG("inserted gw <%u, %.*s, %.*s> at index %u\n", gw_id, gw_name_len,
  			gw_name, gws[i].uri_len, gws[i].uri, i);
  	return 1;
-@@ -2334,6 +2547,65 @@ done:
+@@ -2336,6 +2549,65 @@ done:
  	return j;
  }
  
@@ -347,7 +347,7 @@ index c6f64d2..67b071d 100644
  
  /*
   * Load info of matching GWs into gw_uri_avps
-@@ -3793,3 +4065,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+@@ -3795,3 +4067,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
  	sr_kemi_modules_add(sr_kemi_lcr_exports);
  	return 0;
  }

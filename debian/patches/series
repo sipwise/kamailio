@@ -33,6 +33,9 @@ sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.8
 upstream/0001-db_mysql-switch-warn-to-dbg-for-log-messages-for-opt.patch
 upstream/0002-db_mysql-switch-warn-to-dbg-for-log-messages-for-opt.patch
+upstream/regex-remove-pcre2_free-warning.patch
+upstream/lcr-remove-pcre2_free-warning.patch
+upstream/dialplan-remove-pcre2_free-warning.patch
 ## upstream master
 upstream/rtpengine_rework_rtpp_flags.patch
 upstream/cfgutils-expose-optional-second-string-key-for-lock.patch

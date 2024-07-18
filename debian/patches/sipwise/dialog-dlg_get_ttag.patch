@@ -9,7 +9,7 @@ Subject: dialog: dlg_get_ttag()
  3 files changed, 211 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 0127e61..a0d654d 100644
+index a36f047..020e1ef 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -54,6 +54,7 @@
