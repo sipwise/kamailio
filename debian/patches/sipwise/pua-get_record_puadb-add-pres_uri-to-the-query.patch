@@ -1,0 +1,83 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 30 Jul 2024 16:13:33 +0200
+Subject: pua: get_record_puadb() add pres_uri to the query
+
+---
+ src/modules/pua/pua_db.c       | 17 +++++++++++++----
+ src/modules/pua/pua_db.h       |  4 ++--
+ src/modules/pua/send_publish.c |  5 +++--
+ 3 files changed, 18 insertions(+), 8 deletions(-)
+
+diff --git a/src/modules/pua/pua_db.c b/src/modules/pua/pua_db.c
+index f66c3b2..6c1ac77 100644
+--- a/src/modules/pua/pua_db.c
++++ b/src/modules/pua/pua_db.c
+@@ -790,17 +790,26 @@ int insert_record_puadb(ua_pres_t *pres)
+ 
+ /******************************************************************************/
+ 
+-ua_pres_t *get_record_puadb(
+-		str pres_id, str *etag, ua_pres_t *result, db1_res_t **dbres)
++ua_pres_t *get_record_puadb(str *pres_uri, str pres_id, str *etag,
++		ua_pres_t *result, db1_res_t **dbres)
+ {
+-	db_key_t q_cols[2];
+-	db_val_t q_vals[2], *values;
++	db_key_t q_cols[3];
++	db_val_t q_vals[3], *values;
+ 	db_row_t *rows;
+ 	db1_res_t *res;
+ 	int n_query_cols = 0, nr_rows;
+ 	db_query_f query_fn =
+ 			pua_dbf.query_lock ? pua_dbf.query_lock : pua_dbf.query;
+ 
++	if(pres_uri != NULL) {
++		q_cols[n_query_cols] = &str_pres_uri_col;
++		q_vals[n_query_cols].type = DB1_STR;
++		q_vals[n_query_cols].nul = 0;
++		q_vals[n_query_cols].val.str_val.s = pres_uri->s;
++		q_vals[n_query_cols].val.str_val.len = pres_uri->len;
++		n_query_cols++;
++	}
++
+ 	q_cols[n_query_cols] = &str_pres_id_col;
+ 	q_vals[n_query_cols].type = DB1_STR;
+ 	q_vals[n_query_cols].nul = 0;
+diff --git a/src/modules/pua/pua_db.h b/src/modules/pua/pua_db.h
+index 788d165..5ee2b8c 100644
+--- a/src/modules/pua/pua_db.h
++++ b/src/modules/pua/pua_db.h
+@@ -58,8 +58,8 @@ int update_dialog_puadb(ua_pres_t *pres, int expires, str *contact);
+ list_entry_t *get_subs_list_puadb(str *did);
+ 
+ int insert_record_puadb(ua_pres_t *pres);
+-ua_pres_t *get_record_puadb(
+-		str pres_id, str *etag, ua_pres_t *result, db1_res_t **res);
++ua_pres_t *get_record_puadb(str *pres_uri, str pres_id, str *etag,
++		ua_pres_t *result, db1_res_t **res);
+ int delete_record_puadb(ua_pres_t *pres);
+ int update_record_puadb(ua_pres_t *pres, int expires, str *contact);
+ int update_version_puadb(ua_pres_t *pres);
+diff --git a/src/modules/pua/send_publish.c b/src/modules/pua/send_publish.c
+index 5364426..4a06870 100644
+--- a/src/modules/pua/send_publish.c
++++ b/src/modules/pua/send_publish.c
+@@ -309,7 +309,7 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
+ 		if(pua_dbf.affected_rows != NULL || dbmode != PUA_DB_ONLY) {
+ 			if(find_and_update_record(hentity, hash_code, lexpire, &etag) > 0)
+ 				goto done;
+-		} else if((db_presentity = get_record_puadb(
++		} else if((db_presentity = get_record_puadb(hentity->pres_uri,
+ 						   hentity->id, &hentity->etag, &dbpres, &res))
+ 				  != NULL) {
+ 			update_record_puadb(hentity, lexpire, &etag);
+@@ -468,7 +468,8 @@ int send_publish(publ_info_t *publ)
+ 		dbpres.pres_uri = &pres_uri;
+ 		dbpres.watcher_uri = &watcher_uri;
+ 		dbpres.extra_headers = &extra_headers;
+-		presentity = get_record_puadb(publ->id, publ->etag, &dbpres, &res);
++		presentity = get_record_puadb(
++				publ->pres_uri, publ->id, publ->etag, &dbpres, &res);
+ 	} else {
+ 		ua_pres_t pres;
+ 
