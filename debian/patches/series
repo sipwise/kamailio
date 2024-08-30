@@ -52,6 +52,8 @@ sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
 sipwise/cfgutils-allow-lock_set_size-14.patch
 sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
+sipwise/http_client-add-method-parameter-to-http_connect.patch
+sipwise/lost-add-method-parameter-to-http_connect-calls.patch
 ### active development
 #
 ### Don't just put stuff in any order
