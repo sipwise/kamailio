@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.2-1+0~mr12.5.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [0c6291a] MT#55401 pua and pua_dialoginfo improvements
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 03 Sep 2024 10:10:13 +0200
+
 ngcp-kamailio (5.8.2-1+0~mr12.5.1.1) unstable; urgency=medium
 
   * New release.
