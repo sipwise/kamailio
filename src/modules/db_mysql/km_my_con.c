@@ -143,7 +143,7 @@ struct my_con *db_mysql_new_connection(const struct db_id *id)
 #if MYSQL_VERSION_ID >= 100339
 			mysql_options(ptr->con, MYSQL_OPT_SSL_ENFORCE, (void *)&(int){1});
 #else
-			LM_WARN("ssl mode not supported by %s\n", MARIADB_BASE_VERSION);
+			LM_DBG("ssl mode not supported by %s\n", MARIADB_BASE_VERSION);
 #endif
 			break;
 		case 5: /* SSL_MODE_VERIFY_IDENTITY */
@@ -151,7 +151,7 @@ struct my_con *db_mysql_new_connection(const struct db_id *id)
 					(void *)&(int){1});
 			break;
 		default:
-			LM_WARN("opt_ssl_mode = %d not supported by MariaDB Connector/C\n",
+			LM_DBG("opt_ssl_mode = %d not supported by MariaDB Connector/C\n",
 					db_mysql_opt_ssl_mode);
 			break;
 	}
@@ -179,14 +179,14 @@ struct my_con *db_mysql_new_connection(const struct db_id *id)
 #endif /* MYSQL_VERSION_ID */
 #endif /* MARIADB_BASE_VERSION */
 
-#ifdef MYSQL_OPT_SSL_CA
+#if(MYSQL_VERSION_ID >= 50600)
 	if(db_mysql_opt_ssl_ca)
 		mysql_options(
 				ptr->con, MYSQL_OPT_SSL_CA, (const void *)db_mysql_opt_ssl_ca);
 #else
-	LM_WARN("opt_ssl_ca option not supported by mysql version (value %s) - "
-			"ignoring\n",
-			db_mysql_opt_ssl_ca);
+	LM_DBG("opt_ssl_ca option not supported by mysql version (value %d) - "
+		   "ignoring\n",
+			MYSQL_VERSION_ID);
 #endif /* MYSQL_OPT_SSL_CA */
 
 #ifdef KSR_MYSQL_OPT_RECONNECT
