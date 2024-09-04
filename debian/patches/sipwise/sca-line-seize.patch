@@ -673,7 +673,7 @@ index d308954..dee234c 100644
  int sca_dialog_build_from_tags(sca_dialog *, int, str *, str *, str *);
  int sca_dialog_create_replaces_header(sca_dialog *, str *);
 diff --git a/src/modules/sca/sca_subscribe.c b/src/modules/sca/sca_subscribe.c
-index 895141e..3a7d46f 100644
+index 9e212f0..7d68867 100644
 --- a/src/modules/sca/sca_subscribe.c
 +++ b/src/modules/sca/sca_subscribe.c
 @@ -844,8 +844,8 @@ static int sca_subscription_update_unsafe(sca_mod *scam,
@@ -867,7 +867,7 @@ index 895141e..3a7d46f 100644
  
  	// XXX should lock starting here and use unsafe methods below?
  
-@@ -1398,13 +1414,15 @@ done:
+@@ -1397,13 +1413,15 @@ done:
  	if(req_sub.rr.s != NULL) {
  		pkg_free(req_sub.rr.s);
  	}
