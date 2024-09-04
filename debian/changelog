@@ -1,13 +1,16 @@
-ngcp-kamailio (5.8.2-1+0~mr13.0.0.0) unstable; urgency=medium
+ngcp-kamailio (5.8.3-1+0~mr13.0.0.0) unstable; urgency=medium
 
-  [ Victor Seva ]
-  * [d9b6095] MT#60281 tls: remove confusing error on startup
-  * [f836dd4] MT#60394 dialog: be less verbose on error at dlg_get_var()
-  * [7508181] MT#60312 remove mysql warnings
-  * [8be5217] MT#58547 lcr_rate: use gw_id field from gw_uri_avp for load_peers()
-  * [db64c1f] MT#60312 remove pcre2_free() warnings
+  * MT#60281 tls: remove confusing error on startup
+  * MT#60394 dialog: be less verbose on error at dlg_get_var()
+  * MT#60312 remove mysql warnings
+  * MT#58547 lcr_rate: use gw_id field from gw_uri_avp for load_peers()
+  * MT#60312 remove pcre2_free() warnings
+  * MT#55401 pua and pua_dialoginfo improvements
+  * MT#60852 New upstream version 5.8.3
+  * MT#60852 remove already applied fixes from 5.8
+  * MT#60852 refresh patches
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sun, 28 Jul 2024 12:02:03 +0200
+ -- Victor Seva <vseva@debian.org>  Wed, 04 Sep 2024 13:09:39 +0200
 
 ngcp-kamailio (5.8.2-1+0~mr12.5.0.0) unstable; urgency=medium
 
