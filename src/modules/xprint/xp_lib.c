@@ -1895,8 +1895,10 @@ int xl_mod_init()
 								str_ipaddr.s[str_ipaddr.len] = '\0';
 							} else {
 								pkg_free(s);
+								s = NULL;
 								str_ipaddr.len = 0;
 								PKG_MEM_ERROR_FMT("for str_ipaddr\n");
+								return -1;
 							}
 						} else if(strncmp(str_ipaddr.s, s, str_ipaddr.len)
 								  != 0) {
@@ -1913,7 +1915,8 @@ int xl_mod_init()
 			}
 		}
 	}
-	pkg_free(s);
+	if(s != NULL)
+		pkg_free(s);
 
 	DBG("Hostname:   %.*s\n", str_hostname.len, ZSW(str_hostname.s));
 	DBG("Domainname: %.*s\n", str_domainname.len, ZSW(str_domainname.s));
