@@ -1,0 +1,41 @@
+From: Bastian Triller <bastian.triller@gmail.com>
+Date: Tue, 28 May 2024 14:17:58 +0200
+Subject: rtpengine: Fix extra process in pkg.stats
+
+When DTMF events socket is not configured, pkg.stats RPC method returns
+an empty entry.
+{
+        entry: 13
+        pid: 0
+        rank: -128
+        used: 0
+        free: 0
+        real_used: 0
+        total_size: 67108864
+        total_frags: 0
+        desc:
+}
+
+Fixes: 26f6e57c8f ("Register a new worker process for dtmf event listener")
+(cherry picked from commit e67f6048f4883d446df2d88fe7a7d7f2ff6daf8c)
+---
+ src/modules/rtpengine/rtpengine.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index b116c05..aa4e146 100644
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -2231,8 +2231,10 @@ static int mod_init(void)
+ 			}
+ 		}
+ 
+-		register_procs(1);
+-		cfg_register_child(1);
++		if(rtpengine_dtmf_event_sock.len > 0) {
++			register_procs(1);
++			cfg_register_child(1);
++		}
+ 	}
+ 
+ 	return 0;
