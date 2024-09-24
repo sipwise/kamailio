@@ -59,6 +59,7 @@ sipwise/rtpengine-set-mime-content-length.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
+sipwise/cfgutils-allow-lock_set_size-14.patch
 ### active development
 #
 ### Don't just put stuff in any order
