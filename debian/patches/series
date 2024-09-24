@@ -47,6 +47,7 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
+sipwise/cfgutils-allow-lock_set_size-14.patch
 sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
 ### active development
