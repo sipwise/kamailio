@@ -1,0 +1,97 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 24 Sep 2024 15:33:25 +0200
+Subject: cfgutils: allow lock_set_size > 14
+
+---
+ src/modules/cfgutils/cfgutils.c | 56 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 52 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/cfgutils/cfgutils.c b/src/modules/cfgutils/cfgutils.c
+index f20f3bb..aebc7b7 100644
+--- a/src/modules/cfgutils/cfgutils.c
++++ b/src/modules/cfgutils/cfgutils.c
+@@ -4,6 +4,7 @@
+  * Copyright (C) 2007 BASIS AudioNet GmbH
+  * Copyright (C) 2004 FhG
+  * Copyright (C) 2005-2006 Voice Sistem S.R.L.
++ * Copyright (C) 2024 Victor Seva (Sipwise)
+  *
+  * This file is part of Kamailio, a free SIP server.
+  *
+@@ -674,6 +675,53 @@ static int ki_shm_summary(sip_msg_t *msg)
+ 	return 1;
+ }
+ 
++/*
++ * case insensitive hashing
++ * - s1 - str to hash
++ * - s2 - optional - continue hashing over s2
++ * - size - optional - size of hash table (must be power of 1); if set (!=0),
++ *   instead of hash id, returned value is slot index
++ * return computed hash id or hash table slot index
++ */
++static inline unsigned int cfg_case_hash(str *s1, str *s2, unsigned int size)
++{
++	char *p, *end;
++	register unsigned long v;
++	register unsigned long h;
++
++	h = 0;
++
++	end = s1->s + s1->len;
++	for(p = s1->s; p <= (end - 4); p += 4) {
++		v = (ch_icase(*p) << 24) + (ch_icase(p[1]) << 16)
++			+ (ch_icase(p[2]) << 8) + ch_icase(p[3]);
++		ch_h_inc;
++	}
++	v = 0;
++	for(; p < end; p++) {
++		v <<= 8;
++		v += ch_icase(*p);
++	}
++	ch_h_inc;
++
++	if(s2) {
++		end = s2->s + s2->len;
++		for(p = s2->s; p <= (end - 4); p += 4) {
++			v = (ch_icase(*p) << 24) + (ch_icase(p[1]) << 16)
++				+ (ch_icase(p[2]) << 8) + ch_icase(p[3]);
++			ch_h_inc;
++		}
++		v = 0;
++		for(; p < end; p++) {
++			v <<= 8;
++			v += ch_icase(*p);
++		}
++		ch_h_inc;
++	}
++	h = ((h) + (h >> 11)) + ((h >> 13) + (h >> 23));
++	return size ? ((h) & (size - 1)) : h;
++}
++
+ static int cfg_lock_helper(str *lkey, str *lkey2, int mode)
+ {
+ 	unsigned int pos;
+@@ -695,7 +743,7 @@ static int cfg_lock_helper(str *lkey, str *lkey2, int mode)
+ 		}
+ 		return -1;
+ 	}
+-	pos = core_case_hash(lkey, key2, _cfg_lock_size);
++	pos = cfg_case_hash(lkey, key2, _cfg_lock_size);
+ 	if(key2) {
+ 		LM_DBG("cfg_lock mode %d on %u (%.*s %.*s)\n", mode, pos, STR_FMT(lkey),
+ 				STR_FMT(lkey2));
+@@ -908,10 +956,10 @@ static int mod_init(void)
+ 		return -1;
+ 	}
+ 	if(_cfg_lock_size > 0) {
+-		if(_cfg_lock_size > 14) {
+-			LM_WARN("lock set size too large (%d), making it 14\n",
++		if(_cfg_lock_size > 30) {
++			LM_WARN("lock set size too large (%d), making it 30\n",
+ 					_cfg_lock_size);
+-			_cfg_lock_size = 14;
++			_cfg_lock_size = 30;
+ 		}
+ 		_cfg_lock_size = 1 << _cfg_lock_size;
+ 		_cfg_lock_set = lock_set_alloc(_cfg_lock_size);
