@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.3-1+0~mr13.0.2.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [91c5a44] MT#61110 cfgutils: allow lock_set_size > 14
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 21 Oct 2024 19:21:23 +0200
+
 ngcp-kamailio (5.8.3-1+0~mr13.0.1.0) unstable; urgency=medium
 
   * New release.
