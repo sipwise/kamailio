@@ -1,0 +1,21 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Mon, 28 Oct 2024 16:14:15 +0100
+Subject: rtpengine_add_sip_code
+
+---
+ src/modules/rtpengine/rtpengine.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index e26d533..5fe506d 100644
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -3278,6 +3278,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
+ 
+ 		/* sip message type */
+ 		bencode_dictionary_add_string(ng_flags.dict, "sip-message-type", sip_type_strings[msg->first_line.type]);
++		if (msg->first_line.type == SIP_REPLY)
++			bencode_dictionary_add_integer(ng_flags.dict, "sip-code", msg->first_line.u.reply.statuscode);
+ 	}
+ 
+ 	/* add rtpp flags, if parsed by daemon */
