@@ -207,6 +207,10 @@ static int init_addr_info(struct addr_info *a, char *name, enum si_flags flags)
 
 	memset(a, 0, sizeof(*a));
 	a->name.len = strlen(name);
+	if(a->name.len <= 0) {
+		LM_ERR("invalid or empty name value\n");
+		return -1;
+	}
 	a->name.s = pkg_malloc(a->name.len + 1); /* include \0 */
 	if(a->name.s == 0)
 		goto error;
@@ -224,16 +228,15 @@ static inline struct addr_info *new_addr_info(char *name, enum si_flags gf)
 {
 	struct addr_info *al;
 
-	al = pkg_malloc(sizeof(*al));
-	if(al == 0)
+	al = pkg_mallocxz(sizeof(*al));
+	if(al == 0) {
+		PKG_MEM_ERROR;
 		goto error;
-	al->next = 0;
-	al->prev = 0;
+	}
 	if(init_addr_info(al, name, gf) != 0)
 		goto error;
 	return al;
 error:
-	PKG_MEM_ERROR;
 	if(al) {
 		if(al->name.s)
 			pkg_free(al->name.s);
@@ -1420,7 +1423,7 @@ static int get_flags(int family)
 		if(nlp->nlmsg_len < NLMSG_LENGTH(sizeof(ifi)))
 			goto error;
 
-		LM_ERR("Interface with index %d has flags %d\n", ifi->ifi_index,
+		LM_INFO("Interface with index %d has flags %d\n", ifi->ifi_index,
 				ifi->ifi_flags);
 		if(ifaces == NULL) {
 			LM_ERR("get_flags must not be called on empty interface list");
@@ -1467,6 +1470,8 @@ static int build_iface_list(void)
 	int families[] = {AF_INET, AF_INET6};
 	char name[MAX_IF_LEN];
 	int is_link_local = 0;
+	int num = 0;
+	int ifidx = 0;
 
 	if(ifaces == NULL) {
 		if((ifaces = (struct idxlist *)pkg_malloc(
@@ -1528,16 +1533,13 @@ static int build_iface_list(void)
 			rtl = IFA_PAYLOAD(nlp);
 
 			index = ifi->ifa_index;
-			if(index >= MAX_IFACE_NO) {
-				LM_ERR("Invalid interface index returned: %d\n", index);
-				goto error;
-			}
 
 			entry = (struct idx *)pkg_malloc(sizeof(struct idx));
 			if(entry == 0) {
 				PKG_MEM_ERROR;
 				goto error;
 			}
+			LM_DBG("trying network interface index: %d (n: %d)\n", index, num);
 
 			entry->next = 0;
 			entry->family = families[i];
@@ -1548,24 +1550,24 @@ static int build_iface_list(void)
 			for(; RTA_OK(rtap, rtl); rtap = RTA_NEXT(rtap, rtl)) {
 				switch(rtap->rta_type) {
 					case IFA_ADDRESS:
-						if((*(int *)RTA_DATA(rtap)) == htons(0xfe80)) {
-							LM_DBG("Link Local Address, ignoring ...\n");
-							is_link_local = 1;
-							break;
-						}
 						inet_ntop(families[i], RTA_DATA(rtap), entry->addr,
 								MAX_IF_LEN);
-						LM_DBG("iface <IFA_ADDRESS> addr is  %s\n",
+						if((*(int *)RTA_DATA(rtap)) == htons(0xfe80)) {
+							LM_DBG("Link Local Address is '%s'\n", entry->addr);
+							is_link_local = 1;
+						}
+						LM_DBG("iface <IFA_ADDRESS> address is '%s'\n",
 								entry->addr);
 						break;
 					case IFA_LOCAL:
-						if((*(int *)RTA_DATA(rtap)) == htons(0xfe80)) {
-							LM_DBG("Link Local Address, ignoring ...\n");
-							is_link_local = 1;
-						}
 						inet_ntop(families[i], RTA_DATA(rtap), entry->addr,
 								MAX_IF_LEN);
-						LM_DBG("iface <IFA_LOCAL> addr is %s\n", entry->addr);
+						if((*(int *)RTA_DATA(rtap)) == htons(0xfe80)) {
+							LM_DBG("Link Local Address is '%s'\n", entry->addr);
+							is_link_local = 1;
+						}
+						LM_DBG("iface <IFA_LOCAL> address is '%s'\n",
+								entry->addr);
 						break;
 					case IFA_LABEL:
 						LM_DBG("iface name is %s\n", (char *)RTA_DATA(rtap));
@@ -1581,30 +1583,58 @@ static int build_iface_list(void)
 				}
 			}
 			if(is_link_local) {
-				if(sr_bind_ipv6_link_local == 0) {
+				if(sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_SKIP) {
+					/* skip - config option */
+					LM_DBG("skip binding on '%s' (bind mode: %d)\n",
+							entry->addr, sr_bind_ipv6_link_local);
+					pkg_free(entry);
+					continue;
+				}
+				if(!(sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_BIND)) {
 					/* skip - link local addresses are not bindable without scope */
+					LM_DBG("not set to on '%s' (bind mode: %d)\n", entry->addr,
+							sr_bind_ipv6_link_local);
 					pkg_free(entry);
 					continue;
 				}
 			}
 
-			if(strlen(ifaces[index].name) == 0 && strlen(name) > 0) {
-				memcpy(ifaces[index].name, name, MAX_IF_LEN - 1);
-				ifaces[index].name[MAX_IF_LEN - 1] = '\0';
+			for(ifidx = 0; ifidx < MAX_IFACE_NO; ifidx++) {
+				if(ifaces[ifidx].index == index) {
+					/* interface with same index already found */
+					break;
+				}
+			}
+			if(ifidx == MAX_IFACE_NO) {
+				if(num == MAX_IFACE_NO) {
+					LM_ERR("too many interfaces: %d (n: %d) - skipping\n",
+							index, num);
+					pkg_free(entry);
+					goto done;
+				}
+				ifidx = num;
+				num++;
 			}
 
-			ifaces[index].index = index;
+			if(strlen(ifaces[ifidx].name) == 0 && strlen(name) > 0) {
+				memcpy(ifaces[ifidx].name, name, MAX_IF_LEN - 1);
+				ifaces[ifidx].name[MAX_IF_LEN - 1] = '\0';
+			}
 
-			if(ifaces[index].addresses == 0)
-				ifaces[index].addresses = entry;
+			ifaces[ifidx].index = index;
+
+			if(ifaces[ifidx].addresses == 0)
+				ifaces[ifidx].addresses = entry;
 			else {
-				for(tmp = ifaces[index].addresses; tmp->next;
+				for(tmp = ifaces[ifidx].addresses; tmp->next;
 						tmp = tmp->next) /*empty*/
 					;
 				tmp->next = entry;
 			}
 		}
 	}
+
+done:
 	if(nl_sock > 0)
 		close(nl_sock);
 	/* the socket should be closed so we can bind again */
@@ -1649,13 +1679,18 @@ int add_interfaces_via_netlink(char *if_name, int family, unsigned short port,
 			//if(! (ifaces[i].flags & IFF_UP) ) continue;
 
 			for(tmp = ifaces[i].addresses; tmp; tmp = tmp->next) {
-				LM_DBG("in add_iface_via_netlink Name %s Address %s\n",
+				LM_DBG("in add_iface_via_netlink Name '%s' Address '%s'\n",
 						ifaces[i].name, tmp->addr);
+				if(strlen(tmp->addr) == 0) {
+					LM_DBG("interface '%s' - skip item with empty address\n",
+							ifaces[i].name);
+					continue;
+				}
 				/* match family */
 				if(family && family == tmp->family) {
 					/* check if loopback */
 					if(ifaces[i].flags & IFF_LOOPBACK) {
-						LM_DBG("INTERFACE %s is loopback", ifaces[i].name);
+						LM_DBG("INTERFACE '%s' is loopback\n", ifaces[i].name);
 						flags |= SI_IS_LO;
 					}
 					/* save the info */
@@ -1705,6 +1740,16 @@ int add_interfaces(char *if_name, int family, unsigned short port,
 			continue;
 		if(family && family != ifa->ifa_addr->sa_family)
 			continue;
+		if(ifa->ifa_addr->sa_family == AF_INET6) {
+			struct sockaddr_in6 *caddr = (struct sockaddr_in6 *)ifa->ifa_addr;
+			if((sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_SKIP)
+					&& IN6_IS_ADDR_LINKLOCAL(&(caddr->sin6_addr))) {
+				LM_DBG("skipping iface [%s] fam: [%x] flg: [%lx] addr: [%s]\n",
+						ifa->ifa_name, ifa->ifa_addr->sa_family,
+						(unsigned long)ifa->ifa_flags, tmp);
+				continue;
+			}
+		}
 		sockaddr2ip_addr(&addr, (struct sockaddr *)ifa->ifa_addr);
 		tmp = ip_addr2a(&addr);
 		if(ifa->ifa_flags & IFF_LOOPBACK)
@@ -1741,7 +1786,7 @@ static int fix_hostname(str *name, struct ip_addr *address, str *address_str,
 	/* get "official hostnames", all the aliases etc. */
 	he = resolvehost(name->s);
 	if(he == 0) {
-		LM_ERR("could not resolve %s\n", name->s);
+		LM_ERR("could not resolve '%s'\n", name->s);
 		goto error;
 	}
 	/* check if we got the official name */

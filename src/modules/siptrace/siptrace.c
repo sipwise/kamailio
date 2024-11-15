@@ -133,6 +133,9 @@ int siptrace_net_data_sent(sr_event_param_t *evp);
 static int _siptrace_init_mode = 0;
 static int _siptrace_mode = 0;
 
+#define SIPTRACE_DATA_MODE_ADVADDR 1 /* use advertised address */
+static int _siptrace_data_mode = 0;
+
 
 static str db_url = str_init(DEFAULT_DB_URL);
 static str siptrace_table = str_init("sip_trace");
@@ -272,6 +275,7 @@ static param_export_t params[] = {
 	{"trace_db_mode", INT_PARAM, &trace_db_mode},
 	{"trace_init_mode", PARAM_INT, &_siptrace_init_mode},
 	{"trace_mode", PARAM_INT, &_siptrace_mode},
+	{"data_mode", PARAM_INT, &_siptrace_data_mode},
 	{"evcb_msg", PARAM_STR, &_siptrace_evcb_msg},
 	{"trace_dialog_ack", PARAM_INT, &trace_dialog_ack},
 	{"trace_dialog_spiral", PARAM_INT, &trace_dialog_spiral},
@@ -2308,15 +2312,27 @@ int siptrace_net_data_recv(sr_event_param_t *evp)
 		sto.fromip.s = sto.fromip_buff;
 	}
 
-	sto.toip.len = snprintf(sto.toip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
-			siptrace_proto_name(nd->rcv->proto), ip_addr2strz(&nd->rcv->dst_ip),
-			(int)nd->rcv->dst_port);
-	if(sto.toip.len < 0 || sto.toip.len >= SIPTRACE_ADDR_MAX) {
-		LM_ERR("failed to format toip buffer (%d)\n", sto.toip.len);
-		sto.toip.s = SIPTRACE_ANYADDR;
-		sto.toip.len = SIPTRACE_ANYADDR_LEN;
-	} else {
+	if((_siptrace_data_mode & SIPTRACE_DATA_MODE_ADVADDR)
+			&& nd->rcv->bind_address != NULL
+			&& nd->rcv->bind_address->useinfo.sock_str.len > 0
+			&& (nd->rcv->bind_address->useinfo.sock_str.len
+					< SIPTRACE_ADDR_MAX - 1)) {
+		sto.toip.len = nd->rcv->bind_address->useinfo.sock_str.len;
+		memcpy(sto.toip_buff, nd->rcv->bind_address->useinfo.sock_str.s,
+				sto.toip.len);
+		sto.toip_buff[sto.toip.len] = '\0';
 		sto.toip.s = sto.toip_buff;
+	} else {
+		sto.toip.len = snprintf(sto.toip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+				siptrace_proto_name(nd->rcv->proto),
+				ip_addr2strz(&nd->rcv->dst_ip), (int)nd->rcv->dst_port);
+		if(sto.toip.len < 0 || sto.toip.len >= SIPTRACE_ADDR_MAX) {
+			LM_ERR("failed to format toip buffer (%d)\n", sto.toip.len);
+			sto.toip.s = SIPTRACE_ANYADDR;
+			sto.toip.len = SIPTRACE_ANYADDR_LEN;
+		} else {
+			sto.toip.s = sto.toip_buff;
+		}
 	}
 
 	sto.dir = "in";
@@ -2408,6 +2424,7 @@ int siptrace_net_data_sent(sr_event_param_t *evp)
 	int proto;
 	int evcb_ret;
 	int ret = 0;
+	str vsock;
 
 	if(evp->data == 0)
 		return -1;
@@ -2437,14 +2454,19 @@ int siptrace_net_data_sent(sr_event_param_t *evp)
 		sto.fromip.len = SIPTRACE_ANYADDR_LEN;
 		proto = PROTO_UDP;
 	} else {
-		if(new_dst.send_sock->sock_str.len >= SIPTRACE_ADDR_MAX - 1) {
-			LM_ERR("socket string is too large: %d\n",
-					new_dst.send_sock->sock_str.len);
+		if((_siptrace_data_mode & SIPTRACE_DATA_MODE_ADVADDR)
+				&& new_dst.send_sock->useinfo.sock_str.len > 0) {
+			vsock = new_dst.send_sock->useinfo.sock_str;
+		} else {
+			vsock = new_dst.send_sock->sock_str;
+		}
+		if(vsock.len >= SIPTRACE_ADDR_MAX - 1) {
+			LM_ERR("socket string is too large: %d\n", vsock.len);
 			return -1;
 		}
-		strncpy(sto.fromip_buff, new_dst.send_sock->sock_str.s,
-				new_dst.send_sock->sock_str.len);
-		sto.fromip.len = new_dst.send_sock->sock_str.len;
+		memcpy(sto.fromip_buff, vsock.s, vsock.len);
+		sto.fromip.len = vsock.len;
+		sto.fromip_buff[sto.fromip.len] = '\0';
 		proto = new_dst.send_sock->proto;
 	}
 	sto.fromip.s = sto.fromip_buff;

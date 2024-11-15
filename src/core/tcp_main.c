@@ -3145,6 +3145,13 @@ int tcp_init(struct socket_info *sock_info)
 #endif
 
 	addr = &sock_info->su;
+	if((addr->s.sa_family == AF_INET6)
+			&& (sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_SKIP)
+			&& IN6_IS_ADDR_LINKLOCAL(&addr->sin6.sin6_addr)) {
+		LM_DBG("skip binding on %s (bind mode: %d)\n", sock_info->address_str.s,
+				sr_bind_ipv6_link_local);
+		return 0;
+	}
 	/* sock_info->proto=PROTO_TCP; */
 	if(init_su(addr, &sock_info->address, sock_info->port_no) < 0) {
 		LM_ERR("could no init sockaddr_union\n");
@@ -3212,8 +3219,9 @@ int tcp_init(struct socket_info *sock_info)
 			LM_WARN("setsockopt v6 tos: %s (%d)\n", strerror(errno), tos);
 			/* continue since this is not critical */
 		}
-		if(sr_bind_ipv6_link_local != 0) {
-			LM_INFO("setting scope of %s\n", sock_info->address_str.s);
+		if(sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_BIND) {
+			LM_INFO("setting scope of %s (bind mode: %d)\n",
+					sock_info->address_str.s, sr_bind_ipv6_link_local);
 			addr->sin6.sin6_scope_id =
 					ipv6_get_netif_scope(sock_info->address_str.s);
 		}
@@ -3276,9 +3284,15 @@ int tcp_init(struct socket_info *sock_info)
 	}
 #endif
 	if(bind(sock_info->socket, &addr->s, sockaddru_len(*addr)) == -1) {
-		LM_ERR("bind(%x, %p, %d) on %s:%d : %s\n", sock_info->socket, &addr->s,
-				(unsigned)sockaddru_len(*addr), sock_info->address_str.s,
-				sock_info->port_no, strerror(errno));
+		LM_ERR("bind(%x, %p, %d) on [%s]:%d : (%d / %s)\n", sock_info->socket,
+				&addr->s, (unsigned)sockaddru_len(*addr),
+				sock_info->address_str.s, sock_info->port_no, errno,
+				strerror(errno));
+		if(addr->s.sa_family == AF_INET6) {
+			LM_ERR("might be caused by using a link local address, is "
+				   "'bind_ipv6_link_local' set (now: %d)?\n",
+					sr_bind_ipv6_link_local);
+		}
 		goto error;
 	}
 	if(listen(sock_info->socket, TCP_LISTEN_BACKLOG) == -1) {
