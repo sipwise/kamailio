@@ -1,3 +1,16 @@
+ngcp-kamailio (5.8.4-1+0~mr13.1.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * MT#61110 cfgutils: allow lock_set_size > 14
+  * MT#60205 http_client: support more methods in http_connect()
+  * MT#61537 New upstream version 5.8.4
+  * MT#61537 refresh patches
+
+  [ Richard Fuchs ]
+  * MT#61372 rtpengine: add SIP-code to message
+
+ -- Victor Seva <vseva@debian.org>  Fri, 15 Nov 2024 10:21:07 +0100
+
 ngcp-kamailio (5.8.3-1+0~mr13.1.0.0) unstable; urgency=medium
 
   * New release.
