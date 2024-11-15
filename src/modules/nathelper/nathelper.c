@@ -998,6 +998,8 @@ static int add_contact_alias_3(
 	struct lump *anchor;
 	struct sip_uri uri;
 	char *bracket, *lt, *param, *at, *start;
+	int is_ipv6 = 0;
+	int i;
 
 	/* Do nothing if Contact header does not exist */
 	if(!msg->contact) {
@@ -1058,8 +1060,8 @@ static int add_contact_alias_3(
 	}
 
 	/* Create  ;alias param */
-	param_len = _ksr_contact_salias.len + IP6_MAX_STR_SIZE
-				+ 1 /* ~ */ + 5 /* port */
+	param_len = _ksr_contact_salias.len + 1 /* [ */ + IP6_MAX_STR_SIZE
+				+ 1 /* ] */ + 1 /* ~ */ + 5 /* port */
 				+ 1 /* ~ */ + 1 /* proto */ + 1 /* closing > */;
 	param = (char *)pkg_malloc(param_len);
 	if(!param) {
@@ -1068,8 +1070,20 @@ static int add_contact_alias_3(
 	}
 	at = param;
 	/* ip address */
+	for(i = 0; i < ip_str->len; i++) {
+		if(ip_str->s[i] == ':') {
+			is_ipv6 = 1;
+			break;
+		}
+	}
+	if(is_ipv6 && ip_str->s[0] != '[') {
+		append_chr(at, '[');
+	}
 	append_str(at, _ksr_contact_salias.s, _ksr_contact_salias.len);
 	append_str(at, ip_str->s, ip_str->len);
+	if(is_ipv6 && ip_str->s[0] != '[') {
+		append_chr(at, ']');
+	}
 	/* port */
 	append_chr(at, '~');
 	append_str(at, port_str->s, port_str->len);
@@ -1140,6 +1154,7 @@ static int ki_handle_ruri_alias_mode(struct sip_msg *msg, int mode)
 			*trans, *start;
 	unsigned int len, rest_len, val_len, alias_len, proto_type, cur_uri_len,
 			ip_len, ip_port_len, port_len, i;
+	int is_ipv6 = 0;
 
 	if(parse_sip_msg_uri(msg) < 0) {
 		LM_ERR("while parsing Request-URI\n");
@@ -1188,7 +1203,6 @@ static int ki_handle_ruri_alias_mode(struct sip_msg *msg, int mode)
 	// IPv6 needs some [] added when composing a SIP URI, which further
 	// complicates this code.
 	ip_len = port - val;
-	int is_ipv6 = 0;
 	for(i = 0; i < ip_len; i++) {
 		if(val[i] == ':') {
 			is_ipv6 = 1;
@@ -1206,7 +1220,7 @@ static int ki_handle_ruri_alias_mode(struct sip_msg *msg, int mode)
 	append_str(at, "sip:", 4);
 	ip_port_len = trans - val;
 	alias_len = _ksr_contact_salias.len + ip_port_len + 2 /* ~n */;
-	if(is_ipv6) {
+	if(is_ipv6 && val[0] != '[') {
 		// IPv6 - add '[' ']' around IP
 		// then append ':' and copy the port
 		append_chr(at, '[');

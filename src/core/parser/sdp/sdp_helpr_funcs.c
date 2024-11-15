@@ -151,8 +151,12 @@ int extract_rtpmap(str *body, str *rtpmap_payload, str *rtpmap_encoding,
 	char *cp, *cp1;
 	int len;
 
+	if(body->len <= 9) {
+		return -1;
+	}
 	if(strncasecmp(body->s, "a=rtpmap:", 9) != 0) {
-		/*LM_DBG("We are not pointing to an a=rtpmap: attribute =>`%.*s'\n", body->len, body->s); */
+		/*LM_DBG("We are not pointing to an a=rtpmap: attribute =>`%.*s'\n",
+		 * body->len, body->s); */
 		return -1;
 	}
 
@@ -214,8 +218,12 @@ int extract_fmtp(str *body, str *fmtp_payload, str *fmtp_string)
 	char *cp, *cp1;
 	int len;
 
+	if(body->len <= 7) {
+		return -1;
+	}
 	if(strncasecmp(body->s, "a=fmtp:", 7) != 0) {
-		/*LM_DBG("We are not pointing to an a=fmtp: attribute =>`%.*s'\n", body->len, body->s); */
+		/*LM_DBG("We are not pointing to an a=fmtp: attribute =>`%.*s'\n",
+		 * body->len, body->s); */
 		return -1;
 	}
 
@@ -346,13 +354,16 @@ int extract_candidate(str *body, sdp_stream_cell_t *stream)
 }
 
 
-/* generic method for attribute extraction
+/* generic method for attribute value extraction
  * field must has format "a=attrname:" */
 int extract_field(str *body, str *value, str field)
 {
-	if(strncmp(body->s, field.s, field.len < body->len ? field.len : body->len)
-			!= 0) {
-		/*LM_DBG("We are not pointing to an %.* attribute =>`%.*s'\n", field.len, field.s, body->len, body->s); */
+	if(body->len < field.len) {
+		return -1;
+	}
+	if(strncmp(body->s, field.s, field.len) != 0) {
+		/* LM_DBG("We are not pointing to an %.* attribute =>`%.*s'\n",
+				field.len, field.s, body->len, body->s); */
 		return -1;
 	}
 
@@ -368,22 +379,24 @@ int extract_ice_option(str *body, sdp_stream_cell_t *stream)
 	sdp_ice_opt_t *ice_opt;
 
 	char *ptr_src;
+	char *end;
 	int max_options =
 			10;		/* protection - max options can be listed in one line */
 	int length = 0; /* each option length */
 
 	/* a=ice-options: */
-	if((body->len < 14) || (strncasecmp(body->s, ICE_OPTIONS, 14) != 0))
+	if((body->len <= 14) || (strncasecmp(body->s, ICE_OPTIONS, 14) != 0))
 		return -1;
 
+	end = body->s + body->len;
 	ptr_src = body->s + 14;
 	if(*ptr_src == 32)
 		ptr_src++; /* if starts with a space, skip it */
 
 	/* identify all existing ICE options, if they are listed in one row */
-	while(*ptr_src && *ptr_src != '\r' && *ptr_src != '\n'
+	while(ptr_src < end && *ptr_src && *ptr_src != '\r' && *ptr_src != '\n'
 			&& max_options-- > 0) {
-		while(*ptr_src != 32 && *ptr_src && *ptr_src != '\r'
+		while(ptr_src < end && *ptr_src && *ptr_src != 32 && *ptr_src != '\r'
 				&& *ptr_src != '\n') {
 			length++;
 			ptr_src++;
@@ -447,6 +460,9 @@ int extract_sendrecv_mode(str *body, str *sendrecv_mode, int *is_on_hold)
 {
 	char *cp1;
 
+	if(body->len < 10) {
+		return -1;
+	}
 	cp1 = body->s;
 	if(!((strncasecmp(cp1, "a=sendrecv", 10) == 0)
 			   || (strncasecmp(cp1, "a=recvonly", 10) == 0))) {
