@@ -2,7 +2,7 @@ Source: ngcp-kamailio
 Section: net
 Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
-Rules-Requires-Root: binary-targets
+Rules-Requires-Root: no
 Build-Depends:
  bison,
  debhelper-compat (= 13),
