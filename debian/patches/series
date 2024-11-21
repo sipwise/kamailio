@@ -75,3 +75,4 @@ sipwise/pua_dialoginfo-use_uuid.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/rtpengine_always_add_totag_to_ng_message_when_rtpp_flags.patch
