@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.3-1+0~mr13.0.1.2) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [310fef6] MT#61441 rtpengine: use to-tag for NG message when rtpp-flags
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 28 Nov 2024 14:20:40 +0100
+
 ngcp-kamailio (5.8.3-1+0~mr13.0.1.1) unstable; urgency=medium
 
   [ Victor Seva ]
