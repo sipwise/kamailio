@@ -1,0 +1,21 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 9 Dec 2024 10:22:05 +0100
+Subject: usrloc: don't synchronize on destroy for DB_ONLY
+
+---
+ src/modules/usrloc/usrloc_mod.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
+index 0093058..0df21d3 100644
+--- a/src/modules/usrloc/usrloc_mod.c
++++ b/src/modules/usrloc/usrloc_mod.c
+@@ -620,7 +620,7 @@ static void destroy(void)
+ {
+ 	/* we need to sync DB in order to flush the cache */
+ 	if(ul_dbh) {
+-		if(synchronize_all_udomains(0, 1) != 0) {
++		if(ul_db_mode != DB_ONLY && synchronize_all_udomains(0, 1) != 0) {
+ 			LM_ERR("flushing cache failed\n");
+ 		}
+ 	}
