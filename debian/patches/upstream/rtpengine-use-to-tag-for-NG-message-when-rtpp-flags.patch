@@ -1,0 +1,24 @@
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Fri, 22 Nov 2024 09:49:40 +0100
+Subject: rtpengine: use to-tag for NG message when rtpp-flags
+
+Always use to-tag for NG message with rtpp-flags,
+if presented. This change is caused by the processing
+logic being moved to rtpengine with rtpp-flags.
+---
+ src/modules/rtpengine/rtpengine.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index e26d533..97eff5b 100644
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -3179,7 +3179,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
+ 	 */
+ 
+ 	/* affects to-tag parsing */
+-	ng_flags.to = (op == OP_DELETE) ? 0 : 1;
++	ng_flags.to = (!parse_by_module || op != OP_DELETE) ? 1 : 0;
+ 
+ 	/* module specific parsing */
+ 	if(parse_by_module && flags && parse_flags(&ng_flags, msg, &op, flags->s))

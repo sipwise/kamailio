@@ -7,7 +7,7 @@ Subject: rtpengine_add_sip_code
  1 file changed, 2 insertions(+)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index e26d533..5fe506d 100644
+index 97eff5b..1bb3ca5 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -3278,6 +3278,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
