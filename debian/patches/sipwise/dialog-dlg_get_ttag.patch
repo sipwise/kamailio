@@ -9,7 +9,7 @@ Subject: dialog: dlg_get_ttag()
  3 files changed, 211 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index a36f047..020e1ef 100644
+index 152fd9c..8e76506 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -54,6 +54,7 @@
@@ -39,7 +39,7 @@ index a36f047..020e1ef 100644
  	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  1,fixup_igp_null,
  			0, ANY_ROUTE },
  	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  3,fixup_igp_all,
-@@ -1981,6 +1987,121 @@ static int fixup_dlg_set_var_free(void **param, int param_no)
+@@ -1973,6 +1979,121 @@ static int fixup_dlg_set_var_free(void **param, int param_no)
  	return -1;
  }
  
@@ -161,7 +161,7 @@ index a36f047..020e1ef 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2556,6 +2677,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2548,6 +2669,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},

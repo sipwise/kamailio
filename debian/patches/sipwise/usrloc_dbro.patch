@@ -3,12 +3,12 @@ Date: Thu, 26 Mar 2020 10:06:46 +0100
 Subject: usrloc_dbro
 
 ---
- src/modules/usrloc/usrloc_mod.c | 68 ++++++++++++++++++++++++++++++++++++++++-
+ src/modules/usrloc/usrloc_mod.c | 64 ++++++++++++++++++++++++++++++++++++++++-
  src/modules/usrloc/usrloc_mod.h |  2 ++
- 2 files changed, 69 insertions(+), 1 deletion(-)
+ 2 files changed, 65 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index b14fe72..cd73d04 100644
+index b14fe72..1443953 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
 @@ -200,6 +200,7 @@ str ulattrs_last_mod_col = str_init(
@@ -117,17 +117,6 @@ index b14fe72..cd73d04 100644
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
  	if(_rank == ul_load_rank && ul_db_mode != DB_ONLY && ul_db_load) {
  		/* if cache is used, populate domains from DB */
-@@ -564,6 +626,10 @@ static void destroy(void)
- 		ul_dbf.close(ul_dbh);
- 	}
- 
-+	if (ul_dbh_ro) {
-+		ul_dbf_ro.close(ul_dbh_ro);
-+	}
-+
- 	free_all_udomains();
- 
- 	/* free callbacks list */
 diff --git a/src/modules/usrloc/usrloc_mod.h b/src/modules/usrloc/usrloc_mod.h
 index 7192c9c..4fe237b 100644
 --- a/src/modules/usrloc/usrloc_mod.h

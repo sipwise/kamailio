@@ -1,0 +1,36 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 20 Nov 2024 12:08:14 +0100
+Subject: pua: remove destroy of internal structures on mod-destroy callback
+
+- it is safer and faster to be removed at once by core or OS when application
+  context is destroyed
+---
+ src/modules/pua/pua.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/src/modules/pua/pua.c b/src/modules/pua/pua.c
+index a53bfd8..d69578c 100644
+--- a/src/modules/pua/pua.c
++++ b/src/modules/pua/pua.c
+@@ -296,21 +296,13 @@ static int child_init(int rank)
+ 
+ static void destroy(void)
+ {
+-	if(puacb_list)
+-		destroy_puacb_list();
+-
+ 	/* if dbmode is PUA_DB_ONLY, then HashT will be NULL
+ 	 * so db_update and destroy_htable won't get called */
+ 	if(pua_db && HashT)
+ 		db_update(0, 0);
+ 
+-	if(HashT)
+-		destroy_htable();
+-
+ 	if(pua_db)
+ 		pua_dbf.close(pua_db);
+-	if(pua_evlist)
+-		destroy_pua_evlist();
+ 
+ 	return;
+ }

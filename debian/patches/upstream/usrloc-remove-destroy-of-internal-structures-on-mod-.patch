@@ -1,0 +1,29 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 20 Nov 2024 11:37:40 +0100
+Subject: usrloc: remove destroy of internal structures on mod-destroy
+ callback
+
+- it is safer and faster to be removed at once by core or OS when application
+  context is destroyed
+---
+ src/modules/usrloc/usrloc_mod.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
+index 1443953..0093058 100644
+--- a/src/modules/usrloc/usrloc_mod.c
++++ b/src/modules/usrloc/usrloc_mod.c
+@@ -623,13 +623,7 @@ static void destroy(void)
+ 		if(synchronize_all_udomains(0, 1) != 0) {
+ 			LM_ERR("flushing cache failed\n");
+ 		}
+-		ul_dbf.close(ul_dbh);
+ 	}
+-
+-	free_all_udomains();
+-
+-	/* free callbacks list */
+-	destroy_ulcb_list();
+ }
+ 
+ /*! \brief

@@ -10,10 +10,10 @@ Subject: dialog: support profile_get_size for all profiles
  4 files changed, 69 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 43752da..a36f047 100644
+index 338f7f6..152fd9c 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -3026,6 +3026,31 @@ static void internal_rpc_profile_get_size(
+@@ -3018,6 +3018,31 @@ static void internal_rpc_profile_get_size(
  	return;
  }
  
@@ -45,7 +45,7 @@ index 43752da..a36f047 100644
  /*!
   * \brief Helper function that outputs the dialogs belonging to a given profile via the RPC interface
   * \see rpc_profile_print_dlgs
-@@ -3110,6 +3135,8 @@ static const char *rpc_dlg_set_state_doc[3] = {
+@@ -3102,6 +3127,8 @@ static const char *rpc_dlg_set_state_doc[3] = {
  		0};
  static const char *rpc_profile_get_size_doc[2] = {
  		"Returns the number of dialogs belonging to a profile", 0};
@@ -54,7 +54,7 @@ index 43752da..a36f047 100644
  static const char *rpc_profile_print_dlgs_doc[2] = {
  		"Lists all the dialogs belonging to a profile", 0};
  static const char *rpc_dlg_bridge_doc[2] = {
-@@ -3326,6 +3353,11 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c)
+@@ -3318,6 +3345,11 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c)
  	}
  	return;
  }
@@ -66,7 +66,7 @@ index 43752da..a36f047 100644
  static void rpc_profile_print_dlgs(rpc_t *rpc, void *c)
  {
  	str profile_name = {NULL, 0};
-@@ -3743,6 +3775,8 @@ static rpc_export_t rpc_methods[] = {
+@@ -3735,6 +3767,8 @@ static rpc_export_t rpc_methods[] = {
  		{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
  		{"dlg.profile_get_size", rpc_profile_get_size, rpc_profile_get_size_doc,
  				0},
