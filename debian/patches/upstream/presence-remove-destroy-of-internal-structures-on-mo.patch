@@ -1,0 +1,42 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 20 Nov 2024 12:04:16 +0100
+Subject: presence: remove destroy of internal structures on mod-destroy
+ callback
+
+- it is safer and faster to be removed at once by core or OS when application
+  context is destroyed
+---
+ src/modules/presence/presence.c | 20 --------------------
+ 1 file changed, 20 deletions(-)
+
+diff --git a/src/modules/presence/presence.c b/src/modules/presence/presence.c
+index 9315c0d..dae0bf7 100644
+--- a/src/modules/presence/presence.c
++++ b/src/modules/presence/presence.c
+@@ -635,26 +635,6 @@ static void destroy(void)
+ 		} else
+ 			timer_db_update(0, 0);
+ 	}
+-
+-	if(subs_htable) {
+-		destroy_shtable(subs_htable, shtable_size);
+-	}
+-
+-	if(pres_htable) {
+-		destroy_phtable();
+-	}
+-
+-	if(pa_db && pa_dbf.close) {
+-		pa_dbf.close(pa_db);
+-	}
+-
+-	if(pres_notifier_id != NULL) {
+-		shm_free(pres_notifier_id);
+-	}
+-
+-	destroy_evlist();
+-
+-	ps_ptable_destroy();
+ }
+ 
+ static int fixup_presence(void **param, int param_no)

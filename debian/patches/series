@@ -43,6 +43,12 @@ upstream/cfgutils-initialize-the-optional-key.patch
 upstream/permissions_add_register_allow_with_port_check.patch
 upstream/multipart-sdp.patch
 upstream/dialog-don-t-complain-if-dst_var-doesn-t-exist.patch
+upstream/dialog-remove-destroy-of-internal-structures-on-mod-.patch
+upstream/tm-remove-destroy-of-internal-structures-on-mod-dest.patch
+upstream/usrloc-remove-destroy-of-internal-structures-on-mod-.patch
+upstream/htable-remove-destroy-of-internal-structures-on-mod-.patch
+upstream/presence-remove-destroy-of-internal-structures-on-mo.patch
+upstream/pua-remove-destroy-of-internal-structures-on-mod-des.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
@@ -57,6 +63,7 @@ sipwise/tls-remove-confusing-error-message-when-trying-to-pr.patch
 sipwise/cfgutils-allow-lock_set_size-14.patch
 sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
+sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 ### active development
 #
 ### Don't just put stuff in any order
