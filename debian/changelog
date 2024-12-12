@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.2-1+0~mr12.5.1.5) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [83ebf34] MT#61703 usrloc: avoid shutdown crashes on destroy
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 12 Dec 2024 16:53:08 +0100
+
 ngcp-kamailio (5.8.2-1+0~mr12.5.1.4) unstable; urgency=medium
 
   [ Donat Zenichev ]
