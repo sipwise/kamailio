@@ -64,6 +64,7 @@ sipwise/cfgutils-allow-lock_set_size-14.patch
 sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
+sipwise/db_redis-stop-searching-for-keys-if-scan_key-is-set.patch
 ### active development
 #
 ### Don't just put stuff in any order

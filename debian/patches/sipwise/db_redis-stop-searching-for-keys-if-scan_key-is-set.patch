@@ -1,0 +1,20 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 19 Dec 2024 20:43:50 +0100
+Subject: db_redis: stop searching for keys if scan_key is set
+
+---
+ src/modules/db_redis/redis_dbase.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 84c0c3a..f7bace1 100644
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -794,6 +794,7 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
+ 							type->type.s);
+ 				}
+ 				keyname.s = NULL;
++				break;
+ 			} else if(keyname.s) {
+ 				pkg_free(keyname.s);
+ 				keyname.s = NULL;
