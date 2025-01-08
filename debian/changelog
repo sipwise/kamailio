@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.2-1+0~mr12.5.1.6) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [962af47] MT#61651 db_redis: fix build_query_keys logic
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 08 Jan 2025 11:10:31 +0100
+
 ngcp-kamailio (5.8.2-1+0~mr12.5.1.5) unstable; urgency=medium
 
   [ Victor Seva ]
