@@ -1029,7 +1029,8 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 					offset++;                                                  \
 				}                                                              \
 			} else {                                                           \
-				LM_CRIT("null bind_address\n");                                \
+				LM_CRIT("null bind_address (SUBST_RCV_IP/%p/%p)\n",            \
+						msg->rcv.bind_address, recv_address_str);              \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_RCV_PORT:                                                   \
@@ -1038,7 +1039,7 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 						recv_port_str->len);                                   \
 				offset += recv_port_str->len;                                  \
 			} else {                                                           \
-				LM_CRIT("null bind_address\n");                                \
+				LM_CRIT("null recv port str (SUBST_RCV_PORT)\n");              \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_RCV_ALL:                                                    \
@@ -1130,7 +1131,8 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 				}                                                              \
 				RCVCOMP_PARAM_ADD                                              \
 			} else {                                                           \
-				LM_CRIT("null bind_address\n");                                \
+				LM_CRIT("null bind_address (SUBST_RCV_ALL/%p/%p)\n",           \
+						msg->rcv.bind_address, recv_address_str);              \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_SND_IP:                                                     \
@@ -1147,7 +1149,7 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 					offset++;                                                  \
 				}                                                              \
 			} else {                                                           \
-				LM_CRIT("null send_sock\n");                                   \
+				LM_CRIT("null send_sock (SUBST_SND_IP)\n");                    \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_SND_PORT:                                                   \
@@ -1156,7 +1158,7 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 						send_port_str->len);                                   \
 				offset += send_port_str->len;                                  \
 			} else {                                                           \
-				LM_CRIT("null send sock port\n");                              \
+				LM_CRIT("null send sock port (SUBST_SND_PORT)\n");             \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_SND_ALL:                                                    \
@@ -1246,7 +1248,7 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 				}                                                              \
 				SENDCOMP_PARAM_ADD                                             \
 			} else {                                                           \
-				LM_CRIT("null bind_address\n");                                \
+				LM_CRIT("null send_sock (SUBST_SND_ALL)\n");                   \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_RCV_PROTO:                                                  \
@@ -1285,7 +1287,7 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 								msg->rcv.bind_address->proto);                 \
 				}                                                              \
 			} else {                                                           \
-				LM_CRIT("null send_sock\n");                                   \
+				LM_CRIT("null bind address (SUBST_RCV_PROTO)\n");              \
 			};                                                                 \
 			break;                                                             \
 		case SUBST_SND_PROTO:                                                  \
@@ -1323,7 +1325,7 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
 						LM_CRIT("unknown proto %d\n", send_sock->proto);       \
 				}                                                              \
 			} else {                                                           \
-				LM_CRIT("null send_sock\n");                                   \
+				LM_CRIT("null send_sock (SUBST_SND_PROTO)\n");                 \
 			};                                                                 \
 			break;                                                             \
 		default:                                                               \
@@ -2647,44 +2649,54 @@ char *build_res_buf_from_sip_req(unsigned int code, str *text, str *new_tag,
 				if(unlikely(httpreq))
 					pvia = p;
 				if(hdr == msg->h_via1) {
-					if(rport_buf) {
-						if(msg->via1->rport) { /* delete the old one */
-							/* copy until rport */
-							append_str_trans(p, hdr->name.s,
-									msg->via1->rport->start - hdr->name.s - 1,
-									msg);
-							/* copy new rport */
-							append_str(p, rport_buf, rport_len);
-							/* copy the rest of the via */
-							append_str_trans(p,
-									msg->via1->rport->start
-											+ msg->via1->rport->size,
-									hdr->body.s + hdr->body.len
-											- msg->via1->rport->start
-											- msg->via1->rport->size,
-									msg);
-						} else { /* just append the new one */
-							/* normal whole via copy */
-							append_str_trans(p, hdr->name.s,
-									(hdr->body.s + hdr->body.len) - hdr->name.s,
-									msg);
-							append_str(p, rport_buf, rport_len);
-						}
-					} else {
-						/* normal whole via copy */
+					if(rport_buf && msg->via1->rport) { /* replace old rport */
+						/* copy until rport */
+						append_str_trans(p, hdr->name.s,
+								msg->via1->rport->start - hdr->name.s - 1, msg);
+					} else if(msg->via1->branch) { /* add after branch */
+						append_str_trans(p, hdr->name.s,
+								msg->via1->branch->start - hdr->name.s
+										+ msg->via1->branch->size,
+								msg);
+					} else { /* append after header */
 						append_str_trans(p, hdr->name.s,
 								(hdr->body.s + hdr->body.len) - hdr->name.s,
 								msg);
 					}
-					if(received_buf)
+					if(rport_buf) {
+						/* add rport */
+						append_str(p, rport_buf, rport_len);
+					}
+					if(received_buf) {
+						/* add received */
 						append_str(p, received_buf, received_len);
+					}
+					if(xparams.len > 0) {
+						/* add extra parameters */
+						append_str(p, xparams.s, xparams.len);
+					}
+					/* copy the rest of the via */
+					if(rport_buf && msg->via1->rport) {
+						append_str_trans(p,
+								msg->via1->rport->start
+										+ msg->via1->rport->size,
+								hdr->body.s + hdr->body.len
+										- msg->via1->rport->start
+										- msg->via1->rport->size,
+								msg);
+					} else if(msg->via1->branch) {
+						append_str_trans(p,
+								msg->via1->branch->start
+										+ msg->via1->branch->size,
+								hdr->body.s + hdr->body.len
+										- msg->via1->branch->start
+										- msg->via1->branch->size,
+								msg);
+					}
 				} else {
 					/* normal whole via copy */
 					append_str_trans(p, hdr->name.s,
 							(hdr->body.s + hdr->body.len) - hdr->name.s, msg);
-				}
-				if(xparams.len > 0) {
-					append_str(p, xparams.s, xparams.len);
 				}
 				append_str(p, CRLF, CRLF_LEN);
 				/* if is HTTP, replace Via with Sia
