@@ -7,7 +7,7 @@ Subject: lost: add method parameter to http_connect() calls
  1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/lost/functions.c b/src/modules/lost/functions.c
-index 9495a69..bc75bf4 100644
+index d2c0f0c..565e134 100644
 --- a/src/modules/lost/functions.c
 +++ b/src/modules/lost/functions.c
 @@ -188,7 +188,7 @@ int lost_held_function(struct sip_msg *_m, char *_con, char *_pidf, char *_url,

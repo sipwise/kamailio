@@ -7,7 +7,7 @@ Subject: pua_dialoginfo: use_uuid
  1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index e7a38b0..5960202 100644
+index d1e704f..cbb406a 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -51,6 +51,7 @@
