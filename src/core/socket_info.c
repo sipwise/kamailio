@@ -1332,6 +1332,7 @@ static int nl_bound_sock(void)
 {
 	int sock = -1;
 	struct sockaddr_nl la;
+	struct timeval recvtimeout;
 
 	sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 	if(sock < 0) {
@@ -1343,10 +1344,19 @@ static int nl_bound_sock(void)
 	bzero(&la, sizeof(la));
 	la.nl_family = AF_NETLINK;
 	la.nl_pad = 0;
-	la.nl_pid = getpid();
+	la.nl_pid = 0;
 	la.nl_groups = 0;
 	if(bind(sock, (struct sockaddr *)&la, sizeof(la)) < 0) {
 		LM_ERR("could not bind NETLINK sock to sockaddr_nl\n");
+		goto error;
+	}
+
+	recvtimeout.tv_sec = 4;
+	recvtimeout.tv_usec = 0;
+	if(setsockopt(
+			   sock, SOL_SOCKET, SO_RCVTIMEO, &recvtimeout, sizeof(recvtimeout))
+			< 0) {
+		LM_ERR("failed to set receive timeout\n");
 		goto error;
 	}
 
@@ -1402,6 +1412,10 @@ static int get_flags(int family)
 			goto error;
 		}
 		rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
+		if(rtn <= 0) {
+			LM_ERR("failed to receive data (%d/%d)\n", rtn, errno);
+			goto error;
+		}
 		nlp = (struct nlmsghdr *)p;
 		if(nlp->nlmsg_type == NLMSG_DONE) {
 			LM_DBG("done\n");
@@ -1504,6 +1518,10 @@ static int build_iface_list(void)
 				goto error;
 			}
 			rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
+			if(rtn <= 0) {
+				LM_ERR("failed to receive data (%d/%d)\n", rtn, errno);
+				goto error;
+			}
 			LM_DBG("received %d byles \n", rtn);
 			nlp = (struct nlmsghdr *)p;
 			if(nlp->nlmsg_type == NLMSG_DONE) {
@@ -1740,6 +1758,8 @@ int add_interfaces(char *if_name, int family, unsigned short port,
 			continue;
 		if(family && family != ifa->ifa_addr->sa_family)
 			continue;
+		sockaddr2ip_addr(&addr, (struct sockaddr *)ifa->ifa_addr);
+		tmp = ip_addr2a(&addr);
 		if(ifa->ifa_addr->sa_family == AF_INET6) {
 			struct sockaddr_in6 *caddr = (struct sockaddr_in6 *)ifa->ifa_addr;
 			if((sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_SKIP)
@@ -1750,8 +1770,6 @@ int add_interfaces(char *if_name, int family, unsigned short port,
 				continue;
 			}
 		}
-		sockaddr2ip_addr(&addr, (struct sockaddr *)ifa->ifa_addr);
-		tmp = ip_addr2a(&addr);
 		if(ifa->ifa_flags & IFF_LOOPBACK)
 			flags = SI_IS_LO;
 		else

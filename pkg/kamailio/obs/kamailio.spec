@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.8.4
+%define ver 5.8.5
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -237,6 +237,7 @@ Conflicts:  kamailio-dialplan < %ver, kamailio-dnssec < %ver
 Conflicts:  kamailio-geoip < %ver, kamailio-gzcompress < %ver
 Conflicts:  kamailio-http_client < %ver
 Conflicts:  kamailio-ims < %ver, kamailio-java < %ver, kamailio-json < %ver
+Conflicts:  kamailio-jwt < %ver
 Conflicts:  kamailio-kazoo < %ver
 Conflicts:  kamailio-lcr < %ver, kamailio-ldap < %ver, kamailio-lost < %ver, kamailio-lua < %ver
 Conflicts:  kamailio-nats < %ver
@@ -588,6 +589,17 @@ BuildRequires:  json-c-devel
 %description    json
 JSON string handling and RPC modules for Kamailio.
 %endif
+
+
+%package    jwt
+Summary:    JWT (JSON Web Token) functions module for Kamailio
+Group:      %{PKGGROUP}
+Requires:   libjwt, kamailio = %ver
+BuildRequires:  libjwt-devel
+
+%description    jwt
+This module provides JWT (JSON Web Token) functions to be used in Kamailio configuration file.
+It relies on libjwt (at least v1.12.0) library (https://github.com/benmcollins/libjwt).
 
 
 %if %{with kazoo}
@@ -1188,6 +1200,7 @@ sed -i -e 's/python3/python2/' utils/kamctl/dbtextdb/dbtextdb.py
 # on latest dist need to add --atexit=no for Kamailio options. More details GH #2616
 %if 0%{?fedora} || 0%{?suse_version} || 0%{?rhel} >= 8
 sed -i -e 's|/usr/sbin/kamailio|/usr/sbin/kamailio --atexit=no|' pkg/kamailio/obs/kamailio.service
+sed -i -e 's|/usr/sbin/kamailio|/usr/sbin/kamailio --atexit=no|' pkg/kamailio/obs/kamailio@.service
 %endif
 
 
@@ -1245,6 +1258,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
     kjson \
 %endif
     kjsonrpcs \
+    kjwt \
 %if %{with kazoo}
     kkazoo \
 %endif
@@ -1358,6 +1372,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
     kjson \
 %endif
     kjsonrpcs \
+    kjwt \
 %if %{with kazoo}
     kkazoo \
 %endif
@@ -1435,6 +1450,7 @@ install -m755 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.init \
 # systemd
 install -d %{buildroot}%{_unitdir}
 install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.service %{buildroot}%{_unitdir}/kamailio.service
+install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio@.service %{buildroot}%{_unitdir}/kamailio@.service
 install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/sipcapture.service %{buildroot}%{_unitdir}/sipcapture.service
 install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.tmpfiles %{buildroot}%{_tmpfilesdir}/kamailio.conf
 install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/sipcapture.tmpfiles %{buildroot}%{_tmpfilesdir}/sipcapture.conf
@@ -1666,6 +1682,7 @@ fi
 %dir %attr(-,kamailio,kamailio) %{_var}/run/kamailio
 %else
 %{_unitdir}/kamailio.service
+%{_unitdir}/kamailio@.service
 %{_tmpfilesdir}/kamailio.conf
 %endif
 
@@ -2018,6 +2035,12 @@ fi
 %{_libdir}/kamailio/modules/json.so
 %{_libdir}/kamailio/modules/jsonrpcc.so
 %endif
+
+
+%files      jwt
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.jwt
+%{_libdir}/kamailio/modules/jwt.so
 
 
 %if %{with kazoo}

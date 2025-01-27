@@ -106,7 +106,7 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 # version number
 VERSION = 5
 PATCHLEVEL = 8
-SUBLEVEL = 4
+SUBLEVEL = 5
 EXTRAVERSION =
 
 # memory manager switcher
@@ -492,7 +492,7 @@ endif
 
 ifeq ($(OS), freebsd)
 	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = man/
+	man_dir = share/man/
 	data_dir = share/$(MAIN_NAME)/
 	LOCALBASE ?= /usr/local
 endif
