@@ -31,7 +31,7 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.8
-#
+upstream/htable-do-not-print-item-name-before-is-computed.patch
 ## upstream master
 upstream/rtpengine_rework_rtpp_flags.patch
 upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
