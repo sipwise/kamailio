@@ -3,65 +3,64 @@ Date: Thu, 13 Jun 2024 09:18:18 +0200
 Subject: multipart-sdp
 
 ---
- src/modules/rtpengine/rtpengine.c | 38 +++++++++++++++++++-------------------
- 1 file changed, 19 insertions(+), 19 deletions(-)
+ src/modules/rtpengine/rtpengine.c | 40 +++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
 index 84df238..e26d533 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -4696,28 +4696,13 @@ static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
+@@ -4696,6 +4696,26 @@ static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
  			pkg_free(newbody.s);
  
  		} else {
--			if(cl_field.len) {
--				anchor = del_lump(msg, cl_field.s - msg->buf, cl_field.len, 0);
--				cl_repl.s = pkg_malloc(10);
--				if(!cl_repl.s) {
--					LM_ERR("pkg_malloc for Content-Length failed\n");
--					goto error_free;
--				}
--				cl_repl.len = snprintf(cl_repl.s, 10, "%i", (int)newbody.len);
--				if(!insert_new_lump_after(anchor, cl_repl.s, cl_repl.len, 0)) {
--					LM_ERR("insert_new_lump_after failed\n");
--					goto error_free;
--				}
--				cl_repl.s = NULL;
--			}
--
- 			if(read_sdp_pvar_str.len > 0) {
- 				/* get the body from the message as body ptr may have changed
- 				 * when using read_sdp_pv */
--				cur_body.len = 0;
--				cur_body.s = get_body(msg);
--				cur_body.len = msg->buf + msg->len - cur_body.s;
--
++			if(read_sdp_pvar_str.len > 0) {
++				/* get the body from the message as body ptr may have changed
++				 * when using read_sdp_pv */
 +				if(extract_body(msg, &cur_body, &cl_field) == -1) {
 +					LM_ERR("failed to extract body from message");
 +					goto error_free;
 +				}
- 				anchor = del_lump(msg, cur_body.s - msg->buf, cur_body.len, 0);
- 			} else {
- 				anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
-@@ -4730,6 +4715,21 @@ static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
- 				LM_ERR("insert_new_lump_after failed\n");
- 				goto error_free;
- 			}
-+
-+			if(cl_field.len) {
-+				anchor = del_lump(msg, cl_field.s - msg->buf, cl_field.len, 0);
-+				cl_repl.s = pkg_malloc(10);
-+				if(!cl_repl.s) {
-+					LM_ERR("pkg_malloc for Content-Length failed\n");
-+					goto error_free;
-+				}
-+				cl_repl.len = snprintf(cl_repl.s, 10, "%i", (int)newbody.len);
-+				if(!insert_new_lump_after(anchor, cl_repl.s, cl_repl.len, 0)) {
-+					LM_ERR("insert_new_lump_after failed\n");
-+					goto error_free;
-+				}
-+				cl_repl.s = NULL;
++				anchor = del_lump(msg, cur_body.s - msg->buf, cur_body.len, 0);
++			} else {
++				anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
 +			}
++			if(!anchor) {
++				LM_ERR("del_lump failed\n");
++				goto error_free;
++			}
++			if(!insert_new_lump_after(anchor, newbody.s, newbody.len, 0)) {
++				LM_ERR("insert_new_lump_after failed\n");
++				goto error_free;
++			}
++
+ 			if(cl_field.len) {
+ 				anchor = del_lump(msg, cl_field.s - msg->buf, cl_field.len, 0);
+ 				cl_repl.s = pkg_malloc(10);
+@@ -4710,26 +4730,6 @@ static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
+ 				}
+ 				cl_repl.s = NULL;
+ 			}
+-
+-			if(read_sdp_pvar_str.len > 0) {
+-				/* get the body from the message as body ptr may have changed
+-				 * when using read_sdp_pv */
+-				cur_body.len = 0;
+-				cur_body.s = get_body(msg);
+-				cur_body.len = msg->buf + msg->len - cur_body.s;
+-
+-				anchor = del_lump(msg, cur_body.s - msg->buf, cur_body.len, 0);
+-			} else {
+-				anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
+-			}
+-			if(!anchor) {
+-				LM_ERR("del_lump failed\n");
+-				goto error_free;
+-			}
+-			if(!insert_new_lump_after(anchor, newbody.s, newbody.len, 0)) {
+-				LM_ERR("insert_new_lump_after failed\n");
+-				goto error_free;
+-			}
  		}
  	}
  
