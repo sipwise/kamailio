@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -61,10 +63,10 @@ static cmd_export_t cmds[] = {
  */
 static param_export_t params[] = {
 	{"basedir", PARAM_STR, &_cfgt_params.basedir},
-	{"mask", INT_PARAM, &_cfgt_params.mask},
+	{"mask", PARAM_INT, &_cfgt_params.mask},
 	{"callid_prefix", PARAM_STR, &_cfgt_params.hdr_prefix},
-	{"skip_unknown", INT_PARAM, &_cfgt_params.skip_unknown},
-	{"route_log", INT_PARAM, &_cfgt_params.route_log},
+	{"skip_unknown", PARAM_INT, &_cfgt_params.skip_unknown},
+	{"route_log", PARAM_INT, &_cfgt_params.route_log},
 	{0, 0, 0}
 };
 

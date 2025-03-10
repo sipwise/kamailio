@@ -546,7 +546,8 @@ inline static int pathmax(void)
 #endif
 	if(pathmax == 0) { /* init */
 		pathmax = pathconf("/", _PC_PATH_MAX);
-		pathmax = (pathmax <= 0) ? PATH_MAX_GUESS : pathmax + 1;
+		pathmax = (pathmax <= 0 || pathmax >= INT_MAX - 1) ? PATH_MAX_GUESS
+														   : pathmax + 1;
 	}
 	return pathmax;
 }
@@ -698,6 +699,14 @@ static inline int str2ulong(str *_s, unsigned long *_r)
 static inline int str2int(str *_s, unsigned int *_r)
 {
 	str2unval(_s, _r, int, UINT_MAX);
+}
+
+/*
+ * Convert a str to unsigned short
+ */
+static inline int str2ushort(str *_s, unsigned short *_r)
+{
+	str2unval(_s, _r, short, USHRT_MAX);
 }
 
 
@@ -1008,6 +1017,34 @@ static inline int pkg_str_dup(str *dst, const str *src)
 
 	return 0;
 }
+
+/**
+ * \brief Make a copy of a char pointer to a char pointer using pkg_malloc
+ * \param src source
+ * \return a pointer to the new allocated char on success, 0 on failure
+ */
+static inline char *pkg_char_dup(const char *src)
+{
+	char *rval;
+	int len;
+
+	if(!src) {
+		LM_ERR("NULL src or dst\n");
+		return NULL;
+	}
+
+	len = strlen(src) + 1;
+	rval = (char *)pkg_malloc(len);
+	if(!rval) {
+		PKG_MEM_ERROR;
+		return NULL;
+	}
+
+	memcpy(rval, src, len);
+
+	return rval;
+}
+
 
 /**
  * \brief Compare two str's case sensitive

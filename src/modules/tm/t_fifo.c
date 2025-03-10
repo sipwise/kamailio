@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -175,11 +177,11 @@ int parse_tw_append(modparam_t type, void *val)
 	struct hdr_avp *last;
 	struct hdr_avp *ha = NULL;
 	struct tw_append *app;
-	int_str avp_name;
+	avp_name_t avp_name;
+	avp_flags_t avp_type;
 	char *s;
 	char bar;
 	str foo;
-	int n;
 	int index;
 
 	if(val == 0 || ((char *)val)[0] == 0)
@@ -306,11 +308,11 @@ int parse_tw_append(modparam_t type, void *val)
 		/* process and optimize the element name */
 		if(ha->type == ELEM_IS_AVP) {
 			/* element is AVP */
-			if(parse_avp_spec(&foo, &n, &avp_name, &index) != 0) {
+			if(parse_avp_spec(&foo, &avp_type, &avp_name, &index) != 0) {
 				LM_ERR("bad alias spec <%.*s>\n", foo.len, foo.s);
 				goto error;
 			}
-			if(n & AVP_NAME_STR) {
+			if(avp_type & AVP_NAME_STR) {
 				/* string name */
 				ha->sval.s = (char *)pkg_malloc(avp_name.s.len + 1);
 				if(ha->sval.s == 0) {
@@ -328,7 +330,7 @@ int parse_tw_append(modparam_t type, void *val)
 				ha->ival = avp_name.n;
 				if(ha->title.s == 0) {
 					foo.s = int2str((unsigned long)ha->ival, &foo.len);
-					ha->title.s = (char *)pkg_malloc(n + 1);
+					ha->title.s = (char *)pkg_malloc(foo.len + 1);
 					if(ha->title.s == 0) {
 						PKG_MEM_ERROR;
 						goto error;

@@ -124,7 +124,10 @@ int ht_reset_content(ht_t *ht);
 #define HT_RM_OP_EQ 1
 #define HT_RM_OP_NE 2
 #define HT_RM_OP_SW 3
-#define HT_RM_OP_RE 4
+#define HT_RM_OP_EW 4
+#define HT_RM_OP_RE 5
+#define HT_RM_OP_IN 6
+
 int ht_rm_cell_op(str *sre, ht_t *ht, int mode, int op);
 int ht_match_cell_op_str(str *sre, ht_t *ht, int mode, int op);
 
@@ -140,4 +143,20 @@ ht_cell_t *ht_iterator_get_current(str *iname);
 
 void ht_slot_lock(ht_t *ht, int idx);
 void ht_slot_unlock(ht_t *ht, int idx);
+
+#define HT_UPDATE_EXPIRE(ht, it, now)                                     \
+	do {                                                                  \
+		if(ht->updateexpire || (now && it->expire && it->expire < now)) { \
+			it->expire = now + ht->htexpire;                              \
+		}                                                                 \
+	} while(0)
+#define HT_COPY_EXPIRE(ht, it, now, src)                                  \
+	do {                                                                  \
+		if(ht->updateexpire || (now && it->expire && it->expire < now)) { \
+			it->expire = now + ht->htexpire;                              \
+		} else {                                                          \
+			it->expire = src->expire;                                     \
+		}                                                                 \
+	} while(0)
+
 #endif

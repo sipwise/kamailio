@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -168,8 +170,8 @@ typedef struct SessionInfo
 typedef struct AVP_Param
 {
 	str spec;
-	int_str name;
-	unsigned short type;
+	avp_name_t name;
+	avp_flags_t type;
 } AVP_Param;
 
 typedef struct ice_candidate_data
@@ -207,7 +209,6 @@ static MediaproxySocket mediaproxy_socket = {
 
 struct dlg_binds dlg_api;
 Bool have_dlg_api = False;
-static int dialog_flag = -1;
 
 // The AVP where the caller signaling IP is stored (if defined)
 static AVP_Param signaling_ip_avp = {str_init(SIGNALING_IP_AVP_SPEC), {0}, 0};
@@ -218,35 +219,42 @@ static AVP_Param media_relay_avp = {str_init(MEDIA_RELAY_AVP_SPEC), {0}, 0};
 // The AVP where the ICE candidate priority is stored (if defined)
 static AVP_Param ice_candidate_avp = {str_init(ICE_CANDIDATE_AVP_SPEC), {0}, 0};
 
-static cmd_export_t commands[] = {
-		{"engage_media_proxy", (cmd_function)w_EngageMediaProxy, 0, 0, 0,
-				REQUEST_ROUTE | BRANCH_ROUTE},
-		{"use_media_proxy", (cmd_function)w_UseMediaProxy, 0, 0, 0, ANY_ROUTE},
-		{"end_media_session", (cmd_function)w_EndMediaSession, 0, 0, 0,
-				ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+/* clang-format off */
+static cmd_export_t mod_cmds[] = {
+	{"engage_media_proxy", (cmd_function)w_EngageMediaProxy, 0,
+		0, 0, REQUEST_ROUTE | BRANCH_ROUTE},
+	{"use_media_proxy", (cmd_function)w_UseMediaProxy, 0,
+		0, 0, ANY_ROUTE},
+	{"end_media_session", (cmd_function)w_EndMediaSession, 0,
+		0, 0, ANY_ROUTE},
 
-static param_export_t parameters[] = {
-		{"disable", INT_PARAM, &mediaproxy_disabled},
-		{"mediaproxy_socket", PARAM_STRING, &(mediaproxy_socket.name)},
-		{"mediaproxy_timeout", INT_PARAM, &(mediaproxy_socket.timeout)},
-		{"signaling_ip_avp", PARAM_STR, &(signaling_ip_avp.spec)},
-		{"media_relay_avp", PARAM_STR, &(media_relay_avp.spec)},
-		{"ice_candidate", PARAM_STR, &(ice_candidate)},
-		{"ice_candidate_avp", PARAM_STR, &(ice_candidate_avp.spec)}, {0, 0, 0}};
+	{0, 0, 0, 0, 0, 0}
+};
+
+static param_export_t mod_params[] = {
+	{"disable", PARAM_INT, &mediaproxy_disabled},
+	{"mediaproxy_socket", PARAM_STRING, &(mediaproxy_socket.name)},
+	{"mediaproxy_timeout", PARAM_INT, &(mediaproxy_socket.timeout)},
+	{"signaling_ip_avp", PARAM_STR, &(signaling_ip_avp.spec)},
+	{"media_relay_avp", PARAM_STR, &(media_relay_avp.spec)},
+	{"ice_candidate", PARAM_STR, &(ice_candidate)},
+	{"ice_candidate_avp", PARAM_STR, &(ice_candidate_avp.spec)},
+	{0, 0, 0}
+};
 
 struct module_exports exports = {
-		"mediaproxy",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		commands,		 /* cmd (cfg function) exports */
-		parameters,		 /* param exports */
-		0,				 /* RPC method exports */
-		0,				 /* pseudo-variables exports */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* per-child init function */
-		0				 /* module destroy function */
+	"mediaproxy",	      /* module name */
+	DEFAULT_DLFLAGS,    /* dlopen flags */
+	mod_cmds,           /* exported functions */
+	mod_params,         /* exported parameters */
+	0,                  /* RPC method exports */
+	0,                  /* exported pseudo-variables */
+	0,                  /* response handling function */
+	mod_init,           /* module initialization function */
+	child_init,         /* per-child init function */
+	0                   /* module destroy function */
 };
+/* clang-format on */
 
 
 // String processing functions
@@ -611,7 +619,7 @@ static str get_user_agent(struct sip_msg *msg)
 // Get caller signaling IP
 static str get_signaling_ip(struct sip_msg *msg)
 {
-	int_str value;
+	avp_value_t value;
 
 	if(!search_first_avp(signaling_ip_avp.type | AVP_VAL_STR,
 			   signaling_ip_avp.name, &value, NULL)
@@ -628,7 +636,7 @@ static str get_signaling_ip(struct sip_msg *msg)
 static str get_media_relay(struct sip_msg *msg)
 {
 	static str undefined = str_init("");
-	int_str value;
+	avp_value_t value;
 
 	if(!search_first_avp(media_relay_avp.type | AVP_VAL_STR,
 			   media_relay_avp.name, &value, NULL)
@@ -978,7 +986,7 @@ static Bool has_ice_candidate_component(str *block, int id)
 // for the candidate(s) inserted
 static str get_ice_candidate(void)
 {
-	int_str value;
+	avp_value_t value;
 
 	if(!search_first_avp(ice_candidate_avp.type | AVP_VAL_STR,
 			   ice_candidate_avp.name, &value, NULL)
@@ -1996,7 +2004,6 @@ static int EngageMediaProxy(struct sip_msg *msg)
 		return -1;
 	}
 	msg->msg_flags |= FL_USE_MEDIA_PROXY;
-	setflag(msg, dialog_flag); // have the dialog module trace this dialog
 	return 1;
 }
 
@@ -2049,9 +2056,6 @@ static int w_EndMediaSession(struct sip_msg *msg, char *p1, char *p2)
 static int mod_init(void)
 {
 	pv_spec_t avp_spec;
-	int *param;
-	modparam_t type;
-
 	// initialize the signaling_ip_avp structure
 	if(!signaling_ip_avp.spec.s || signaling_ip_avp.spec.len <= 0) {
 		LM_WARN("missing/empty signaling_ip_avp parameter. will use "
@@ -2129,21 +2133,6 @@ static int mod_init(void)
 	// bind to the dialog API
 	if(load_dlg_api(&dlg_api) == 0) {
 		have_dlg_api = True;
-
-		// load dlg_flag and default_timeout parameters from the dialog module
-		param = find_param_export(
-				find_module_by_name("dialog"), "dlg_flag", INT_PARAM, &type);
-		if(!param) {
-			LM_CRIT("cannot find dlg_flag parameter in the dialog module\n");
-			return -1;
-		}
-
-		if(type != INT_PARAM) {
-			LM_CRIT("dlg_flag parameter found but with wrong type: %d\n", type);
-			return -1;
-		}
-
-		dialog_flag = *param;
 
 		// register dialog creation callback
 		if(dlg_api.register_dlgcb(

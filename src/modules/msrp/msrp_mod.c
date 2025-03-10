@@ -49,6 +49,9 @@ static int mod_init(void);
 static int child_init(int);
 static void mod_destroy(void);
 
+static int w_msrp_forward(sip_msg_t *msg, char *str1, char *str2);
+static int w_msrp_forward1(sip_msg_t *msg, char *taddr, char *str2);
+static int w_msrp_forward2(sip_msg_t *msg, char *tpath, char *fpath);
 static int w_msrp_relay(sip_msg_t *msg, char *str1, char *str2);
 static int w_msrp_reply2(sip_msg_t *msg, char *code, char *text);
 static int w_msrp_reply3(sip_msg_t *msg, char *code, char *text, char *hdrs);
@@ -75,59 +78,75 @@ str msrp_event_callback = STR_NULL;
 static int msrp_frame_received(sr_event_param_t *evp);
 sip_msg_t *msrp_fake_sipmsg(msrp_frame_t *mf);
 
+/* clang-format off */
 static tr_export_t mod_trans[] = {
-		{{"msrpuri", sizeof("msrpuri") - 1}, /* string class */
-				tr_parse_msrpuri},
+	{{"msrpuri", sizeof("msrpuri") - 1}, /* string class */ tr_parse_msrpuri},
 
-		{{0, 0}, 0}};
-
-static pv_export_t mod_pvs[] = {
-		{{"msrp", (sizeof("msrp") - 1)}, PVT_OTHER, pv_get_msrp, pv_set_msrp,
-				pv_parse_msrp_name, 0, 0, 0},
-
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
-
-static cmd_export_t cmds[] = {
-		{"msrp_relay", (cmd_function)w_msrp_relay, 0, 0, 0, ANY_ROUTE},
-		{"msrp_reply", (cmd_function)w_msrp_reply2, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"msrp_reply", (cmd_function)w_msrp_reply3, 3, fixup_spve_all, 0,
-				ANY_ROUTE},
-		{"msrp_is_request", (cmd_function)w_msrp_is_request, 0, 0, 0,
-				ANY_ROUTE},
-		{"msrp_is_reply", (cmd_function)w_msrp_is_reply, 0, 0, 0, ANY_ROUTE},
-		{"msrp_set_dst", (cmd_function)w_msrp_set_dst, 2, fixup_spve_all, 0,
-				ANY_ROUTE},
-		{"msrp_relay_flags", (cmd_function)w_msrp_relay_flags, 1,
-				fixup_igp_null, 0, ANY_ROUTE},
-		{"msrp_reply_flags", (cmd_function)w_msrp_reply_flags, 1,
-				fixup_igp_null, 0, ANY_ROUTE},
-		{"msrp_cmap_save", (cmd_function)w_msrp_cmap_save, 0, 0, 0, ANY_ROUTE},
-		{"msrp_cmap_lookup", (cmd_function)w_msrp_cmap_lookup, 0, 0, 0,
-				ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {{"sipmsg", PARAM_INT, &msrp_param_sipmsg},
-		{"cmap_size", PARAM_INT, &msrp_cmap_size},
-		{"auth_min_expires", PARAM_INT, &msrp_auth_min_expires},
-		{"auth_max_expires", PARAM_INT, &msrp_auth_max_expires},
-		{"timer_interval", PARAM_INT, &msrp_timer_interval},
-		{"use_path_addr", PARAM_STR, &msrp_use_path_addr},
-		{"event_callback", PARAM_STR, &msrp_event_callback}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"msrp",			 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* cmd (cfg function) exports */
-		params,			 /* param exports */
-		0,				 /* RPC method exports */
-		mod_pvs,		 /* pseudo-variables exports */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* per-child init function */
-		mod_destroy		 /* module destroy function */
+	{{0, 0}, 0}
 };
 
+static pv_export_t mod_pvs[] = {
+	{{"msrp", (sizeof("msrp") - 1)}, PVT_OTHER, pv_get_msrp, pv_set_msrp,
+		pv_parse_msrp_name, 0, 0, 0},
+
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
+
+static cmd_export_t cmds[] = {
+	{"msrp_forward", (cmd_function)w_msrp_forward, 0,
+		0, 0, ANY_ROUTE},
+	{"msrp_forward", (cmd_function)w_msrp_forward1, 1,
+		fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"msrp_forward", (cmd_function)w_msrp_forward2, 2,
+		fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"msrp_relay", (cmd_function)w_msrp_relay, 0,
+		0, 0, ANY_ROUTE},
+	{"msrp_reply", (cmd_function)w_msrp_reply2, 2,
+		fixup_spve_spve, 0, ANY_ROUTE},
+	{"msrp_reply", (cmd_function)w_msrp_reply3, 3,
+		fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"msrp_is_request", (cmd_function)w_msrp_is_request, 0,
+		0, 0, ANY_ROUTE},
+	{"msrp_is_reply", (cmd_function)w_msrp_is_reply, 0,
+		0, 0, ANY_ROUTE},
+	{"msrp_set_dst", (cmd_function)w_msrp_set_dst, 2,
+		fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"msrp_relay_flags", (cmd_function)w_msrp_relay_flags, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+	{"msrp_reply_flags", (cmd_function)w_msrp_reply_flags, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+	{"msrp_cmap_save", (cmd_function)w_msrp_cmap_save, 0,
+		0, 0, ANY_ROUTE},
+	{"msrp_cmap_lookup", (cmd_function)w_msrp_cmap_lookup, 0,
+		0, 0, ANY_ROUTE},
+
+	{0, 0, 0, 0, 0, 0}
+};
+
+static param_export_t params[] = {
+	{"sipmsg", PARAM_INT, &msrp_param_sipmsg},
+	{"cmap_size", PARAM_INT, &msrp_cmap_size},
+	{"auth_min_expires", PARAM_INT, &msrp_auth_min_expires},
+	{"auth_max_expires", PARAM_INT, &msrp_auth_max_expires},
+	{"timer_interval", PARAM_INT, &msrp_timer_interval},
+	{"use_path_addr", PARAM_STR, &msrp_use_path_addr},
+	{"event_callback", PARAM_STR, &msrp_event_callback},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"msrp",          /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	mod_pvs,         /* pseudo-variables exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	mod_destroy      /* module destroy function */
+};
+/* clang-format on */
 
 /**
  * init module function
@@ -198,6 +217,65 @@ static int child_init(int rank)
 static void mod_destroy(void)
 {
 	return;
+}
+
+static int ki_msrp_forward(sip_msg_t *msg, str *tpath, str *fpath)
+{
+	msrp_frame_t *mf;
+	int ret;
+
+	mf = msrp_get_current_frame();
+	if(mf == NULL)
+		return -1;
+
+	tpath = (tpath != NULL && tpath->len > 0) ? tpath : NULL;
+	fpath = (fpath != NULL && fpath->len > 0) ? fpath : NULL;
+
+	ret = msrp_forward(mf, tpath, fpath);
+	if(ret == 0)
+		ret = 1;
+	return ret;
+}
+
+static int w_msrp_forward(sip_msg_t *msg, char *str1, char *str2)
+{
+	return w_msrp_forward2(msg, NULL, NULL);
+}
+
+static int w_msrp_forward1(sip_msg_t *msg, char *tpath, char *str2)
+{
+	return w_msrp_forward2(msg, tpath, NULL);
+}
+
+static int w_msrp_forward2(sip_msg_t *msg, char *tpath, char *fpath)
+{
+	if(tpath != NULL) {
+		str rtpath = STR_NULL;
+
+		if(fixup_get_svalue(msg, (gparam_t *)tpath, &rtpath) != 0) {
+			LM_ERR("invalid to path parameter\n");
+			return -1;
+		}
+
+		if(fpath != NULL) {
+			str rfpath = STR_NULL;
+
+			if(fixup_get_svalue(msg, (gparam_t *)fpath, &rfpath) != 0) {
+				LM_ERR("invalid from path parameter\n");
+				return -1;
+			}
+
+			return ki_msrp_forward(msg, &rtpath, &rfpath);
+		}
+
+		return ki_msrp_forward(msg, &rtpath, NULL);
+
+	} else if(fpath != NULL) {
+		LM_ERR("invalid to path parameter\n");
+		return -1;
+	}
+
+	return ki_msrp_forward(msg, NULL, NULL);
 }
 
 /**
@@ -571,6 +649,11 @@ static void msrp_local_timer(unsigned int ticks, void *param)
  */
 /* clang-format off */
 static sr_kemi_t sr_kemi_msrp_exports[] = {
+	{ str_init("msrp"), str_init("forward"),
+		SR_KEMIP_INT, ki_msrp_forward,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("msrp"), str_init("relay"),
 		SR_KEMIP_INT, ki_msrp_relay,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,

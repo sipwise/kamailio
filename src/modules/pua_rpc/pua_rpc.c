@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -372,27 +374,28 @@ static void pua_rpc_subscribe(rpc_t *rpc, void *ctx)
 
 static const char *pua_rpc_subscribe_doc[2] = {"Send subscribe request", 0};
 
-
+/* clang-format off */
 rpc_export_t pua_rpc_ex[] = {
-		{"pua.publish", pua_rpc_publish, pua_rpc_publish_doc, 0},
-		{"pua.send_publish", pua_rpc_send_publish, pua_rpc_send_publish_doc, 0},
-		{"pua.subscribe", pua_rpc_subscribe, pua_rpc_subscribe_doc, 0},
-		{0, 0, 0, 0}};
-
+	{"pua.publish", pua_rpc_publish, pua_rpc_publish_doc, 0},
+	{"pua.send_publish", pua_rpc_send_publish, pua_rpc_send_publish_doc, 0},
+	{"pua.subscribe", pua_rpc_subscribe, pua_rpc_subscribe_doc, 0},
+	{0, 0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"pua_rpc",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		0,				 /* exported functions */
-		0,				 /* exported parameters */
-		pua_rpc_ex,		 /* RPC method exports */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		0,				 /* per-child init function */
-		0				 /* module destroy function */
+	"pua_rpc",		   /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	0,               /* exported functions */
+	0,               /* exported parameters */
+	pua_rpc_ex,      /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	0,               /* per-child init function */
+	0                /* module destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function

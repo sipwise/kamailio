@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -116,8 +118,8 @@ static cmd_export_t cmds[] = {
  */
 static param_export_t params[] = {{"filename", PARAM_STRING, &filename},
 		{"modpath", PARAM_STRING, &modpath},
-		{"unsafemodfnc", INT_PARAM, &unsafemodfnc},
-		{"reset_cycles", INT_PARAM, &_ap_reset_cycles_init},
+		{"unsafemodfnc", PARAM_INT, &unsafemodfnc},
+		{"reset_cycles", PARAM_INT, &_ap_reset_cycles_init},
 		{"perl_destroy_func", PARAM_STRING, &perl_destroy_func},
 		{"parse_mode", PARAM_INT, &_ap_parse_mode},
 		{"warn_mode", PARAM_INT, &_ap_warn_mode}, {0, 0, 0}};

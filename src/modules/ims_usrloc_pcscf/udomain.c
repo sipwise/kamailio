@@ -7,7 +7,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -17,7 +17,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -27,6 +27,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -496,7 +498,7 @@ int get_pcontact_from_cache(udomain_t *_d, pcontact_info_t *contact_info,
 					contact_info->aor.len, contact_info->aor.s);
 			return 1;
 		}
-		LM_DBG("checking for rinstance");
+		LM_DBG("checking for rinstance\n");
 		/*check for alias - NAT */
 		params = needle_uri.sip_params.s;
 		params_len = needle_uri.sip_params.len;
@@ -548,7 +550,7 @@ int get_pcontact_from_cache(udomain_t *_d, pcontact_info_t *contact_info,
 			int check2_passed = 0;
 			ip_addr_t c_ip_addr;
 			ip_addr_t ci_ip_addr;
-			LM_DBG("mached a record by aorhash: %u\n", aorhash);
+			LM_DBG("matched a record by aorhash: %u\n", aorhash);
 
 			// convert 'contact->contact host' ip string to ip_addr_t
 			if(str2ipxbuf(&c->contact_host, &c_ip_addr) < 0) {

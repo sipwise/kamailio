@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -98,10 +100,15 @@ typedef struct branch_data
 	int otcpid;
 } branch_data_t;
 
+unsigned int get_nr_branches(void);
+
 /*! \brief
  * Return pointer to branch[idx] structure
  */
 branch_t *get_sip_branch(int idx);
+
+int get_all_sip_branches(branch_t **vbranches, unsigned int *nbranches);
+int set_all_sip_branches(branch_t *vbranches, unsigned int nbranches);
 
 /*! \brief
  * Drop branch[idx]

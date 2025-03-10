@@ -52,6 +52,7 @@ static int w_mq_pv_free(struct sip_msg *msg, char *mq, char *str2);
 int mq_param(modparam_t type, void *val);
 int mq_param_name(modparam_t type, void *val);
 static int fixup_mq_add(void **param, int param_no);
+static int fixup_free_mq_add(void **param, int param_no);
 static int bind_mq(mq_api_t *api);
 
 static int mqueue_rpc_init(void);
@@ -59,42 +60,49 @@ static int mqueue_rpc_init(void);
 static int mqueue_size = 0;
 
 int mqueue_addmode = 0;
-
+/* clang-format off */
 static pv_export_t mod_pvs[] = {
-		{{"mqk", sizeof("mqk") - 1}, PVT_OTHER, pv_get_mqk, 0, pv_parse_mq_name,
-				0, 0, 0},
-		{{"mqv", sizeof("mqv") - 1}, PVT_OTHER, pv_get_mqv, 0, pv_parse_mq_name,
-				0, 0, 0},
-		{{"mq_size", sizeof("mq_size") - 1}, PVT_OTHER, pv_get_mq_size, 0,
-				pv_parse_mq_name, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
-
-
-static cmd_export_t cmds[] = {{"mq_fetch", (cmd_function)w_mq_fetch, 1,
-									  fixup_spve_null, 0, ANY_ROUTE},
-		{"mq_add", (cmd_function)w_mq_add, 3, fixup_mq_add, 0, ANY_ROUTE},
-		{"mq_pv_free", (cmd_function)w_mq_pv_free, 1, fixup_spve_null, 0,
-				ANY_ROUTE},
-		{"mq_size", (cmd_function)w_mq_size, 1, fixup_spve_null, 0, ANY_ROUTE},
-		{"bind_mq", (cmd_function)bind_mq, 1, 0, 0, ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {{"db_url", PARAM_STR, &mqueue_db_url},
-		{"mqueue", PARAM_STRING | USE_FUNC_PARAM, (void *)mq_param},
-		{"mqueue_name", PARAM_STRING | USE_FUNC_PARAM, (void *)mq_param_name},
-		{"mqueue_size", INT_PARAM, &mqueue_size},
-		{"mqueue_addmode", INT_PARAM, &mqueue_addmode}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"mqueue", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds, params, 0,		   /* exported RPC methods */
-		mod_pvs,				   /* exported pseudo-variables */
-		0,						   /* response function */
-		mod_init,				   /* module initialization function */
-		0,						   /* per child init function */
-		mod_destroy				   /* destroy function */
+	{{"mqk", sizeof("mqk") - 1}, PVT_OTHER, pv_get_mqk, 0, pv_parse_mq_name,
+			0, 0, 0},
+	{{"mqv", sizeof("mqv") - 1}, PVT_OTHER, pv_get_mqv, 0, pv_parse_mq_name,
+			0, 0, 0},
+	{{"mq_size", sizeof("mq_size") - 1}, PVT_OTHER, pv_get_mq_size, 0,
+			pv_parse_mq_name, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
 };
 
+static cmd_export_t cmds[] = {
+	{"mq_fetch", (cmd_function)w_mq_fetch, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"mq_add", (cmd_function)w_mq_add, 3,
+		fixup_mq_add, fixup_free_mq_add, ANY_ROUTE},
+	{"mq_pv_free", (cmd_function)w_mq_pv_free, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"mq_size", (cmd_function)w_mq_size, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"bind_mq", (cmd_function)bind_mq, 1, 0, 0, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
+
+static param_export_t params[] = {
+	{"db_url", PARAM_STR, &mqueue_db_url},
+	{"mqueue", PARAM_STRING | PARAM_USE_FUNC, (void *)mq_param},
+	{"mqueue_name", PARAM_STRING | PARAM_USE_FUNC, (void *)mq_param_name},
+	{"mqueue_size", PARAM_INT, &mqueue_size},
+	{"mqueue_addmode", PARAM_INT, &mqueue_addmode},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"mqueue", DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds, params, 0,		   /* exported RPC methods */
+	mod_pvs,				   /* exported pseudo-variables */
+	0,						   /* response function */
+	mod_init,				   /* module initialization function */
+	0,						   /* per child init function */
+	mod_destroy				   /* destroy function */
+};
+/* clang-format on */
 
 /**
  * init module function
@@ -112,10 +120,10 @@ static int mod_init(void)
 	}
 
 	while(mh != NULL) {
-		if (mh->dbmode == 1 || mh->dbmode == 2) {
+		if(mh->dbmode == 1 || mh->dbmode == 2) {
 			if(mqueue_db_load_queue(&(mh->name)) < 0) {
-				LM_ERR("error loading mqueue: %.*s from DB\n",
-					mh->name.len, mh->name.s);
+				LM_ERR("error loading mqueue: %.*s from DB\n", mh->name.len,
+						mh->name.s);
 				return 1;
 			}
 		}
@@ -299,6 +307,16 @@ static int fixup_mq_add(void **param, int param_no)
 {
 	if(param_no == 1 || param_no == 2 || param_no == 3) {
 		return fixup_spve_null(param, 1);
+	}
+
+	LM_ERR("invalid parameter number %d\n", param_no);
+	return E_UNSPEC;
+}
+
+static int fixup_free_mq_add(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2 || param_no == 3) {
+		return fixup_free_spve_null(param, 1);
 	}
 
 	LM_ERR("invalid parameter number %d\n", param_no);

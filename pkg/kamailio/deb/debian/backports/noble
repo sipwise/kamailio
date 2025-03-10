@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Target dist: Ubuntu 24.04 (Noble Numbat)
+# Target dist: Ubuntu Noble
 DIST=noble
 
 rm -rf ${DIST}

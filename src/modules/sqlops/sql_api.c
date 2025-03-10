@@ -36,6 +36,7 @@
 #include "sql_api.h"
 
 extern int sqlops_results_maxsize;
+extern int sqlops_log_buf_size;
 
 sql_con_t *_sql_con_root = NULL;
 sql_result_t *_sql_result_root = NULL;
@@ -149,16 +150,21 @@ int sql_connect(int mode)
 					sc->name.len, sc->name.s);
 			return -1;
 		}
-		sc->dbh = sc->dbf.init(&sc->db_url);
-		if(sc->dbh == NULL) {
-			if(!mode) {
-				LM_ERR("failed to connect to the database [%.*s]\n",
-						sc->name.len, sc->name.s);
-				return -1;
-			} else {
-				LM_INFO("failed to connect to the database [%.*s] - trying "
-						"next\n",
-						sc->name.len, sc->name.s);
+		if(mode == 2) {
+			LM_DBG("database initialized but not connecting[%.*s]mode[%d]\n",
+					sc->name.len, sc->name.s, mode);
+		} else {
+			sc->dbh = sc->dbf.init(&sc->db_url);
+			if(sc->dbh == NULL) {
+				if(!mode) {
+					LM_ERR("failed to connect to the database [%.*s]\n",
+							sc->name.len, sc->name.s);
+					return -1;
+				} else {
+					LM_INFO("failed to connect to the database [%.*s] - trying "
+							"next\n",
+							sc->name.len, sc->name.s);
+				}
 			}
 		}
 		sc = sc->next;
@@ -276,7 +282,9 @@ int sql_do_query(sql_con_t *con, str *query, sql_result_t *res)
 	}
 	if(con->dbf.raw_query(con->dbh, query, &db_res) != 0) {
 		LM_ERR("cannot do the query [%.*s]\n",
-				(query->len > 64) ? 64 : query->len, query->s);
+				(query->len > sqlops_log_buf_size) ? sqlops_log_buf_size
+												   : query->len,
+				query->s);
 		return -1;
 	}
 

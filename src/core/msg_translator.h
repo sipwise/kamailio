@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -172,6 +174,11 @@ void process_lumps(struct sip_msg *msg, struct lump *lumps, char *new_buf,
  * set the internal buffer for sip msg with obuf and reparse
  */
 int sip_msg_update_buffer(sip_msg_t *msg, str *obuf);
+
+/**
+ * evaluate changes and set the output buffer
+ */
+int sip_msg_eval_changes(sip_msg_t *msg, str *obuf);
 
 /**
  * apply changes to sip msg buffer and reparse

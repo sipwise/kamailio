@@ -58,10 +58,8 @@ static void mod_destroy(void);
 
 static int w_crypto_aes_encrypt(
 		sip_msg_t *msg, char *inb, char *keyb, char *outb);
-static int fixup_crypto_aes_encrypt(void **param, int param_no);
 static int w_crypto_aes_decrypt(
 		sip_msg_t *msg, char *inb, char *keyb, char *outb);
-static int fixup_crypto_aes_decrypt(void **param, int param_no);
 
 static int w_crypto_nio_in(sip_msg_t *msg, char *p1, char *p2);
 static int w_crypto_nio_out(sip_msg_t *msg, char *p1, char *p2);
@@ -71,6 +69,7 @@ static int w_crypto_nio_decrypt(sip_msg_t *msg, char *p1, char *p2);
 static int w_crypto_hmac_sha256(
 		sip_msg_t *msg, char *inb, char *keyb, char *outb);
 static int fixup_crypto_hmac(void **param, int param_no);
+static int fixup_free_crypto_hmac(void **param, int param_no);
 
 static char *_crypto_salt_param = "k8hTm4aZ";
 
@@ -86,9 +85,9 @@ str _crypto_netio_key = STR_NULL;
 
 static cmd_export_t cmds[] = {
 		{"crypto_aes_encrypt", (cmd_function)w_crypto_aes_encrypt, 3,
-				fixup_crypto_aes_encrypt, 0, ANY_ROUTE},
+				fixup_spve2_pvar, fixup_free_spve2_pvar, ANY_ROUTE},
 		{"crypto_aes_decrypt", (cmd_function)w_crypto_aes_decrypt, 3,
-				fixup_crypto_aes_decrypt, 0, ANY_ROUTE},
+				fixup_spve2_pvar, fixup_free_spve2_pvar, ANY_ROUTE},
 		{"crypto_netio_in", (cmd_function)w_crypto_nio_in, 0, 0, 0, ANY_ROUTE},
 		{"crypto_netio_out", (cmd_function)w_crypto_nio_out, 0, 0, 0,
 				ANY_ROUTE},
@@ -97,7 +96,7 @@ static cmd_export_t cmds[] = {
 		{"crypto_netio_decrypt", (cmd_function)w_crypto_nio_decrypt, 0, 0, 0,
 				ANY_ROUTE},
 		{"crypto_hmac_sha256", (cmd_function)w_crypto_hmac_sha256, 3,
-				fixup_crypto_hmac, 0, ANY_ROUTE},
+				fixup_crypto_hmac, fixup_free_crypto_hmac, ANY_ROUTE},
 		{"load_crypto", (cmd_function)load_crypto, 0, 0, 0, 0},
 		{0, 0, 0, 0, 0, 0}};
 
@@ -348,28 +347,6 @@ static int w_crypto_aes_encrypt(
 /**
  *
  */
-static int fixup_crypto_aes_encrypt(void **param, int param_no)
-{
-	if(param_no == 1 || param_no == 2) {
-		if(fixup_spve_null(param, 1) < 0)
-			return -1;
-		return 0;
-	} else if(param_no == 3) {
-		if(fixup_pvar_null(param, 1) != 0) {
-			LM_ERR("failed to fixup result pvar\n");
-			return -1;
-		}
-		if(((pv_spec_t *)(*param))->setf == NULL) {
-			LM_ERR("result pvar is not writeble\n");
-			return -1;
-		}
-	}
-	return 0;
-}
-
-/**
- *
- */
 static int ki_crypto_hmac_sha256_helper(
 		sip_msg_t *msg, str *ins, str *key, pv_spec_t *dst)
 {
@@ -471,6 +448,19 @@ static int fixup_crypto_hmac(void **param, int param_no)
 			LM_ERR("result pvar is not writeble\n");
 			return -1;
 		}
+	}
+	return 0;
+}
+
+/**
+ *
+ */
+static int fixup_free_crypto_hmac(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2) {
+		fixup_free_spve_null(param, 1);
+	} else if(param_no == 3) {
+		fixup_free_pvar_null(param, 1);
 	}
 	return 0;
 }
@@ -589,29 +579,6 @@ static int w_crypto_aes_decrypt(
 
 	return ki_crypto_aes_decrypt_helper(msg, &ins, &keys, dst);
 }
-
-/**
- *
- */
-static int fixup_crypto_aes_decrypt(void **param, int param_no)
-{
-	if(param_no == 1 || param_no == 2) {
-		if(fixup_spve_null(param, 1) < 0)
-			return -1;
-		return 0;
-	} else if(param_no == 3) {
-		if(fixup_pvar_null(param, 1) != 0) {
-			LM_ERR("failed to fixup result pvar\n");
-			return -1;
-		}
-		if(((pv_spec_t *)(*param))->setf == NULL) {
-			LM_ERR("result pvar is not writeble\n");
-			return -1;
-		}
-	}
-	return 0;
-}
-
 
 /**
  * testing function

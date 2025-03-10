@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -100,6 +102,7 @@ static int subst_uri_f(struct sip_msg *, char *, char *);
 static int subst_user_f(struct sip_msg *, char *, char *);
 static int subst_body_f(struct sip_msg *, char *, char *);
 static int subst_hf_f(struct sip_msg *, char *, char *, char *);
+static int subst_v_f(struct sip_msg *, char *, char *, char *);
 static int filter_body_f(struct sip_msg *, char *, char *);
 static int is_present_hf_f(struct sip_msg *msg, char *str_hf, char *foo);
 static int search_append_body_f(struct sip_msg *, char *, char *);
@@ -173,179 +176,183 @@ static int w_via_param_rm(sip_msg_t *msg, char *pname, char *pidx);
 
 static int mod_init(void);
 
-static tr_export_t mod_trans[] = {{{"re", sizeof("re") - 1}, /* regexp class */
-										  tr_txt_parse_re},
-
-		{{0, 0}, 0}};
+/* clang-format off */
+static tr_export_t mod_trans[] = {
+	{{"re", sizeof("re") - 1}, tr_txt_parse_re},
+	{{0, 0}, 0}
+};
 
 static cmd_export_t cmds[] = {
-		{"search", (cmd_function)search_f, 1, fixup_regexp_null,
-				fixup_free_regexp_null, ANY_ROUTE},
-		{"search_body", (cmd_function)search_body_f, 1, fixup_regexp_null,
-				fixup_free_regexp_null, ANY_ROUTE},
-		{"search_hf", (cmd_function)search_hf_f, 3, fixup_search_hf, 0,
-				ANY_ROUTE},
-		{"search_append", (cmd_function)search_append_f, 2, fixup_regexp_none,
-				fixup_free_regexp_none, ANY_ROUTE},
-		{"search_append_body", (cmd_function)search_append_body_f, 2,
-				fixup_regexp_none, fixup_free_regexp_none, ANY_ROUTE},
-		{"replace", (cmd_function)replace_f, 2, fixup_regexp_none,
-				fixup_free_regexp_none, ANY_ROUTE},
-		{"replace_str", (cmd_function)replace_str_f, 3, fixup_spve_all,
-				fixup_free_spve_all, ANY_ROUTE},
-		{"replace_body", (cmd_function)replace_body_f, 2, fixup_regexp_none,
-				fixup_free_regexp_none, ANY_ROUTE},
-		{"replace_body_str", (cmd_function)replace_body_str_f, 3,
-				fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
-		{"replace_hdrs", (cmd_function)replace_hdrs_f, 2, fixup_regexp_none,
-				fixup_free_regexp_none, ANY_ROUTE},
-		{"replace_hdrs_str", (cmd_function)replace_hdrs_str_f, 3,
-				fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
-		{"replace_all", (cmd_function)replace_all_f, 2, fixup_regexp_none,
-				fixup_free_regexp_none, ANY_ROUTE},
-		{"replace_body_all", (cmd_function)replace_body_all_f, 2,
-				fixup_regexp_none, fixup_free_regexp_none, ANY_ROUTE},
-		{"replace_body_atonce", (cmd_function)replace_body_atonce_f, 2,
-				fixup_regexpNL_none, fixup_free_regexp_none, ANY_ROUTE},
-		{"append_to_reply", (cmd_function)append_to_reply_f, 1, fixup_spve_null,
-				0, REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"append_hf", (cmd_function)append_hf_1, 1, add_header_fixup, 0,
-				ANY_ROUTE},
-		{"append_hf", (cmd_function)append_hf_2, 2, add_header_fixup, 0,
-				ANY_ROUTE},
-		{"insert_hf", (cmd_function)insert_hf_1, 1, add_header_fixup, 0,
-				ANY_ROUTE},
-		{"insert_hf", (cmd_function)insert_hf_2, 2, add_header_fixup, 0,
-				ANY_ROUTE},
-		{"append_urihf", (cmd_function)append_urihf, 2, fixup_str_str,
-				fixup_free_str_str,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"remove_hf", (cmd_function)remove_hf_f, 1, hname_fixup,
-				free_hname_fixup, ANY_ROUTE},
-		{"remove_hf_idx", (cmd_function)remove_hf_idx_f, 2, fixup_spve_igp,
-				fixup_free_spve_igp, ANY_ROUTE},
-		{"remove_hf_re", (cmd_function)remove_hf_re_f, 1, fixup_regexp_null,
-				fixup_free_regexp_null, ANY_ROUTE},
-		{"remove_hf_exp", (cmd_function)remove_hf_exp_f, 2, fixup_regexp_regexp,
-				fixup_free_regexp_regexp, ANY_ROUTE},
-		{"is_present_hf", (cmd_function)is_present_hf_f, 1, hname_fixup,
-				free_hname_fixup, ANY_ROUTE},
-		{"is_present_hf_re", (cmd_function)is_present_hf_re_f, 1,
-				fixup_regexp_null, fixup_free_regexp_null, ANY_ROUTE},
-		{"remove_hf_pv", (cmd_function)remove_hf_pv_f, 1, fixup_spve_null,
-				fixup_free_spve_null, ANY_ROUTE},
-		{"remove_hf_re_pv", (cmd_function)remove_hf_re_pv_f, 1, fixup_spve_null,
-				fixup_free_spve_null, ANY_ROUTE},
-		{"remove_hf_exp_pv", (cmd_function)remove_hf_exp_pv_f, 2,
-				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
-		{"remove_hf_match", (cmd_function)remove_hf_match_f, 3, fixup_spve_all,
-				fixup_free_spve_all, ANY_ROUTE},
-		{"is_present_hf_pv", (cmd_function)is_present_hf_pv_f, 1,
-				fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
-		{"is_present_hf_re_pv", (cmd_function)is_present_hf_re_pv_f, 1,
-				fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
-		{"subst", (cmd_function)subst_f, 1, fixup_substre, 0, ANY_ROUTE},
-		{"subst_uri", (cmd_function)subst_uri_f, 1, fixup_substre, 0,
-				REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"subst_user", (cmd_function)subst_user_f, 1, fixup_substre, 0,
-				REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"subst_body", (cmd_function)subst_body_f, 1, fixup_substre, 0,
-				ANY_ROUTE},
-		{"subst_hf", (cmd_function)subst_hf_f, 3, fixup_subst_hf, 0, ANY_ROUTE},
-		{"filter_body", (cmd_function)filter_body_f, 1, fixup_str_null, 0,
-				ANY_ROUTE},
-		{"append_time", (cmd_function)append_time_f, 0, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"set_body", (cmd_function)set_body_f, 2, fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
-		{"set_reply_body", (cmd_function)set_rpl_body_f, 2, fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"is_method", (cmd_function)is_method_f, 1, fixup_method, 0, ANY_ROUTE},
-		{"has_body", (cmd_function)has_body_f, 0, 0, 0, ANY_ROUTE},
-		{"has_body", (cmd_function)has_body_f, 1, fixup_body_type, 0,
-				ANY_ROUTE},
-		{"is_privacy", (cmd_function)is_privacy_f, 1, fixup_privacy, 0,
-				ANY_ROUTE},
-		{"in_list", (cmd_function)in_list_f, 3, fixup_in_list,
-				fixup_free_in_list, ANY_ROUTE},
-		{"in_list_prefix", (cmd_function)in_list_prefix_f, 3,
-				fixup_in_list_prefix, fixup_free_in_list_prefix, ANY_ROUTE},
-		{"cmp_str", (cmd_function)cmp_str_f, 2, fixup_spve_spve, 0, ANY_ROUTE},
-		{"cmp_istr", (cmd_function)cmp_istr_f, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"search_str", (cmd_function)w_search_str, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"starts_with", (cmd_function)starts_with_f, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"ends_with", (cmd_function)ends_with_f, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"str_find", (cmd_function)str_find_f, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"str_ifind", (cmd_function)str_ifind_f, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"str_any_in", (cmd_function)str_any_in_f, 2, fixup_spve_spve, 0,
-				ANY_ROUTE},
-		{"is_audio_on_hold", (cmd_function)is_audio_on_hold_f, 0, 0, 0,
-				ANY_ROUTE},
-		{"append_time_to_request", (cmd_function)append_time_request_f, 0, 0, 0,
-				ANY_ROUTE},
-		{"via_param_rm", (cmd_function)w_via_param_rm, 2, fixup_spve_igp,
-				fixup_free_spve_igp, ANY_ROUTE},
+	{"search", (cmd_function)search_f, 1, fixup_regexp_null,
+			fixup_free_regexp_null, ANY_ROUTE},
+	{"search_body", (cmd_function)search_body_f, 1, fixup_regexp_null,
+			fixup_free_regexp_null, ANY_ROUTE},
+	{"search_hf", (cmd_function)search_hf_f, 3, fixup_search_hf, 0,
+			ANY_ROUTE},
+	{"search_append", (cmd_function)search_append_f, 2, fixup_regexp_none,
+			fixup_free_regexp_none, ANY_ROUTE},
+	{"search_append_body", (cmd_function)search_append_body_f, 2,
+			fixup_regexp_none, fixup_free_regexp_none, ANY_ROUTE},
+	{"replace", (cmd_function)replace_f, 2, fixup_regexp_none,
+			fixup_free_regexp_none, ANY_ROUTE},
+	{"replace_str", (cmd_function)replace_str_f, 3, fixup_spve_all,
+			fixup_free_spve_all, ANY_ROUTE},
+	{"replace_body", (cmd_function)replace_body_f, 2, fixup_regexp_none,
+			fixup_free_regexp_none, ANY_ROUTE},
+	{"replace_body_str", (cmd_function)replace_body_str_f, 3,
+			fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"replace_hdrs", (cmd_function)replace_hdrs_f, 2, fixup_regexp_none,
+			fixup_free_regexp_none, ANY_ROUTE},
+	{"replace_hdrs_str", (cmd_function)replace_hdrs_str_f, 3,
+			fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"replace_all", (cmd_function)replace_all_f, 2, fixup_regexp_none,
+			fixup_free_regexp_none, ANY_ROUTE},
+	{"replace_body_all", (cmd_function)replace_body_all_f, 2,
+			fixup_regexp_none, fixup_free_regexp_none, ANY_ROUTE},
+	{"replace_body_atonce", (cmd_function)replace_body_atonce_f, 2,
+			fixup_regexpNL_none, fixup_free_regexp_none, ANY_ROUTE},
+	{"append_to_reply", (cmd_function)append_to_reply_f, 1, fixup_spve_null,
+			0, REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"append_hf", (cmd_function)append_hf_1, 1, add_header_fixup, 0,
+			ANY_ROUTE},
+	{"append_hf", (cmd_function)append_hf_2, 2, add_header_fixup, 0,
+			ANY_ROUTE},
+	{"insert_hf", (cmd_function)insert_hf_1, 1, add_header_fixup, 0,
+			ANY_ROUTE},
+	{"insert_hf", (cmd_function)insert_hf_2, 2, add_header_fixup, 0,
+			ANY_ROUTE},
+	{"append_urihf", (cmd_function)append_urihf, 2, fixup_str_str,
+			fixup_free_str_str,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"remove_hf", (cmd_function)remove_hf_f, 1, hname_fixup,
+			free_hname_fixup, ANY_ROUTE},
+	{"remove_hf_idx", (cmd_function)remove_hf_idx_f, 2, fixup_spve_igp,
+			fixup_free_spve_igp, ANY_ROUTE},
+	{"remove_hf_re", (cmd_function)remove_hf_re_f, 1, fixup_regexp_null,
+			fixup_free_regexp_null, ANY_ROUTE},
+	{"remove_hf_exp", (cmd_function)remove_hf_exp_f, 2, fixup_regexp_regexp,
+			fixup_free_regexp_regexp, ANY_ROUTE},
+	{"is_present_hf", (cmd_function)is_present_hf_f, 1, hname_fixup,
+			free_hname_fixup, ANY_ROUTE},
+	{"is_present_hf_re", (cmd_function)is_present_hf_re_f, 1,
+			fixup_regexp_null, fixup_free_regexp_null, ANY_ROUTE},
+	{"remove_hf_pv", (cmd_function)remove_hf_pv_f, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
+	{"remove_hf_re_pv", (cmd_function)remove_hf_re_pv_f, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
+	{"remove_hf_exp_pv", (cmd_function)remove_hf_exp_pv_f, 2,
+			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{"remove_hf_match", (cmd_function)remove_hf_match_f, 3, fixup_spve_all,
+			fixup_free_spve_all, ANY_ROUTE},
+	{"is_present_hf_pv", (cmd_function)is_present_hf_pv_f, 1,
+			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"is_present_hf_re_pv", (cmd_function)is_present_hf_re_pv_f, 1,
+			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"subst", (cmd_function)subst_f, 1, fixup_substre, 0, ANY_ROUTE},
+	{"subst_uri", (cmd_function)subst_uri_f, 1, fixup_substre, 0,
+			REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"subst_user", (cmd_function)subst_user_f, 1, fixup_substre, 0,
+			REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"subst_body", (cmd_function)subst_body_f, 1, fixup_substre, 0,
+			ANY_ROUTE},
+	{"subst_hf", (cmd_function)subst_hf_f, 3, fixup_subst_hf, 0, ANY_ROUTE},
+	{"subst_v", (cmd_function)subst_v_f, 3, fixup_spve2_pvar,
+			fixup_free_spve2_pvar, ANY_ROUTE},
+	{"filter_body", (cmd_function)filter_body_f, 1, fixup_str_null, 0,
+			ANY_ROUTE},
+	{"append_time", (cmd_function)append_time_f, 0, 0, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"set_body", (cmd_function)set_body_f, 2, fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
+	{"set_reply_body", (cmd_function)set_rpl_body_f, 2, fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"is_method", (cmd_function)is_method_f, 1, fixup_method, 0, ANY_ROUTE},
+	{"has_body", (cmd_function)has_body_f, 0, 0, 0, ANY_ROUTE},
+	{"has_body", (cmd_function)has_body_f, 1, fixup_body_type, 0,
+			ANY_ROUTE},
+	{"is_privacy", (cmd_function)is_privacy_f, 1, fixup_privacy, 0,
+			ANY_ROUTE},
+	{"in_list", (cmd_function)in_list_f, 3, fixup_in_list,
+			fixup_free_in_list, ANY_ROUTE},
+	{"in_list_prefix", (cmd_function)in_list_prefix_f, 3,
+			fixup_in_list_prefix, fixup_free_in_list_prefix, ANY_ROUTE},
+	{"cmp_str", (cmd_function)cmp_str_f, 2, fixup_spve_spve, 0, ANY_ROUTE},
+	{"cmp_istr", (cmd_function)cmp_istr_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"search_str", (cmd_function)w_search_str, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"starts_with", (cmd_function)starts_with_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"ends_with", (cmd_function)ends_with_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"str_find", (cmd_function)str_find_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"str_ifind", (cmd_function)str_ifind_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"str_any_in", (cmd_function)str_any_in_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"is_audio_on_hold", (cmd_function)is_audio_on_hold_f, 0, 0, 0,
+			ANY_ROUTE},
+	{"append_time_to_request", (cmd_function)append_time_request_f, 0, 0, 0,
+			ANY_ROUTE},
+	{"via_param_rm", (cmd_function)w_via_param_rm, 2, fixup_spve_igp,
+			fixup_free_spve_igp, ANY_ROUTE},
 
-		{"set_body_multipart", (cmd_function)set_multibody_0, 0, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"set_body_multipart", (cmd_function)set_multibody_1, 1,
-				fixup_spve_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"set_body_multipart", (cmd_function)set_multibody_2, 2,
-				fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"set_body_multipart", (cmd_function)set_multibody_3, 3,
-				fixup_multibody_f, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"append_body_part", (cmd_function)append_multibody_2, 2,
-				fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"append_body_part", (cmd_function)append_multibody_3, 3,
-				fixup_multibody_f, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"append_body_part_hex", (cmd_function)append_multibody_hex_2, 2,
-				fixup_spve_spve, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"append_body_part_hex", (cmd_function)append_multibody_hex_3, 3,
-				fixup_multibody_f, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"remove_body_part", (cmd_function)remove_multibody_f, 1,
-				fixup_spve_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
-		{"get_body_part_raw", (cmd_function)get_body_part_raw_f, 2,
-				fixup_get_body_part, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
-		{"get_body_part", (cmd_function)get_body_part_f, 2, fixup_get_body_part,
-				0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
-		{"regex_substring", (cmd_function)regex_substring_f, 5,
-				fixup_regex_substring, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
+	{"set_body_multipart", (cmd_function)set_multibody_0, 0, 0, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"set_body_multipart", (cmd_function)set_multibody_1, 1,
+			fixup_spve_null, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"set_body_multipart", (cmd_function)set_multibody_2, 2,
+			fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"set_body_multipart", (cmd_function)set_multibody_3, 3,
+			fixup_multibody_f, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"append_body_part", (cmd_function)append_multibody_2, 2,
+			fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"append_body_part", (cmd_function)append_multibody_3, 3,
+			fixup_multibody_f, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"append_body_part_hex", (cmd_function)append_multibody_hex_2, 2,
+			fixup_spve_spve, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"append_body_part_hex", (cmd_function)append_multibody_hex_3, 3,
+			fixup_multibody_f, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"remove_body_part", (cmd_function)remove_multibody_f, 1,
+			fixup_spve_null, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"get_body_part_raw", (cmd_function)get_body_part_raw_f, 2,
+			fixup_get_body_part, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
+	{"get_body_part", (cmd_function)get_body_part_f, 2, fixup_get_body_part,
+			0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
+	{"regex_substring", (cmd_function)regex_substring_f, 5,
+			fixup_regex_substring, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
 
-		{"bind_textops", (cmd_function)bind_textops, 0, 0, 0, 0},
+	{"bind_textops", (cmd_function)bind_textops, 0, 0, 0, 0},
 
-		{0, 0, 0, 0, 0, 0}};
+	{0, 0, 0, 0, 0, 0}
+};
 
 
 struct module_exports exports = {
-		"textops",		 /* module name*/
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		0,				 /* exported parameters */
-		0,				 /* exported rpc functions */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		0,				 /* per-child init function */
-		0				 /* module destroy function */
+	"textops",       /* module name*/
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	0,               /* exported parameters */
+	0,               /* exported rpc functions */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	0,               /* per-child init function */
+	0                /* module destroy function */
 };
-
+/* clang-format on */
 
 static int mod_init(void)
 {
@@ -1526,6 +1533,78 @@ static int subst_body_f(struct sip_msg *msg, char *subst, char *ignored)
 {
 	return subst_body_helper_f(msg, (struct subst_expr *)subst);
 }
+
+/* sed-perl style re: s/regular expression/replacement/flags, like
+ *  subst but with variables */
+static int subst_v_helper_f(
+		sip_msg_t *msg, str *itext, str *subex, pv_spec_t *pvd)
+{
+	str *result;
+	int nmatches;
+	struct subst_expr *se;
+	pv_value_t val;
+
+	if(pvd->setf == NULL) {
+		LM_ERR("the variable is read only\n");
+		return -1;
+	}
+	se = subst_parser(subex);
+	if(se == 0) {
+		LM_ERR("bad subst re: %.*s\n", subex->len, subex->s);
+		return -1;
+	}
+	/* pkg malloc'ed result */
+	result = subst_str(itext->s, msg, se, &nmatches);
+	if(result == NULL) {
+		if(nmatches < 0) {
+			LM_ERR("substitution failed\n");
+		}
+		subst_expr_free(se);
+		return -1;
+	}
+	memset(&val, 0, sizeof(pv_value_t));
+	val.rs.s = result->s;
+	val.rs.len = result->len;
+	val.flags = PV_VAL_STR;
+	pvd->setf(msg, &pvd->pvp, (int)EQ_T, &val);
+
+	pkg_free(result->s);
+	pkg_free(result);
+	subst_expr_free(se);
+	return 1;
+}
+
+/* sed-perl style re: s/regular expression/replacement/flags, like
+ *  subst but with variables */
+static int ki_subst_v(sip_msg_t *msg, str *itext, str *subex, str *opv)
+{
+	pv_spec_t *pvd = NULL;
+
+	pvd = pv_cache_get(opv);
+	if(pvd == NULL) {
+		LM_ERR("failed to get pv spec\n");
+		return -1;
+	}
+	return subst_v_helper_f(msg, itext, subex, pvd);
+}
+
+static int subst_v_f(sip_msg_t *msg, char *pitext, char *psubex, char *popv)
+{
+	str itext = STR_NULL;
+	str subex = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t *)pitext, &itext) < 0) {
+		LM_ERR("failed to get header name\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)psubex, &subex) < 0) {
+		LM_ERR("failed to get header name\n");
+		return -1;
+	}
+
+	return subst_v_helper_f(msg, &itext, &subex, (pv_spec_t *)popv);
+}
+
 
 static inline int find_line_start(
 		char *text, unsigned int text_len, char **buf, unsigned int *buf_len)
@@ -4947,11 +5026,7 @@ static int ki_via_param_rm(sip_msg_t *msg, str *name, int idx)
 								LM_ERR("no memory for delete operation\n");
 								return -1;
 							}
-							if(ret < 0) {
-								ret = 1;
-							} else {
-								ret++;
-							}
+							ret++;
 						}
 					}
 					if(ret > 0) {
@@ -4962,7 +5037,7 @@ static int ki_via_param_rm(sip_msg_t *msg, str *name, int idx)
 			}
 		}
 	}
-	return ret;
+	return (ret == 0) ? -1 : ret;
 }
 
 /**
@@ -5279,6 +5354,11 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 	},
 	{ str_init("textops"), str_init("subst_hf"),
 		SR_KEMIP_INT, ki_subst_hf,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("subst_v"),
+		SR_KEMIP_INT, ki_subst_v,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

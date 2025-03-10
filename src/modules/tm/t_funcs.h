@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -55,8 +57,8 @@ extern int tm_error; /* delayed tm error */
 extern struct msgid_var user_cell_set_flags;
 extern struct msgid_var user_cell_reset_flags;
 
-extern int fr_inv_timer_avp_type;
-extern int_str fr_inv_timer_avp;
+extern avp_flags_t fr_inv_timer_avp_type;
+extern avp_name_t fr_inv_timer_avp;
 extern str contacts_avp;
 extern str contact_flows_avp;
 

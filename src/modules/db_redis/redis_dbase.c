@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -614,7 +616,10 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
 			if(set_keys) {
 				// add key for parent set
 				// <version>:<table>::index::<type>
-				pkg_free(keyname.s);
+				if(keyname.s) {
+					pkg_free(keyname.s);
+					keyname.s = NULL;
+				}
 				keyname.len = table->version_code.len + table_name->len + 9
 							  + type->type.len;
 				keyname.s = pkg_malloc(keyname.len + 1);
@@ -628,12 +633,16 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
 						type->type.s);
 				if(db_redis_key_add_str(set_keys, &keyname) != 0) {
 					LM_ERR("Failed to add query key to set key list\n");
+					pkg_free(keyname.s);
+					keyname.s = NULL;
 					goto err;
 				}
 			}
 		}
-		if(keyname.s)
+		if(keyname.s) {
 			pkg_free(keyname.s);
+			keyname.s = NULL;
+		}
 	}
 
 	return 0;
@@ -1836,13 +1845,13 @@ static int db_redis_perform_delete(const db1_con_t *_h, km_redis_con_t *con,
 					"performing delete\n",
 					CON_TABLE(_h)->len, CON_TABLE(_h)->s);
 		else
-			LM_WARN("performing table scan on table '%.*s' while performing "
-					"delete using match key "
-					"'%.*s' at offset %llx\n",
+			LM_DBG("performing table scan on table '%.*s' while performing "
+				   "delete using match key "
+				   "'%.*s' at offset %llx\n",
 					CON_TABLE(_h)->len, CON_TABLE(_h)->s, ts_scan_key->len,
 					ts_scan_key->s, (unsigned long long)ts_scan_start);
 		for(i = 0; i < _n; ++i) {
-			LM_WARN("  scan key %d is '%.*s'\n", i, _k[i]->len, _k[i]->s);
+			LM_DBG("  scan key %d is '%.*s'\n", i, _k[i]->len, _k[i]->s);
 		}
 		if(db_redis_scan_query_keys(con, CON_TABLE(_h), _n, keys, keys_count,
 				   manual_keys, manual_keys_count, ts_scan_start, ts_scan_key,

@@ -6,7 +6,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -16,7 +16,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -26,6 +26,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -113,55 +115,57 @@ int route_uar_user_unknown_no = -1;
 
 /** module functions */
 static int mod_init(void);
-static int fixup_uar(void **param, int param_no);
-static int fixup_lir(void **param, int param_no);
+static int fixup_uar_lir(void **param, int param_no);
+static int fixup_free_uar_lir(void **param, int param_no);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"I_perform_user_authorization_request",
-				(cmd_function)I_perform_user_authorization_request, 2,
-				fixup_uar, 0, REQUEST_ROUTE},
-		{"I_perform_location_information_request",
-				(cmd_function)I_perform_location_information_request, 2,
-				fixup_lir, 0, REQUEST_ROUTE},
-		{"I_scscf_select", (cmd_function)I_scscf_select, 1, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"I_scscf_drop", (cmd_function)I_scscf_drop, 0, 0, 0,
-				REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"I_perform_user_authorization_request", (cmd_function)I_perform_user_authorization_request, 2,
+		fixup_uar_lir, fixup_free_uar_lir, REQUEST_ROUTE},
+	{"I_perform_location_information_request",(cmd_function)I_perform_location_information_request, 2,
+		fixup_uar_lir, fixup_free_uar_lir, REQUEST_ROUTE},
+	{"I_scscf_select", (cmd_function)I_scscf_select, 1,
+		0, 0, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"I_scscf_drop", (cmd_function)I_scscf_drop, 0,
+		0, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"route_lir_user_unknown", PARAM_STRING, &route_lir_user_unknown},
-		{"route_uar_user_unknown", PARAM_STRING, &route_uar_user_unknown},
-		{"scscf_entry_expiry", INT_PARAM, &scscf_entry_expiry},
-		{"db_url", PARAM_STRING, &ims_icscf_db_url},
-		{"db_nds_table", PARAM_STRING, &ims_icscf_db_nds_table},
-		{"db_scscf_table", PARAM_STRING, &ims_icscf_db_scscf_table},
-		{"db_capabilities_table", PARAM_STRING,
-				&ims_icscf_db_capabilities_table},
-		{"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
-		{"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
-		{"preferred_scscf_uri", PARAM_STR, &preferred_scscf_uri},
-		{"use_preferred_scscf_uri", INT_PARAM, &use_preferred_scscf_uri},
-		{0, 0, 0}};
+	{"route_lir_user_unknown", PARAM_STRING, &route_lir_user_unknown},
+	{"route_uar_user_unknown", PARAM_STRING, &route_uar_user_unknown},
+	{"scscf_entry_expiry", PARAM_INT, &scscf_entry_expiry},
+	{"db_url", PARAM_STRING, &ims_icscf_db_url},
+	{"db_nds_table", PARAM_STRING, &ims_icscf_db_nds_table},
+	{"db_scscf_table", PARAM_STRING, &ims_icscf_db_scscf_table},
+	{"db_capabilities_table", PARAM_STRING, &ims_icscf_db_capabilities_table},
+	{"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
+	{"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
+	{"preferred_scscf_uri", PARAM_STR, &preferred_scscf_uri},
+	{"use_preferred_scscf_uri", PARAM_INT, &use_preferred_scscf_uri},
+	{0, 0, 0}
+};
 
-stat_export_t mod_stats[] = {{"uar_avg_response_time", STAT_IS_FUNC,
-									 (stat_var **)get_avg_uar_response_time},
-		{"lir_avg_response_time", STAT_IS_FUNC,
-				(stat_var **)get_avg_lir_response_time},
-		{"uar_timeouts", 0, (stat_var **)&stat_uar_timeouts},
-		{"lir_timeouts", 0, (stat_var **)&stat_lir_timeouts}, {0, 0, 0}};
+stat_export_t mod_stats[] = {
+	{"uar_avg_response_time", STAT_IS_FUNC, (stat_var **)get_avg_uar_response_time},
+	{"lir_avg_response_time", STAT_IS_FUNC, (stat_var **)get_avg_lir_response_time},
+	{"uar_timeouts", 0, (stat_var **)&stat_uar_timeouts},
+	{"lir_timeouts", 0, (stat_var **)&stat_lir_timeouts},
+	{0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"ims_icscf", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,						  /* Exported functions */
-		params, 0,					  /* exported RPC methods */
-		0,							  /* exported pseudo-variables */
-		0,							  /* reponse handling function */
-		mod_init,					  /* module initialization function */
-		0,							  /* per-child init function */
-		0							  /* module destroy function */
+	"ims_icscf", DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,						  /* Exported functions */
+	params, 0,					  /* exported RPC methods */
+	0,							  /* exported pseudo-variables */
+	0,							  /* reponse handling function */
+	mod_init,					  /* module initialization function */
+	0,							  /* per-child init function */
+	0							  /* module destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function
@@ -227,7 +231,7 @@ static int mod_init(void)
 
 	if(!i_hash_table_init(ims_icscf_hash_size)) {
 		LOG(L_ERR, "ERR" M_NAME ":mod_init: Error initializing the Hash Table "
-								"for stored S-CSCF lists\n");
+				   "for stored S-CSCF lists\n");
 		goto error;
 	}
 
@@ -274,7 +278,7 @@ error:
 	return -1;
 }
 
-static int fixup_uar(void **param, int param_no)
+static int fixup_uar_lir(void **param, int param_no)
 {
 	if(strlen((char *)*param) <= 0) {
 		LM_ERR("empty parameter %d not allowed\n", param_no);
@@ -290,18 +294,13 @@ static int fixup_uar(void **param, int param_no)
 	return 0;
 }
 
-static int fixup_lir(void **param, int param_no)
+static int fixup_free_uar_lir(void **param, int param_no)
 {
-	if(strlen((char *)*param) <= 0) {
-		LM_ERR("empty parameter %d not allowed\n", param_no);
-		return -1;
-	}
-
 	switch(param_no) {
 		case 1:
-			return fixup_spve_null(param, param_no);
+			return fixup_free_spve_null(param, param_no);
 		case 2:
-			return fixup_var_int_12(param, 1);
+			return fixup_free_fparam_all(param, 1);
 	}
 	return 0;
 }

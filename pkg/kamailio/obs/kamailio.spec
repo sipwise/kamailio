@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.8.5
+%define ver 6.0.1
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -8,7 +8,6 @@
 %bcond_without cnxcc
 %bcond_with dnssec
 %bcond_without evapi
-%bcond_without geoip
 %bcond_without http_async_client
 %bcond_without ims
 %bcond_without jansson
@@ -21,7 +20,7 @@
 %bcond_without nats
 %bcond_without perl
 %bcond_without phonenum
-%bcond_without python2
+%bcond_with python2
 %bcond_without python3
 %bcond_without rabbitmq
 %bcond_without redis
@@ -45,7 +44,6 @@
 %bcond_without cnxcc
 %bcond_with dnssec
 %bcond_without evapi
-%bcond_without geoip
 %bcond_without http_async_client
 %bcond_without ims
 %bcond_without jansson
@@ -92,7 +90,6 @@
 %bcond_without cnxcc
 %bcond_with dnssec
 %bcond_without evapi
-%bcond_without geoip
 %bcond_without http_async_client
 %bcond_without ims
 %bcond_without jansson
@@ -116,21 +113,21 @@
 %bcond_without wolfssl
 %endif
 
-%if 0%{?rhel} == 9
+%if 0%{?rhel} == 9 || 0%{?rhel} == 10
 %if 0%{?centos_ver}
 %define dist_name centos
 %define dist_version %{?centos}
-%define dist .el9.centos
+%define dist .el%{?centos_ver}.centos
 %endif
 %if 0%{?almalinux_ver}
 %define dist_name centos
 %define dist_version %{?almalinux}
-%define dist .el9.almalinux
+%define dist .el%{?almalinux_ver}.almalinux
 %endif
 %if 0%{?rocky_ver}
 %define dist_name centos
 %define dist_version %{?rocky}
-%define dist .el9.rocky
+%define dist .el%{?rocky_ver}.rocky
 %endif
 %if 0%{?centos_ver} == 0 && 0%{?almalinux_ver} == 0 && 0%{?rocky_ver} == 0
 %define dist_name rhel
@@ -139,7 +136,6 @@
 %bcond_without cnxcc
 %bcond_with dnssec
 %bcond_without evapi
-%bcond_without geoip
 %bcond_without http_async_client
 %bcond_without ims
 %bcond_without jansson
@@ -169,7 +165,6 @@
 %bcond_without cnxcc
 %bcond_with dnssec
 %bcond_with evapi
-%bcond_without geoip
 %bcond_without http_async_client
 %bcond_without ims
 %bcond_without jansson
@@ -467,16 +462,14 @@ suspended when sending the event, to be resumed at a later point, maybe triggere
 %endif
 
 
-%if %{with geoip}
 %package    geoip
 Summary:    MaxMind GeoIP support for Kamailio
 Group:      %{PKGGROUP}
-Requires:   GeoIP, libmaxminddb, kamailio = %ver
-BuildRequires:  GeoIP-devel, libmaxminddb-devel
+Requires:   libmaxminddb, kamailio = %ver
+BuildRequires:  libmaxminddb-devel
 
 %description    geoip
 MaxMind GeoIP support for Kamailio.
-%endif
 
 
 %package    gzcompress
@@ -1205,7 +1198,6 @@ sed -i -e 's|/usr/sbin/kamailio|/usr/sbin/kamailio --atexit=no|' pkg/kamailio/ob
 
 
 %build
-ln -s ../obs pkg/kamailio/%{dist_name}/%{dist_version}
 %if 0%{?fedora} || 0%{?suse_version} || 0%{?rhel} >= 8
 export FREERADIUS=1
 %endif
@@ -1239,10 +1231,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with evapi}
     kev \
 %endif
-%if %{with geoip}
-    kgeoip \
     kgeoip2 \
-%endif
     kgzcompress \
 %if %{with http_async_client}
     khttp_async \
@@ -1353,10 +1342,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with evapi}
     kev \
 %endif
-%if %{with geoip}
-    kgeoip \
     kgeoip2 \
-%endif
     kgzcompress \
 %if %{with http_async_client}
     khttp_async \
@@ -1444,29 +1430,29 @@ install -d %{buildroot}%{_sharedstatedir}/kamailio
 # On RedHat 6 like
 install -d %{buildroot}%{_var}/run/kamailio
 install -d %{buildroot}%{_sysconfdir}/rc.d/init.d
-install -m755 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.init \
+install -m755 pkg/kamailio/obs/kamailio.init \
         %{buildroot}%{_sysconfdir}/rc.d/init.d/kamailio
 %else
 # systemd
 install -d %{buildroot}%{_unitdir}
-install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.service %{buildroot}%{_unitdir}/kamailio.service
-install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio@.service %{buildroot}%{_unitdir}/kamailio@.service
-install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/sipcapture.service %{buildroot}%{_unitdir}/sipcapture.service
-install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.tmpfiles %{buildroot}%{_tmpfilesdir}/kamailio.conf
-install -Dpm 0644 pkg/kamailio/%{dist_name}/%{dist_version}/sipcapture.tmpfiles %{buildroot}%{_tmpfilesdir}/sipcapture.conf
+install -Dpm 0644 pkg/kamailio/obs/kamailio.service %{buildroot}%{_unitdir}/kamailio.service
+install -Dpm 0644 pkg/kamailio/obs/kamailio@.service %{buildroot}%{_unitdir}/kamailio@.service
+install -Dpm 0644 pkg/kamailio/obs/sipcapture.service %{buildroot}%{_unitdir}/sipcapture.service
+install -Dpm 0644 pkg/kamailio/obs/kamailio.tmpfiles %{buildroot}%{_tmpfilesdir}/kamailio.conf
+install -Dpm 0644 pkg/kamailio/obs/sipcapture.tmpfiles %{buildroot}%{_tmpfilesdir}/sipcapture.conf
 %endif
 
 %if 0%{?suse_version}
 install -d %{buildroot}%{_fillupdir}
-install -m644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.sysconfig \
+install -m644 pkg/kamailio/obs/kamailio.sysconfig \
         %{buildroot}%{_fillupdir}/sysconfig.kamailio
-install -m644 pkg/kamailio/%{dist_name}/%{dist_version}/sipcapture.sysconfig \
+install -m644 pkg/kamailio/obs/sipcapture.sysconfig \
         %{buildroot}%{_fillupdir}/sysconfig.sipcapture
 %else
 install -d %{buildroot}%{_sysconfdir}/sysconfig
-install -m644 pkg/kamailio/%{dist_name}/%{dist_version}/kamailio.sysconfig \
+install -m644 pkg/kamailio/obs/kamailio.sysconfig \
         %{buildroot}%{_sysconfdir}/sysconfig/kamailio
-install -m644 pkg/kamailio/%{dist_name}/%{dist_version}/sipcapture.sysconfig \
+install -m644 pkg/kamailio/obs/sipcapture.sysconfig \
         %{buildroot}%{_sysconfdir}/sysconfig/sipcapture
 %endif
 
@@ -1597,10 +1583,9 @@ fi
 %doc %{_docdir}/kamailio/modules/README.pipelimit
 %doc %{_docdir}/kamailio/modules/README.posops
 %doc %{_docdir}/kamailio/modules/README.prefix_route
-%doc %{_docdir}/kamailio/modules/README.print
-%doc %{_docdir}/kamailio/modules/README.print_lib
 %doc %{_docdir}/kamailio/modules/README.pv
 %doc %{_docdir}/kamailio/modules/README.pv_headers
+%doc %{_docdir}/kamailio/modules/README.pvtpl
 %doc %{_docdir}/kamailio/modules/README.pua_rpc
 %doc %{_docdir}/kamailio/modules/README.qos
 %doc %{_docdir}/kamailio/modules/README.ratelimit
@@ -1635,6 +1620,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.tmrec
 %doc %{_docdir}/kamailio/modules/README.tmx
 %doc %{_docdir}/kamailio/modules/README.topoh
+%doc %{_docdir}/kamailio/modules/README.topos_htable
 %doc %{_docdir}/kamailio/modules/README.uac
 %doc %{_docdir}/kamailio/modules/README.uac_redirect
 %doc %{_docdir}/kamailio/modules/README.uid_auth_db
@@ -1687,14 +1673,6 @@ fi
 %endif
 
 %dir %{_libdir}/kamailio
-%{_libdir}/kamailio/libprint.so.1
-%{_libdir}/kamailio/libprint.so.1.2
-%{_libdir}/kamailio/libsrdb1.so.1
-%{_libdir}/kamailio/libsrdb1.so.1.0
-%{_libdir}/kamailio/libsrdb2.so.1
-%{_libdir}/kamailio/libsrdb2.so.1.0
-%{_libdir}/kamailio/libtrie.so.1
-%{_libdir}/kamailio/libtrie.so.1.0
 
 %dir %{_libdir}/kamailio/modules
 %{_libdir}/kamailio/modules/acc.so
@@ -1762,11 +1740,10 @@ fi
 %{_libdir}/kamailio/modules/pipelimit.so
 %{_libdir}/kamailio/modules/posops.so
 %{_libdir}/kamailio/modules/prefix_route.so
-%{_libdir}/kamailio/modules/print.so
-%{_libdir}/kamailio/modules/print_lib.so
 %{_libdir}/kamailio/modules/pua_rpc.so
 %{_libdir}/kamailio/modules/pv.so
 %{_libdir}/kamailio/modules/pv_headers.so
+%{_libdir}/kamailio/modules/pvtpl.so
 %{_libdir}/kamailio/modules/qos.so
 %{_libdir}/kamailio/modules/ratelimit.so
 %{_libdir}/kamailio/modules/registrar.so
@@ -1824,6 +1801,7 @@ fi
 %{_libdir}/kamailio/modules/log_custom.so
 %{_libdir}/kamailio/modules/statsc.so
 %{_libdir}/kamailio/modules/topos.so
+%{_libdir}/kamailio/modules/topos_htable.so
 %{_libdir}/kamailio/modules/cfgt.so
 %if "%{?_unitdir}" != ""
 %{_libdir}/kamailio/modules/log_systemd.so
@@ -1950,14 +1928,10 @@ fi
 %endif
 
 
-%if %{with geoip}
 %files      geoip
 %defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.geoip
 %doc %{_docdir}/kamailio/modules/README.geoip2
-%{_libdir}/kamailio/modules/geoip.so
 %{_libdir}/kamailio/modules/geoip2.so
-%endif
 
 
 %files      gzcompress
@@ -1981,9 +1955,6 @@ fi
 %if %{with ims}
 %files      ims
 %defattr(-,root,root)
-%{_libdir}/kamailio/libkamailio_ims.so.0
-%{_libdir}/kamailio/libkamailio_ims.so.0.1
-
 %doc %{_docdir}/kamailio/modules/README.cdp
 %doc %{_docdir}/kamailio/modules/README.cdp_avp
 %doc %{_docdir}/kamailio/modules/README.ims_auth
@@ -1995,6 +1966,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.ims_isc
 %doc %{_docdir}/kamailio/modules/README.ims_ocs
 %doc %{_docdir}/kamailio/modules/README.ims_qos
+%doc %{_docdir}/kamailio/modules/README.ims_qos_npn
 %doc %{_docdir}/kamailio/modules/README.ims_registrar_pcscf
 %doc %{_docdir}/kamailio/modules/README.ims_registrar_scscf
 %doc %{_docdir}/kamailio/modules/README.ims_usrloc_pcscf
@@ -2010,6 +1982,7 @@ fi
 %{_libdir}/kamailio/modules/ims_isc.so
 %{_libdir}/kamailio/modules/ims_ocs.so
 %{_libdir}/kamailio/modules/ims_qos.so
+%{_libdir}/kamailio/modules/ims_qos_npn.so
 %{_libdir}/kamailio/modules/ims_registrar_pcscf.so
 %{_libdir}/kamailio/modules/ims_registrar_scscf.so
 %{_libdir}/kamailio/modules/ims_usrloc_pcscf.so
@@ -2075,9 +2048,7 @@ fi
 %files      lua
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_lua
-%doc %{_docdir}/kamailio/modules/README.app_lua_sr
 %{_libdir}/kamailio/modules/app_lua.so
-%{_libdir}/kamailio/modules/app_lua_sr.so
 %endif
 
 
@@ -2188,6 +2159,7 @@ fi
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.presence
 %doc %{_docdir}/kamailio/modules/README.presence_conference
+%doc %{_docdir}/kamailio/modules/README.presence_dfks
 %doc %{_docdir}/kamailio/modules/README.presence_dialoginfo
 %doc %{_docdir}/kamailio/modules/README.presence_mwi
 %doc %{_docdir}/kamailio/modules/README.presence_profile
@@ -2207,6 +2179,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.xcap_server
 %{_libdir}/kamailio/modules/presence.so
 %{_libdir}/kamailio/modules/presence_conference.so
+%{_libdir}/kamailio/modules/presence_dfks.so
 %{_libdir}/kamailio/modules/presence_dialoginfo.so
 %{_libdir}/kamailio/modules/presence_mwi.so
 %{_libdir}/kamailio/modules/presence_profile.so

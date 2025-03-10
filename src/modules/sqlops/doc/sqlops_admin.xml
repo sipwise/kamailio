@@ -194,13 +194,51 @@ modparam("sqlops", "tr_buf_size", 4096)
 </programlisting>
 		</example>
 	</section>
+	<section id="sqlops.p.log_buf_size">
+		<title><varname>log_buf_size</varname> (int)</title>
+		<para>
+		The size of the buffer (characters) when logging raw SQL operations.
+		</para>
+		<para>
+		Note: When the buffer is smaller than the SQL operation, the operation is logged truncated up to log_buf_size.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 128.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>log_buf_size</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("sqlops", "log_buf_size", 4096)
+...
+</programlisting>
+		</example>
+	</section>
 	<section id="sqlops.p.connect_mode">
 		<title><varname>connect_mode</varname> (int)</title>
 		<para>
-		Control if the module must stop loading when connecting to database
-		server fails during start up. Values: 0 - stop loading; 1 - continue
-		even if connecting to database server fails.
+		Control how the module will connect to database.
+		Values:
 		</para>
+	<itemizedlist>
+		<listitem>
+		<para>
+			<emphasis>0</emphasis> connect at start up or fail
+		</para>
+		</listitem>
+		<listitem>
+		<para>
+			<emphasis>1</emphasis> connect at start up but continue even if connecting to database server fails
+		</para>
+		</listitem>
+		<listitem>
+		<para>
+			<emphasis>2</emphasis> do not connect until needed (this will limit the amount of idle connections)
+		</para>
+		</listitem>
+	</itemizedlist>
 		<para>
 		<emphasis>
 			Default value is 0.
@@ -607,4 +645,3 @@ xlog("Affected rows: $sqlrows(ca)\n");
 		</section>
 	</section>
 </chapter>
-

@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -508,9 +510,9 @@ static inline int parse_param2(
 		t->len = t->name.len;
 	}
 
-	if(_s->s[0] == ',')
+	if(separator != ',' && _s->s[0] == ',')
 		goto ok; /* To be able to parse header parameters */
-	if(_s->s[0] == '>')
+	if(separator != '>' && _s->s[0] == '>')
 		goto ok; /* To be able to parse URI parameters */
 
 	if(_s->s[0] != separator) {

@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,6 +59,7 @@
 #include "cdp_functions.h"
 #include "cdp_tls.h"
 #include "../../core/mod_fix.h"
+#include "../../core/kemi.h"
 
 MODULE_VERSION
 
@@ -301,7 +304,10 @@ int w_cdp_check_peer(sip_msg_t *msg, char *peer, char *p2)
 	}
 	return -1;
 }
-
+int ki_cdp_check_peer(sip_msg_t *msg, str *peer)
+{
+	return w_cdp_check_peer(msg, peer->s, "NULL");
+}
 static int w_cdp_has_app(sip_msg_t *msg, char *appid, char *param)
 {
 	unsigned int app_flags;
@@ -324,6 +330,10 @@ static int w_cdp_has_app(sip_msg_t *msg, char *appid, char *param)
 	return check_application(-1, a);
 }
 
+static int ki_cdp_has_app(sip_msg_t *msg, str *appid)
+{
+	return w_cdp_has_app(msg, appid->s, "NULL");
+}
 static int w_cdp_has_app2(sip_msg_t *msg, char *vendor, char *appid)
 {
 	unsigned int vendor_flags, app_flags;
@@ -358,4 +368,43 @@ static int w_cdp_has_app2(sip_msg_t *msg, char *vendor, char *appid)
 		return -1;
 	}
 	return check_application(v, a);
+}
+static int ki_cdp_has_app2(sip_msg_t *msg, str *vendor, str *appid)
+{
+	return w_cdp_has_app2(msg, vendor->s, appid->s);
+}
+
+/**
+ *
+ */
+/* clang-format off */
+static sr_kemi_t sr_kemi_cdp_exports[] = {
+	{ str_init("cdp"), str_init("cdp_check_peer"),
+		SR_KEMIP_INT, ki_cdp_check_peer,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("cdp"), str_init("cdp_has_app"),
+		SR_KEMIP_INT, ki_cdp_has_app,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("cdp"), str_init("cdp_has_app2"),
+		SR_KEMIP_INT, ki_cdp_has_app2,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+
+	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
+};
+/* clang-format on */
+
+/**
+ *
+ */
+
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	sr_kemi_modules_add(sr_kemi_cdp_exports);
+	return 0;
 }

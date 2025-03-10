@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -40,10 +42,6 @@
 #include "../../core/parser/parse_uri.h"
 #include "../../core/parser/parse_supported.h"
 
-#define KSR_RTHREAD_SKIP_P
-#define KSR_RTHREAD_NEED_V
-#include "../../core/rthreads.h"
-
 #include "api.h"
 #include "config.h"
 
@@ -59,29 +57,36 @@ static unsigned int ob_force_no_flag = (unsigned int)-1;
 static str ob_key = {0, 0};
 static str flow_token_secret = {0, 0};
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"bind_ob", (cmd_function)bind_ob, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0}};
+	{"bind_ob", (cmd_function)bind_ob, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"force_outbound_flag", PARAM_INT, &ob_force_flag},
-		{"force_no_outbound_flag", PARAM_INT, &ob_force_no_flag},
-		{"flow_token_secret", PARAM_STRING, &flow_token_secret}, {0, 0, 0}};
+	{"force_outbound_flag", PARAM_INT, &ob_force_flag},
+	{"force_no_outbound_flag", PARAM_INT, &ob_force_no_flag},
+	{"flow_token_secret", PARAM_STR, &flow_token_secret},
+	{0, 0, 0}
+};
 
 struct module_exports exports = {
-		"outbound", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,						 /* exported functions */
-		params,						 /* exported parameters */
-		0,							 /* exported·RPC·methods */
-		0,							 /* exported pseudo-variables */
-		0,							 /* response·function */
-		mod_init,					 /* module initialization function */
-		0,							 /* per-child initialization function */
-		destroy						 /* destroy function */
+	"outbound",
+	DEFAULT_DLFLAGS,    /* dlopen flags */
+	cmds,               /* exported functions */
+	params,             /* exported parameters */
+	0,                  /* RPC method exports */
+	0,                  /* exported pseudo-variables */
+	0,                  /* response handling function */
+	mod_init,           /* module initialization function */
+	0,                  /* per-child init function */
+	destroy             /* module destroy function */
 };
+/* clang-format on */
 
 static void mod_init_openssl(void)
 {
-	if(flow_token_secret.s) {
+	if(flow_token_secret.s && flow_token_secret.len > 0) {
 		assert(ob_key.len == SHA_DIGEST_LENGTH);
 		LM_DBG("flow_token_secret mod param set. use persistent ob_key");
 #if OPENSSL_VERSION_NUMBER < 0x030000000L
@@ -118,11 +123,7 @@ static int mod_init(void)
 	}
 	ob_key.len = OB_KEY_LEN;
 
-#if OPENSSL_VERSION_NUMBER < 0x010101000L
 	mod_init_openssl();
-#else
-	run_threadV(mod_init_openssl);
-#endif
 
 	if(cfg_declare("outbound", outbound_cfg_def, &default_outbound_cfg,
 			   cfg_sizeof(outbound), &outbound_cfg)) {
@@ -179,15 +180,25 @@ int encode_flow_token(str *flow_token, struct receive_info *rcv)
 		return -1;
 	}
 
+	/* By encoding the bind address into the flow token as the destination
+	   address, we make sure that we'll still be able to find the socket when
+	   decoding it even if there's an haproxy in front */
+	struct ip_addr dst_ip = rcv->dst_ip;
+	unsigned short dst_port = rcv->dst_port;
+	if(rcv->bind_address) {
+		dst_ip = rcv->bind_address->address;
+		dst_port = rcv->bind_address->port_no;
+	}
+
 	/* Encode protocol information */
 	unenc_flow_token[pos++] =
-			(rcv->dst_ip.af == AF_INET6 ? 0x80 : 0x00) | rcv->proto;
+			(dst_ip.af == AF_INET6 ? 0x80 : 0x00) | rcv->proto;
 
 	/* Encode destination address */
-	for(i = 0; i < (rcv->dst_ip.af == AF_INET6 ? 16 : 4); i++)
-		unenc_flow_token[pos++] = rcv->dst_ip.u.addr[i];
-	unenc_flow_token[pos++] = (rcv->dst_port >> 8) & 0xff;
-	unenc_flow_token[pos++] = rcv->dst_port & 0xff;
+	for(i = 0; i < (dst_ip.af == AF_INET6 ? 16 : 4); i++)
+		unenc_flow_token[pos++] = dst_ip.u.addr[i];
+	unenc_flow_token[pos++] = (dst_port >> 8) & 0xff;
+	unenc_flow_token[pos++] = dst_port & 0xff;
 
 	/* Encode source address */
 	for(i = 0; i < (rcv->src_ip.af == AF_INET6 ? 16 : 4); i++)

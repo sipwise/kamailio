@@ -21,6 +21,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -2141,10 +2143,11 @@ int t_lookup_ident_filter(struct cell **trans, unsigned int hash_index,
 
 	LOCK_HASH(hash_index);
 
-#ifndef E2E_CANCEL_HOP_BY_HOP
-#warning "t_lookup_ident() can only reliably match INVITE transactions in " \
-	"E2E_CANCEL_HOP_BY_HOP mode"
-#endif
+	/* ! E2E_CANCEL_HOP_BY_HOP */
+	if(!tm_e2e_cancel_hop_by_hop) {
+		LM_WARN("can only reliably match INVITE transactions in "
+				"E2E_CANCEL_HOP_BY_HOP mode\n");
+	}
 	hash_bucket = &(get_tm_table()->entries[hash_index]);
 	/* all the transactions from the entry are compared */
 	clist_foreach(hash_bucket, p_cell, next_c)

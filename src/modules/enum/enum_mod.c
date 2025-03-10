@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -58,9 +60,9 @@ str service = {0, 0};
 /* clang-format off */
 static cmd_export_t cmds[] = {
 	{"enum_query", (cmd_function)enum_query_0, 0, 0, 0, REQUEST_ROUTE},
-	{"enum_query", (cmd_function)enum_query_1, 1, fixup_spve_null, 0,
+	{"enum_query", (cmd_function)enum_query_1, 1, fixup_spve_null, fixup_free_spve_null,
 	 REQUEST_ROUTE},
-	{"enum_query", (cmd_function)enum_query_2, 2, fixup_spve_spve, 0,
+	{"enum_query", (cmd_function)enum_query_2, 2, fixup_spve_spve, fixup_free_spve_spve,
 	 REQUEST_ROUTE},
 	{"enum_pv_query", (cmd_function)enum_pv_query_1, 1, fixup_spve_null,
 	 fixup_free_spve_null, REQUEST_ROUTE},
@@ -75,9 +77,9 @@ static cmd_export_t cmds[] = {
 	{"is_from_user_enum", (cmd_function)is_from_user_enum_2, 2,
 	 fixup_spve_spve, fixup_free_spve_spve, REQUEST_ROUTE},
 	{"i_enum_query", (cmd_function)i_enum_query_0, 0, 0, 0, REQUEST_ROUTE},
-	{"i_enum_query", (cmd_function)i_enum_query_1, 1, fixup_spve_null, 0,
+	{"i_enum_query", (cmd_function)i_enum_query_1, 1, fixup_spve_null, fixup_free_spve_null,
 	 REQUEST_ROUTE},
-	{"i_enum_query", (cmd_function)i_enum_query_2, 2, fixup_spve_spve, 0,
+	{"i_enum_query", (cmd_function)i_enum_query_2, 2, fixup_spve_spve, fixup_free_spve_spve,
 	 REQUEST_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };

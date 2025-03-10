@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -361,10 +363,10 @@ static char *build_ack(struct sip_msg *rpl, struct cell *trans, int branch,
 	if(cfg_get(tm, tm_cfg, reparse_invite)) {
 		/* build the ACK from the INVITE which was sent out */
 		return build_local_reparse(
-				trans, branch, ret_len, ACK, ACK_LEN, &to, 0);
+				trans, branch, ret_len, ACK, ACK_LEN, &to, NULL, 0);
 	} else {
 		/* build the ACK from the reveived INVITE */
-		return build_local(trans, branch, ret_len, ACK, ACK_LEN, &to, 0);
+		return build_local(trans, branch, ret_len, ACK, ACK_LEN, &to, NULL, 0);
 	}
 }
 
@@ -1401,7 +1403,7 @@ static enum rps t_should_relay_response(struct cell *Trans, int new_code,
 		 *  faked a CANCEL on a non-replied branch don't
 		 * report on it either */
 		if((Trans->uac[branch].last_received == 487)
-				|| (Trans->uac[branch].last_received == 408
+				|| (Trans->uac[branch].last_received == _tm_reply_408_code
 						&& new_code == 487)) {
 			LM_DBG("%d came for a %d branch (ignored)\n", new_code,
 					Trans->uac[branch].last_received);
@@ -1999,8 +2001,12 @@ enum rps relay_reply(struct cell *t, struct sip_msg *p_msg, int branch,
 				/* revert the temporary "store" reply above */
 				t->uac[branch].reply = reply_bak;
 			} else {
-				reason.s = error_text(relayed_code);
-				reason.len = strlen(reason.s);
+				if(relayed_code == _tm_reply_408_code) {
+					reason = _tm_reply_408_reason;
+				} else {
+					reason.s = error_text(relayed_code);
+					reason.len = strlen(reason.s);
+				}
 				buf = build_res_buf_from_sip_req(relayed_code, &reason, to_tag,
 						t->uas.request, &res_len, &bm);
 			}
@@ -2488,8 +2494,8 @@ int reply_received(struct sip_msg *p_msg)
 				LM_DBG("branch CANCEL created\n");
 				if(t->uas.cancel_reas) {
 					/* cancel reason was saved, use it */
-					cancel_branch(
-							t, branch, t->uas.cancel_reas, F_CANCEL_B_FORCE_C);
+					cancel_branch(t, branch, NULL, t->uas.cancel_reas,
+							F_CANCEL_B_FORCE_C);
 				} else {
 					/* note that in this case we do not know the reason,
 					 * we only know it's a final reply (either locally
@@ -2498,8 +2504,8 @@ int reply_received(struct sip_msg *p_msg)
 					cancel_data.reason.cause = (t->uas.status >= 200)
 													   ? t->uas.status
 													   : CANCEL_REAS_UNKNOWN;
-					cancel_branch(
-							t, branch, &cancel_data.reason, F_CANCEL_B_FORCE_C);
+					cancel_branch(t, branch, NULL, &cancel_data.reason,
+							F_CANCEL_B_FORCE_C);
 				}
 			}
 			goto done; /* nothing to do */

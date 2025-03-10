@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -77,55 +79,57 @@ static int sql_res_param(modparam_t type, void *val);
 extern int sqlops_tr_buf_size;
 
 int sqlops_results_maxsize = 32;
+int sqlops_log_buf_size = 128;
 
 static int sqlops_connect_mode = 0;
 
+/* clang-format off */
 static pv_export_t mod_pvs[] = {
-		{{"dbr", sizeof("dbr") - 1}, PVT_OTHER, pv_get_dbr, 0,
-				pv_parse_dbr_name, 0, 0, 0},
-		{{"sqlrows", sizeof("sqlrows") - 1}, PVT_OTHER, pv_get_sqlrows, 0,
-				pv_parse_con_name, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
+	{{"dbr", sizeof("dbr") - 1}, PVT_OTHER, pv_get_dbr, 0, pv_parse_dbr_name, 0, 0, 0},
+	{{"sqlrows", sizeof("sqlrows") - 1}, PVT_OTHER, pv_get_sqlrows, 0, pv_parse_con_name, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
 
-static cmd_export_t cmds[] = {{"sql_query", (cmd_function)sql_query, 3,
-									  fixup_sql_query, 0, ANY_ROUTE},
-		{"sql_query", (cmd_function)sql_query2, 2, fixup_sql_query, 0,
-				ANY_ROUTE},
-		{"sql_query_async", (cmd_function)sql_query_async, 2, fixup_sql_query,
-				0, ANY_ROUTE},
-		{"sql_xquery", (cmd_function)sql_xquery, 3, fixup_sql_xquery, 0,
-				ANY_ROUTE},
-		{"sql_pvquery", (cmd_function)sql_pvquery, 3, fixup_sql_pvquery, 0,
-				ANY_ROUTE},
-		{"sql_result_free", (cmd_function)sql_rfree, 1, fixup_sql_rfree, 0,
-				ANY_ROUTE},
-		{"bind_sqlops", (cmd_function)bind_sqlops, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0}};
+static cmd_export_t cmds[] = {
+	{"sql_query", (cmd_function)sql_query, 3, fixup_sql_query, 0, ANY_ROUTE},
+	{"sql_query", (cmd_function)sql_query2, 2, fixup_sql_query, 0, ANY_ROUTE},
+	{"sql_query_async", (cmd_function)sql_query_async, 2, fixup_sql_query, 0, ANY_ROUTE},
+	{"sql_xquery", (cmd_function)sql_xquery, 3, fixup_sql_xquery, 0, ANY_ROUTE},
+	{"sql_pvquery", (cmd_function)sql_pvquery, 3, fixup_sql_pvquery, 0,	ANY_ROUTE},
+	{"sql_result_free", (cmd_function)sql_rfree, 1, fixup_sql_rfree, 0, ANY_ROUTE},
+	{"bind_sqlops", (cmd_function)bind_sqlops, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"sqlcon", PARAM_STRING | USE_FUNC_PARAM, (void *)sql_con_param},
-		{"sqlres", PARAM_STRING | USE_FUNC_PARAM, (void *)sql_res_param},
-		{"tr_buf_size", PARAM_INT, &sqlops_tr_buf_size},
-		{"connect_mode", PARAM_INT, &sqlops_connect_mode},
-		{"results_maxsize", PARAM_INT, &sqlops_results_maxsize}, {0, 0, 0}};
+	{"sqlcon", PARAM_STRING | PARAM_USE_FUNC, (void *)sql_con_param},
+	{"sqlres", PARAM_STRING | PARAM_USE_FUNC, (void *)sql_res_param},
+	{"tr_buf_size", PARAM_INT, &sqlops_tr_buf_size},
+	{"log_buf_size", PARAM_INT, &sqlops_log_buf_size},
+	{"connect_mode", PARAM_INT, &sqlops_connect_mode},
+	{"results_maxsize", PARAM_INT, &sqlops_results_maxsize},
+	{0, 0, 0}
+};
 
 static tr_export_t mod_trans[] = {
-		{{"sql", sizeof("sql") - 1}, tr_parse_sql}, {{0, 0}, 0}};
-
+	{{"sql", sizeof("sql") - 1}, tr_parse_sql},
+	{{0, 0}, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"sqlops",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* exported rpc functions */
-		mod_pvs,		 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* per-child init function */
-		destroy			 /* module destroy function */
+	"sqlops",        /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* exported rpc functions */
+	mod_pvs,         /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	destroy          /* module destroy function */
 };
+/* clang-format on */
 
 static int mod_init(void)
 {
@@ -138,12 +142,15 @@ static int mod_init(void)
 static int child_init(int rank)
 {
 	int ret;
+
 	if(rank == PROC_INIT || rank == PROC_MAIN || rank == PROC_TCP_MAIN)
 		return 0;
 
-	ret = sql_connect((sqlops_connect_mode == 1) ? 1 : 0);
+	ret = sql_connect((sqlops_connect_mode == 1 || sqlops_connect_mode == 2)
+							  ? sqlops_connect_mode
+							  : 0);
 
-	LM_DBG("SQL result: %d \n", ret);
+	LM_DBG("SQL result[%d] process rank[%d]\n", ret, rank);
 
 	if(ret != 0 && sqlops_connect_mode == 1) {
 		LM_INFO("SQL result: %d but start_without_db_connection enabled - "
@@ -209,8 +216,9 @@ static int sql_check_connection(sql_con_t *dbl)
 		return 0;
 	}
 
-	if(sqlops_connect_mode != 1) {
-		LM_CRIT("no database handle with reconnect disabled\n");
+	if(sqlops_connect_mode != 1 && sqlops_connect_mode != 2) {
+		LM_CRIT("no database handle with reconnect disabled [%d]\n",
+				sqlops_connect_mode);
 		return -1;
 	}
 
@@ -229,7 +237,7 @@ static int sql_query(struct sip_msg *msg, char *dbl, char *query, char *res)
 {
 	str sq;
 	if(sql_check_connection((sql_con_t *)dbl) < 0) {
-		LM_ERR("invalid connection to database");
+		LM_ERR("invalid connection to database\n");
 		return -2;
 	}
 	if(pv_printf_s(msg, (pv_elem_t *)query, &sq) != 0) {
@@ -248,7 +256,7 @@ static int sql_query_async(struct sip_msg *msg, char *dbl, char *query)
 {
 	str sq;
 	if(sql_check_connection((sql_con_t *)dbl) < 0) {
-		LM_ERR("invalid connection to database");
+		LM_ERR("invalid connection to database\n");
 		return -2;
 	}
 	if(pv_printf_s(msg, (pv_elem_t *)query, &sq) != 0) {
@@ -265,7 +273,7 @@ static int sql_query_async(struct sip_msg *msg, char *dbl, char *query)
 static int sql_xquery(struct sip_msg *msg, char *dbl, char *query, char *res)
 {
 	if(sql_check_connection((sql_con_t *)dbl) < 0) {
-		LM_ERR("invalid connection to database");
+		LM_ERR("invalid connection to database\n");
 		return -2;
 	}
 	return sql_do_xquery(
@@ -278,7 +286,7 @@ static int sql_xquery(struct sip_msg *msg, char *dbl, char *query, char *res)
 static int sql_pvquery(struct sip_msg *msg, char *dbl, char *query, char *res)
 {
 	if(sql_check_connection((sql_con_t *)dbl) < 0) {
-		LM_ERR("invalid connection to database");
+		LM_ERR("invalid connection to database\n");
 		return -2;
 	}
 	return sql_do_pvquery(

@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -83,9 +85,25 @@ static struct sqlite_connection *db_sqlite_new_connection(
 		return NULL;
 	}
 
+	// set the timeout before the journal, because when forking many children,
+	// all will do the journal query below approx at the same time, and
+	// without a dedicated busy-timeout set, most will fail and makes kamailio
+	// fail to start!
+	if(db_param && db_param->busy_timeout >= 0) {
+		LM_DBG("setting sqlite busy_timeout to %d\n", db_param->busy_timeout);
+		int rc = sqlite3_busy_timeout(con->conn, db_param->busy_timeout);
+		if(rc != SQLITE_OK) {
+			LM_ERR("error setting busy timeout [%s]\n",
+					sqlite3_errmsg(con->conn));
+			pkg_free(con);
+			return NULL;
+		}
+	}
 	if(db_param && db_param->journal_mode.s) {
 		sqlite3_stmt *stmt;
 		char query[32];
+		LM_DBG("setting sqlite journal mode to '%s'\n",
+				db_param->journal_mode.s);
 		snprintf(query, 32, "PRAGMA journal_mode=%s", db_param->journal_mode.s);
 		int rc = sqlite3_prepare_v2(
 				con->conn, query, strlen(query), &stmt, NULL);
@@ -126,14 +144,17 @@ db1_con_t *db_sqlite_init(const str *_url)
  * No function should be called after this
  */
 
-static void db_sqlite_free_connection(struct sqlite_connection *con)
+static void db_sqlite_free_connection(struct pool_con *con)
 {
+	struct sqlite_connection *_c;
+
 	if(!con)
 		return;
+	_c = (struct sqlite_connection *)con;
 
-	sqlite3_close(con->conn);
-	free_db_id(con->hdr.id);
-	pkg_free(con);
+	sqlite3_close(_c->conn);
+	free_db_id(_c->hdr.id);
+	pkg_free(_c);
 }
 
 void db_sqlite_close(db1_con_t *_h)
@@ -348,7 +369,7 @@ static int type_to_dbtype(int type)
 	}
 }
 
-static str *str_dup(const char *_s)
+static str *sqlt_str_dup(const char *_s)
 {
 	str *s;
 	int len = strlen(_s);
@@ -411,7 +432,8 @@ int db_sqlite_store_result(const db1_con_t *_h, db1_res_t **_r)
 				const char *decltype;
 				int dbtype;
 
-				RES_NAMES(res)[i] = str_dup(sqlite3_column_name(conn->stmt, i));
+				RES_NAMES(res)
+				[i] = sqlt_str_dup(sqlite3_column_name(conn->stmt, i));
 				if(RES_NAMES(res)[i] == NULL)
 					goto no_mem;
 				decltype = sqlite3_column_decltype(conn->stmt, i);

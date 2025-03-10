@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -1025,7 +1027,7 @@ static int rpc_add(struct binrpc_ctx *ctx, char *fmt, ...)
 	int err;
 	str st;
 	str *sp;
-	struct rpc_struct_l *rs;
+	struct rpc_struct_l *rs = NULL;
 	str null_value = str_init("<null string>");
 	double d;
 
@@ -1069,12 +1071,14 @@ static int rpc_add(struct binrpc_ctx *ctx, char *fmt, ...)
 				if(err < 0)
 					goto error_add;
 				rs = new_rpc_struct();
-				if(rs == 0)
+				if(rs == NULL)
 					goto error_mem;
 				rs->offset = binrpc_pkt_len(&ctx->out.pkt);
 				err = binrpc_end_struct(&ctx->out.pkt);
-				if(err < 0)
+				if(err < 0) {
+					ctl_free(rs);
 					goto error_add;
+				}
 				clist_append(&ctx->out.structs, rs, next, prev);
 				*(va_arg(ap, void **)) = rs;
 				break;
@@ -1180,7 +1184,7 @@ static int rpc_struct_add(struct rpc_struct_l *s, char *fmt, ...)
 	va_list ap;
 	int err;
 	struct binrpc_val avp;
-	struct rpc_struct_l *rs;
+	struct rpc_struct_l *rs = NULL;
 	str *sp;
 	str null_value = str_init("<null string>");
 
@@ -1226,7 +1230,7 @@ static int rpc_struct_add(struct rpc_struct_l *s, char *fmt, ...)
 					goto error_add;
 				}
 				rs = new_rpc_struct();
-				if(rs == 0) {
+				if(rs == NULL) {
 					LM_ERR("not enough memory (%c)\n", *fmt);
 					goto error_mem;
 				}
@@ -1234,6 +1238,7 @@ static int rpc_struct_add(struct rpc_struct_l *s, char *fmt, ...)
 				err = binrpc_end_struct(&s->pkt);
 				if(err < 0) {
 					LM_ERR("failed to end struct (%c)\n", *fmt);
+					ctl_free(rs);
 					goto error_add;
 				}
 				clist_append(&s->substructs, rs, next, prev);
@@ -1289,8 +1294,8 @@ static int rpc_array_add(struct rpc_struct_l *s, char *fmt, ...)
 	va_list ap;
 	int err;
 	str st;
-	str *sp;
-	struct rpc_struct_l *rs;
+	str *sp = NULL;
+	struct rpc_struct_l *rs = NULL;
 	str null_value = str_init("<null string>");
 	double d;
 
@@ -1334,12 +1339,14 @@ static int rpc_array_add(struct rpc_struct_l *s, char *fmt, ...)
 				if(err < 0)
 					goto error_add;
 				rs = new_rpc_struct();
-				if(rs == 0)
+				if(rs == NULL)
 					goto error_mem;
 				rs->offset = binrpc_pkt_len(&s->pkt);
 				err = binrpc_end_struct(&s->pkt);
-				if(err < 0)
+				if(err < 0) {
+					ctl_free(rs);
 					goto error_add;
+				}
 				clist_append(&s->substructs, rs, next, prev);
 				*(va_arg(ap, void **)) = rs;
 				break;

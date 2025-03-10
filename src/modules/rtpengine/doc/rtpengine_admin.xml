@@ -219,20 +219,20 @@ modparam("rtpengine", "rtpengine_disable_tout", 20)
 		</para>
 		<para>
 		<emphasis>
-			Default value is <quote>1</quote> (enabled).
+			Default value is <quote>0</quote> (disabled).
 		</emphasis>
 		</para>
 		<para>
 			Can be set at runtime, e.g.:
 			<programlisting>
-			$ &sercmd; cfg.set_now_int rtpengine aggressive_redetection 0
+			$ &sercmd; cfg.set_now_int rtpengine aggressive_redetection 1
 			</programlisting>
 		</para>
 		<example>
 		<title>Set <varname>aggressive_redetection</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("rtpengine", "aggressive_redetection", 0)
+modparam("rtpengine", "aggressive_redetection", 1)
 ...
 </programlisting>
 		</example>
@@ -477,6 +477,32 @@ route {
 </programlisting>
 		</example>
 	</section>
+
+	<section id="rtpengine.p.write_sdp_pv_mode">
+		<title><varname>write_sdp_pv_mode</varname> (int)</title>
+		<para>
+			If this parameter is set to 1, the returned SDP is written to pv
+			and also set to message body.
+		</para>
+		<para>
+			Default value: 0 (write SDP only to pv).
+		</para>
+		<example>
+		<title>Set <varname>write_sdp_pv_mode</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "write_sdp_pv", "$avp(sdp)")
+modparam("rtpengine", "write_sdp_pv_mode", 1)
+...
+route {
+	...
+	rtpengine_manage();
+	xinfo("new sdp: $avp(sdp)\n");
+}
+</programlisting>
+		</example>
+	</section>
+
 
 	<section id="rtpengine.p.rtp_inst_pvar">
 		<title><varname>rtp_inst_pvar</varname> (string)</title>
@@ -2378,6 +2404,25 @@ modparam("rtpengine", "ping_mode", 0)
 
 	</section>
 
+<section id="rtpengine.p.ping_interval">
+	<title><varname>ping_interval</varname> (integer)</title>
+	<para>
+		Specify the interval in seconds between pings to all rtpengines registered.
+	</para>
+	<para>
+		<emphasis>
+			Default value is <quote>60</quote>.
+		</emphasis>
+	</para>
+	<example>
+	<title>Set <varname>ping_interval</varname> parameter</title>
+	<programlisting format="linespecific">
+...
+modparam("rtpengine", "ping_interval", 10)
+...
+	</programlisting>
+	</example>
+</section>
 
 	<section>
 	<title>Functions</title>
@@ -2420,7 +2465,7 @@ rtpengine_offer();
 	</section>
 	<section id="rtpengine.f.rtpengine_offer">
 		<title>
-		<function moreinfo="none">rtpengine_offer([flags])</function>
+		<function moreinfo="none">rtpengine_offer([flags][,via-branch])</function>
 		</title>
 		<para>
 		Rewrites &sdp; body to ensure that media is passed through
@@ -2809,7 +2854,23 @@ rtpengine_offer();
 			 Check also the documentation of RTPEngine, these flags are documented there as well:
 			<ulink url="https://github.com/sipwise/rtpengine">https://github.com/sipwise/rtpengine</ulink>.
 			</para>
-		</listitem>
+			</listitem>
+			<listitem>
+			<para>
+			<emphasis>via-branch</emphasis> - provide the via-branch taken from one of SIP message Via headers.
+			</para>
+			<para>The <quote>via-branch</quote> parameter helps to match NG command (offer, answer, delete etc.) to particular monologue.
+			It does the same job as the <quote>via-branch</quote> option flag, but it also enables alternative parsing behavior,
+			when option flags are passed to rtpengine using bencode string format and is then parsed there.
+			The benefit of the second approach is that any new flags supported by rtpengine
+			will automatically be supported without having to worry about support in the control module.
+			Regardless whether the flags parsing is done by the module or daemon,
+			a functional behavior remains the same and has no difference in terms of SDP processing.
+			Possible values are the same as for the <quote>via-branch</quote> option flag.
+			If the newer approach is to be applied, but no <quote>via-branch</quote> is meant to be
+			added for identfication, then <quote>none</quote> can be given instead.
+			This parameter can be applied for the rtpengine versions equal or later than mr12.4.</para>
+			</listitem>
 		</itemizedlist>
 		<para>
 		This function can be used from ANY_ROUTE.
@@ -2880,10 +2941,27 @@ onreply_route[1]
 ...
 </programlisting>
                 </example>
+
+
+		<example>
+		<title><function>rtpengine_offer</function> usage of via-branch parameter</title>
+		<programlisting format="linespecific">
+route {
+...
+    if (is_method("INVITE")) {
+        if (has_body("application/sdp")) {
+            if (rtpengine_offer("replace-origin replace-session-connection strict-source label=callee OSRTP-accept transport-protocol=RTP/AVP address-family=IP4", "auto-next"))
+                t_on_reply("1");
+        }
+    }
+...
+}
+		</programlisting>
+		</example>
 	</section>
 	<section id="rtpengine.f.rtpengine_answer">
 		<title>
-			<function moreinfo="none">rtpengine_answer([flags])</function>
+			<function moreinfo="none">rtpengine_answer([flags][,via-branch])</function>
 		</title>
 		<para>
 		Rewrites &sdp; body to ensure that media is passed through
@@ -2908,7 +2986,7 @@ onreply_route[1]
 	</section>
 	<section id="rtpengine.f.rtpengine_info">
 		<title>
-		<function moreinfo="none">rtpengine_info([flags])</function>
+		<function moreinfo="none">rtpengine_info([flags][,via-branch])</function>
 		</title>
 		<para>
 		Send an updated offer to rtpengine. This is meant to be used when processing
@@ -2936,7 +3014,7 @@ rtpengine_info();
 	</section>
 	<section id="rtpengine.f.rtpengine_delete">
 		<title>
-		<function moreinfo="none">rtpengine_delete([flags])</function>
+		<function moreinfo="none">rtpengine_delete([flags][,via-branch])</function>
 		</title>
 		<para>
 		Tears down the RTP proxy session for the current call.
@@ -2960,7 +3038,7 @@ rtpengine_delete();
 	</section>
 	<section id="rtpengine.f.rtpengine_query">
 		<title>
-		<function moreinfo="none">rtpengine_query([flags])</function>
+		<function moreinfo="none">rtpengine_query([flags][,via-branch])</function>
 		</title>
 		<para>
 		Queries the &rtp; proxy about the current status and statistics of a running
@@ -3015,7 +3093,7 @@ if(rtpengine_query_v("j", "$var(rdata)")) {
 
 	<section id="rtpengine.f.rtpengine_manage">
 	<title>
-		<function moreinfo="none">rtpengine_manage([flags])</function>
+		<function moreinfo="none">rtpengine_manage([flags][,via-branch])</function>
 	</title>
 		<para>
 		Manage the RTPEngine session - it combines the functionality of

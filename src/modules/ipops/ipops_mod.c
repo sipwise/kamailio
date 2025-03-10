@@ -109,6 +109,7 @@ static int w_dns_int_match_ip(sip_msg_t *, char *, char *);
 static int fixup_detailed_ip_type(void **param, int param_no);
 static int fixup_free_detailed_ip_type(void **param, int param_no);
 static int w_dns_query(sip_msg_t *msg, char *str1, char *str2);
+static int w_ptr_query(sip_msg_t *msg, char *str1, char *str2);
 static int w_srv_query(sip_msg_t *msg, char *str1, char *str2);
 static int w_naptr_query(sip_msg_t *msg, char *str1, char *str2);
 static int w_dns_set_local_ttl(sip_msg_t *, char *, char *);
@@ -118,6 +119,8 @@ static int mod_init(void);
 static pv_export_t mod_pvs[] = {
 	{{"dns", sizeof("dns") - 1}, PVT_OTHER, pv_get_dns, 0,
 			pv_parse_dns_name, 0, 0, 0},
+	{{"ptrquery", sizeof("ptrquery") - 1}, PVT_OTHER, pv_get_ptr, 0,
+			pv_parse_ptr_name, 0, 0, 0},
 	{{"srvquery", sizeof("srvquery") - 1}, PVT_OTHER, pv_get_srv, 0,
 			pv_parse_srv_name, 0, 0, 0},
 	{{"naptrquery", sizeof("naptrquery") - 1}, PVT_OTHER, pv_get_naptr, 0,
@@ -162,6 +165,8 @@ static cmd_export_t cmds[] = {
 	{"dns_int_match_ip", (cmd_function)w_dns_int_match_ip, 2,
 			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"dns_query", (cmd_function)w_dns_query, 2, fixup_spve_spve,
+			fixup_free_spve_spve, ANY_ROUTE},
+	{"ptr_query", (cmd_function)w_ptr_query, 2, fixup_spve_spve,
 			fixup_free_spve_spve, ANY_ROUTE},
 	{"srv_query", (cmd_function)w_srv_query, 2, fixup_spve_spve,
 			fixup_free_spve_spve, ANY_ROUTE},
@@ -1293,6 +1298,50 @@ static int ki_dns_query(sip_msg_t *msg, str *naptrname, str *pvid)
 }
 
 /**
+ *! \brief Return 1 (true) if the given `ip` IP address (string or pv)
+ * could successfully be resolved to a domain and saved into `pv_name` pv.
+ * Otherwise, return negative values depending on the error.
+ *
+ * \param[in] msg SIP message structure.
+ * \param[in] ip IP address (string or pv) to resolve.
+ * \param[in] pv_name PV name to save the resolved domain.
+ * \returns 1 on success.
+ * \returns negative values depending on the error:
+ * \retval 1 success.
+ * \retval res -1 to -5 for bad input.
+ * \retval -6 for error in resolving the domain.
+ */
+static int w_ptr_query(sip_msg_t *msg, char *ip, char *pv_name)
+{
+	str ip_address;
+	str name;
+
+	if(msg == NULL) {
+		LM_ERR("received null msg\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t *)ip, &ip_address) < 0) {
+		LM_ERR("cannot get the IP address\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)pv_name, &name) < 0) {
+		LM_ERR("cannot get the pv container name\n");
+		return -1;
+	}
+
+	return ptr_update_pv(&ip_address, &name);
+}
+
+/**
+ * \brief KEMI wrapper for `ptr_query` function.
+ */
+static int ki_ptr_query(sip_msg_t *msg, str *ip, str *pvid)
+{
+	return ptr_update_pv(ip, pvid);
+}
+
+/**
  *
  */
 static int w_srv_query(sip_msg_t *msg, char *str1, char *str2)
@@ -1469,6 +1518,11 @@ static sr_kemi_t sr_kemi_ipops_exports[] = {
 	},
 	{ str_init("ipops"), str_init("dns_query"),
 		SR_KEMIP_INT, ki_dns_query,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("ipops"), str_init("ptr_query"),
+		SR_KEMIP_INT, ki_ptr_query,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

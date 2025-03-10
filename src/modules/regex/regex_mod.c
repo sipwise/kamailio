@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -115,50 +117,46 @@ static int w_pcre_match_group(struct sip_msg *_msg, char *_s1, char *_s2);
  */
 /* clang-format off */
 static cmd_export_t cmds[] = {
-	{"pcre_match", (cmd_function)w_pcre_match, 2, fixup_spve_spve, 0,
-			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
-					| LOCAL_ROUTE},
+	{"pcre_match", (cmd_function)w_pcre_match, 2,
+		fixup_spve_spve, fixup_free_spve_spve,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE | LOCAL_ROUTE},
 	{"pcre_match_group", (cmd_function)w_pcre_match_group, 2,
-			fixup_spve_spve, 0,
-			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
-					| LOCAL_ROUTE},
+		fixup_spve_spve, fixup_free_spve_spve,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE | LOCAL_ROUTE},
 	{"pcre_match_group", (cmd_function)w_pcre_match_group, 1,
-			fixup_spve_null, 0,
-			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE
-					| LOCAL_ROUTE},
+		fixup_spve_null, fixup_free_spve_null,
+		REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE | LOCAL_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
-
 
 /*
  * Exported parameters
  */
 static param_export_t params[] = {
 	{"file", PARAM_STRING, &file},
-	{"max_groups", INT_PARAM, &max_groups},
-	{"group_max_size", INT_PARAM, &group_max_size},
-	{"pcre_caseless", INT_PARAM, &pcre_caseless},
-	{"pcre_multiline", INT_PARAM, &pcre_multiline},
-	{"pcre_dotall", INT_PARAM, &pcre_dotall},
-	{"pcre_extended", INT_PARAM, &pcre_extended},
+	{"max_groups", PARAM_INT, &max_groups},
+	{"group_max_size", PARAM_INT, &group_max_size},
+	{"pcre_caseless", PARAM_INT, &pcre_caseless},
+	{"pcre_multiline", PARAM_INT, &pcre_multiline},
+	{"pcre_dotall", PARAM_INT, &pcre_dotall},
+	{"pcre_extended", PARAM_INT, &pcre_extended},
 	{0, 0, 0}
 };
-
 
 /*
  * Module interface
  */
 struct module_exports exports = {
-	"regex",		 /*!< module name */
-	DEFAULT_DLFLAGS, /*!< dlopen flags */
-	cmds,			 /*!< exported functions */
-	params,			 /*!< exported parameters */
-	0,				 /*!< exported RPC functions */
-	0,				 /*!< exported pseudo-variables */
-	0,				 /*!< response handling function */
-	mod_init,		 /*!< module initialization function */
-	0,				 /*!< per-child init function */
-	destroy			 /*!< destroy function */
+	"regex",         /*!< module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	0,               /* per-child init function */
+	destroy          /* module destroy function */
 };
 /* clang-format on */
 

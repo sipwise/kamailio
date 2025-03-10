@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -116,13 +118,12 @@ xmlDocPtr parse_dp_config_file(char *filename)
 	parser_init();
 
 	if(!filename) {
-		LM_ERR("ERROR:parse_dp_config_file(): filename parameter is null\n");
+		LM_ERR("filename parameter is null\n");
 		goto error;
 	}
 	f = fopen(filename, "r");
 	if(!f) {
-		LM_ERR("ERROR:parse_dp_config_file(): Error opening <%s> file > %s\n",
-				filename, strerror(errno));
+		LM_ERR("Error opening <%s> file > %s\n", filename, strerror(errno));
 		goto error;
 	}
 	fclose(f);
@@ -150,7 +151,7 @@ xmlDocPtr parse_dp_config_str(str config_str)
 
 	char c = config_str.s[config_str.len];
 	if(!config_str.len) {
-		LM_ERR("ERROR:parse_dp_config_str(): empty string\n");
+		LM_ERR("empty string\n");
 		goto error;
 	}
 	parser_init();
@@ -160,9 +161,8 @@ xmlDocPtr parse_dp_config_str(str config_str)
 	config_str.s[config_str.len] = c;
 
 	if(!doc) {
-		LM_ERR("parse_dp_config_file():  This is not a valid XML string "
-			   "<%.*s>\n",
-				config_str.len, config_str.s);
+		LM_ERR("This is not a valid XML string <%.*s>\n", config_str.len,
+				config_str.s);
 		goto error;
 	}
 
@@ -192,7 +192,7 @@ dp_config *parse_dp_config(xmlDocPtr doc)
 
 	root = xmlDocGetRootElement(doc);
 	if(!root) {
-		LM_ERR("parse_dp_config():  Empty XML \n");
+		LM_ERR("Empty XML \n");
 		goto error;
 	}
 
@@ -200,7 +200,7 @@ dp_config *parse_dp_config(xmlDocPtr doc)
 	if(k > 12)
 		k = 12;
 	if(strncasecmp((char *)root->name, "DiameterPeer", k) != 0) {
-		LM_ERR("parse_dp_config(): XML Root is not <DiameterPeer>\n");
+		LM_ERR("XML Root is not <DiameterPeer>\n");
 		goto error;
 	}
 

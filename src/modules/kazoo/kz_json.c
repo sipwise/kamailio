@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -305,8 +307,8 @@ int kz_json_get_keys(struct sip_msg *msg, char *json, char *field, char *dst)
 {
 	str json_s;
 	str field_s;
-	int_str keys_avp_name;
-	unsigned short keys_avp_type;
+	avp_name_t keys_avp_name;
+	avp_flags_t keys_avp_type;
 	pv_spec_t *avp_spec;
 
 	if(fixup_get_svalue(msg, (gparam_p)json, &json_s) != 0) {

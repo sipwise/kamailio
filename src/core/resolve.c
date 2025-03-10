@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -1859,11 +1861,15 @@ ip_addr_t *str2ip(str *st)
 */
 struct hostent *__resolvehost(char *name)
 {
+#ifdef USE_DNS_CACHE
 	if(dns_cache_init) {
 		return dns_resolvehost(name);
 	} else {
+#endif
 		return _resolvehost(name);
+#ifdef USE_DNS_CACHE
 	}
+#endif
 }
 
 /*
@@ -1880,11 +1886,15 @@ struct hostent *__resolvehost(char *name)
 */
 struct hostent *__sip_resolvehost(str *name, unsigned short *port, char *proto)
 {
+#ifdef USE_DNS_CACHE
 	if(dns_cache_init) {
 		return dns_sip_resolvehost(name, port, proto);
 	} else {
+#endif
 		return _sip_resolvehost(name, port, proto);
+#ifdef USE_DNS_CACHE
 	}
+#endif
 }
 /* converts a str to an ipv6 address struct stored in ipb
  * - ipb must be already allocated

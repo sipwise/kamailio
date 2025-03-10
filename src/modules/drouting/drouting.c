@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -85,16 +87,16 @@ static rt_data_t **rdata = 0;
 /* AVP used to store serial RURIs */
 static struct _ruri_avp
 {
-	unsigned short type; /* AVP ID */
-	int_str name;		 /* AVP name*/
+	avp_flags_t type; /* AVP ID */
+	avp_name_t name;  /* AVP name*/
 } ruri_avp = {0, {.n = (int)0xad346b2f}};
 static str ruri_avp_spec = {0, 0};
 
 /* AVP used to store serial ATTRs */
 static struct _attrs_avp
 {
-	unsigned short type; /* AVP ID */
-	int_str name;		 /* AVP name*/
+	avp_flags_t type; /* AVP ID */
+	avp_name_t name;  /* AVP name*/
 } attrs_avp = {0, {.n = (int)0xad346b30}};
 static str attrs_avp_spec = {0, 0};
 
@@ -159,16 +161,16 @@ static param_export_t params[] = {
 	{"drr_table", PARAM_STR, &drr_table},
 	{"drg_table", PARAM_STR, &drg_table},
 	{"drl_table", PARAM_STR, &drl_table},
-	{"use_domain", INT_PARAM, &use_domain},
+	{"use_domain", PARAM_INT, &use_domain},
 	{"drg_user_col", PARAM_STR, &drg_user_col},
 	{"drg_domain_col", PARAM_STR, &drg_domain_col},
 	{"drg_grpid_col", PARAM_STR, &drg_grpid_col},
 	{"ruri_avp", PARAM_STR, &ruri_avp_spec},
 	{"attrs_avp", PARAM_STR, &attrs_avp_spec},
-	{"sort_order", INT_PARAM, &sort_order},
-	{"fetch_rows", INT_PARAM, &dr_fetch_rows},
-	{"force_dns", INT_PARAM, &dr_force_dns},
-	{"enable_keepalive", INT_PARAM, &dr_enable_keepalive},
+	{"sort_order", PARAM_INT, &sort_order},
+	{"fetch_rows", PARAM_INT, &dr_fetch_rows},
+	{"force_dns", PARAM_INT, &dr_force_dns},
+	{"enable_keepalive", PARAM_INT, &dr_enable_keepalive},
 	{0, 0, 0}
 };
 
@@ -672,7 +674,7 @@ static int do_routing_1(struct sip_msg *msg, char *str1, char *str2)
 static int ki_next_routing(sip_msg_t *msg)
 {
 	struct usr_avp *avp;
-	int_str val;
+	avp_value_t val;
 
 	/* search for the first RURI AVP containing a string */
 	do {
@@ -731,7 +733,7 @@ static int do_routing(struct sip_msg *msg, int grp_id)
 	int i, j, l, t;
 	struct sip_uri uri;
 	str *ruri;
-	int_str val;
+	avp_value_t val;
 #define DR_MAX_GWLIST 32
 	static int active_gwlist[DR_MAX_GWLIST];
 	static int local_gwlist[DR_MAX_GWLIST];

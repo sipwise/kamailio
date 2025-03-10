@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -212,6 +214,7 @@ static int w_t_get_status_code(sip_msg_t *msg, char *p1, char *p2);
 
 static int t_clean(struct sip_msg *msg, char *key, char *value);
 static int w_t_exists(struct sip_msg *msg, char *p1, char *p2);
+static int w_t_cell_append_branches(sip_msg_t *msg, char *pindex, char *plabel);
 
 /* by default the fr timers avps are not set, so that the avps won't be
  * searched for nothing each time a new transaction is created */
@@ -224,6 +227,8 @@ str ulattrs_xavp_name = {NULL, 0};
 str on_sl_reply_name = {NULL, 0};
 int tm_remap_503_500 = 1;
 str _tm_event_callback_lres_sent = {NULL, 0};
+int _tm_reply_408_code = 408;
+str _tm_reply_408_reason = str_init("Request Timeout");
 
 #ifdef USE_DNS_FAILOVER
 str failover_reply_codes_str = {NULL, 0};
@@ -241,6 +246,8 @@ int tm_exec_time_check_param = 5000;  /* milliseconds */
 int tm_failure_exec_mode = 0;
 
 int tm_dns_reuse_rcv_socket = 0;
+
+int tm_headers_mode = 0;
 
 static rpc_export_t tm_rpc[];
 
@@ -440,6 +447,8 @@ static cmd_export_t cmds[] = {
 	{"t_next_contact_flow", t_next_contact_flow, 0, 0, 0, REQUEST_ROUTE},
 	{"t_clean", t_clean, 0, 0, 0, ANY_ROUTE},
 	{"t_exists", w_t_exists, 0, 0, 0, ANY_ROUTE},
+	{"t_cell_append_branches", w_t_cell_append_branches, 2, fixup_igp_igp,
+			fixup_free_igp_igp, ANY_ROUTE},
 
 	/* not applicable from the script */
 	{"load_tm", (cmd_function)load_tm, NO_SCRIPT, 0, 0, 0},
@@ -504,6 +513,8 @@ static param_export_t params[] = {
 	{"dns_reuse_rcv_socket", PARAM_INT, &tm_dns_reuse_rcv_socket},
 	{"local_cancel_reason", PARAM_INT, &default_tm_cfg.local_cancel_reason},
 	{"e2e_cancel_reason", PARAM_INT, &default_tm_cfg.e2e_cancel_reason},
+	{"e2e_cancel_hop_by_hop", PARAM_INT, &tm_e2e_cancel_hop_by_hop},
+	{"headers_mode", PARAM_INT, &tm_headers_mode},
 	{"xavp_contact", PARAM_STR, &ulattrs_xavp_name},
 	{"event_callback", PARAM_STR, &tm_event_callback},
 	{"relay_100", PARAM_INT, &default_tm_cfg.relay_100},
@@ -515,6 +526,8 @@ static param_export_t params[] = {
 #ifdef USE_DNS_FAILOVER
 	{"failover_reply_codes", PARAM_STR, &failover_reply_codes_str},
 #endif
+	{"reply_408_code", PARAM_INT, &_tm_reply_408_code},
+	{"reply_408_reason", PARAM_STR, &_tm_reply_408_reason},
 	{0, 0, 0}
 };
 
@@ -3203,6 +3216,26 @@ static int ki_t_exists(sip_msg_t *msg)
 static int w_t_exists(struct sip_msg *msg, char *p1, char *p2)
 {
 	return ki_t_exists(msg);
+}
+
+static int w_t_cell_append_branches(sip_msg_t *msg, char *pindex, char *plabel)
+{
+	int tindex = 0;
+	int tlabel = 0;
+	int ret;
+
+	if(fixup_get_ivalue(msg, (gparam_t *)pindex, &tindex) != 0) {
+		LM_ERR("invalid index parameter\n");
+		return -1;
+	}
+	if(fixup_get_ivalue(msg, (gparam_t *)plabel, &tlabel) != 0) {
+		LM_ERR("invalid label parameter\n");
+		return -1;
+	}
+
+	ret = t_cell_append_branches(tindex, tlabel);
+
+	return (ret == 0) ? 1 : ret;
 }
 
 #ifdef USE_DNS_FAILOVER

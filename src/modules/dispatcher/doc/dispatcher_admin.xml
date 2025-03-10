@@ -1420,6 +1420,13 @@ With congestion control the formula becomes :
 			</listitem>
 			<listitem>
 				<para>
+				<quote>64</quote> - round-robin (next destination) with over
+				load control (destination record is skipped based on over
+				load control rate).
+				</para>
+			</listitem>
+			<listitem>
+				<para>
 				<quote>X</quote> - if the algorithm is not implemented, the
 				first entry in set is chosen.
 				</para>
@@ -2007,6 +2014,81 @@ onreply_route {
 </programlisting>
 		</example>
 	</section>
+	<section id="dispatcher.f.ds_dsg_fetch_uri">
+		<title>
+		<function moreinfo="none">ds_dsg_fetch_uri(setid, uri)</function>
+		</title>
+		<para>
+		Sets the destination group id to setid for fetching $dsg(key) attributes
+		and the overload-control attributes to the corresponding uri record from
+		that group.
+		</para>
+		<para>Parameters: <emphasis>setid</emphasis> - integer or variable
+		holding the set id value; <emphasis>uri</emphasis> - string or variables
+		holding the SIP URI value.</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>ds_dsg_fetch_uri()</function> usage</title>
+		<programlisting format="linespecific">
+...
+    ds_dsg_fetch_uri("1", "sip:127.0.0.1:5080");
+    xinfo("set id: 1 - all: $dsg(count); active: $dsg(active); $dsg(ocrate)\n");
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="dispatcher.f.ds_oc_set_attrs">
+		<title>
+		<function moreinfo="none">ds_oc_set_attrs(setid, uri, rval, tval, sval)</function>
+		</title>
+		<para>
+		Sets the overload control rate, time internval limit and sequence number
+		for the destination record (setid, uri) following RFC7339 specifications.
+		</para>
+		<para>Description of parameters:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>setid</emphasis> - the set (group) id. The parameter
+				can be an integer or a variable holding an integer value.
+			</para>
+		</listitem>
+        <listitem>
+			<para><emphasis>uri</emphasis> - the URI of the destination.</para>
+		</listitem>
+        <listitem>
+			<para><emphasis>rval</emphasis> - the value of the overload control
+			rate (from 1 to 100) - how many times to skip using this destination
+			in 100 selections.</para>
+		</listitem>
+        <listitem>
+			<para><emphasis>tval</emphasis> - time interval limit to apply the
+			overload control rate (in milliseconds). If the value is 0 or
+			negative, then the default value 500 is used.</para>
+		</listitem>
+        <listitem>
+			<para><emphasis>sval</emphasis> - the sequence number for overload
+			control.</para>
+		</listitem>
+		</itemizedlist>
+		<para>The parameters can include variables.</para>
+		<para>The returns 1 (cfg-true) when the oc attrbutes are udpated for a
+		destination record; -1 (cfg-false) when there is an internal error;
+		-2 (cfg-false) when no destination is updated (e.g., not found or the
+		ocseq condition fails).</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>ds_oc_set_attrs()</function> usage</title>
+		<programlisting format="linespecific">
+...
+    ds_oc_set_attrs("1", "sip:127.0.0.1:5080", "30", "180000", "1");
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 
 	<section>
@@ -2283,6 +2365,30 @@ kamctl rpc dispatcher.hash 4 bob server.com
 ...
 </programlisting>
     </section>
+	<section id="dispatcher.r.oclist">
+		<title>
+		<function moreinfo="none">dispatcher.oclist</function>
+		</title>
+		<para>
+		List the overload control attributes for the records in a specific group.
+		</para>
+		<para>
+		Name: <emphasis>dispatcher.oclist</emphasis>
+		</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_group_: destination group id</para></listitem>
+		</itemizedlist>
+		<para>
+		Example:
+		</para>
+<programlisting  format="linespecific">
+...
+# prototype: kamcli dispatcher.oclist _group_
+kamcli dispatcher.oclist 1
+...
+</programlisting>
+    </section>
 
    </section>
 
@@ -2318,6 +2424,8 @@ kamctl rpc dispatcher.hash 4 bob server.com
 				<listitem><para>16 (bit at index 4 - 1 &lt;&lt;4) - skip DNS A/AAAA resolve at startup,
 				useful when the hostname of the destination address is a NAPTR or SRV record only.
 				Such addresses cannot be matched anymore with ds_is_from_list(...).</para>
+				</listitem>
+				<listitem><para>32 (bit at index 5 - 1 &lt;&lt;5) - no ping to destination</para>
 				</listitem>
 			</itemizedlist>
 			</para>
@@ -2387,6 +2495,14 @@ kamctl rpc dispatcher.hash 4 bob server.com
 						</listitem>
 						<listitem>
 							<para>'latency' - latency_stats initialization in ms.</para>
+						</listitem>
+						<listitem>
+							<para>'ocmin' - minimum limit for over load control rate
+							(value between 0 and 100, default 10).</para>
+						</listitem>
+						<listitem>
+							<para>'ocrate' - over load control rate
+							(value between 0 and 100, default 100).</para>
 						</listitem>
 					</itemizedlist>
 		</para>

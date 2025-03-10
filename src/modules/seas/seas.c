@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -85,29 +87,35 @@ int read_pipe = 0;
 
 struct seas_functions seas_f;
 
-static cmd_export_t cmds[] = {{"as_relay_t", (cmd_function)w_as_relay_t, 1,
-									  fixup_as_relay, 0, REQUEST_ROUTE},
-		{"as_relay_sl", (cmd_function)w_as_relay_sl, 1, fixup_as_relay, 0,
-				REQUEST_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+/* clang-format off */
+static cmd_export_t cmds[] = {
+	{"as_relay_t", (cmd_function)w_as_relay_t, 1, fixup_as_relay, 0, REQUEST_ROUTE},
+	{"as_relay_sl", (cmd_function)w_as_relay_sl, 1, fixup_as_relay, 0, REQUEST_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"listen_sockets", PARAM_STRING, &seas_listen_socket},
-		{"stats_socket", PARAM_STRING, &seas_stats_socket},
-		{"jain_ping", PARAM_STRING, &jain_ping_config},
-		{"servlet_ping", PARAM_STRING, &servlet_ping_config},
-		{"clusters", PARAM_STRING, &cluster_cfg}, {0, 0, 0}};
+	{"listen_sockets", PARAM_STRING, &seas_listen_socket},
+	{"stats_socket", PARAM_STRING, &seas_stats_socket},
+	{"jain_ping", PARAM_STRING, &jain_ping_config},
+	{"servlet_ping", PARAM_STRING, &servlet_ping_config},
+	{"clusters", PARAM_STRING, &cluster_cfg},
+	{0, 0, 0}
+};
 
 struct module_exports exports = {
-		"seas", DEFAULT_DLFLAGS, cmds, /* exported commands */
-		params,						   /* exported parameters */
-		0,							   /* exported RPC methods */
-		0,				 /* exported module-items (pseudo variables) */
-		0,				 /* response function */
-		seas_init,		 /* module initialization function */
-		seas_child_init, /* per-child init function */
-		seas_exit		 /* module exit function */
+	"seas",
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	seas_init,       /* module initialization function */
+	seas_child_init, /* per-child init function */
+	seas_exit        /* module destroy function */
 };
+/* clang-format on */
 
 static int fixup_as_relay(void **param, int param_no)
 {

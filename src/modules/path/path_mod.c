@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -83,51 +85,54 @@ struct rr_binds path_rrb;
  */
 ob_api_t path_obb;
 
+/* clang-format off */
 /*! \brief
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-		{"add_path", (cmd_function)add_path, 0, 0, 0, REQUEST_ROUTE},
-		{"add_path", (cmd_function)add_path_usr, 1, fixup_spve_null, 0,
-				REQUEST_ROUTE},
-		{"add_path", (cmd_function)add_path_usr, 2, fixup_spve_spve, 0,
-				REQUEST_ROUTE},
-		{"add_path_received", (cmd_function)add_path_received, 0, 0, 0,
-				REQUEST_ROUTE},
-		{"add_path_received", (cmd_function)add_path_received_usr, 1,
-				fixup_spve_null, 0, REQUEST_ROUTE},
-		{"add_path_received", (cmd_function)add_path_received_usr, 2,
-				fixup_spve_spve, 0, REQUEST_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
+	{"add_path", (cmd_function)add_path, 0,
+		0, 0, REQUEST_ROUTE},
+	{"add_path", (cmd_function)add_path_usr, 1,
+		fixup_spve_null, fixup_free_spve_null, REQUEST_ROUTE},
+	{"add_path", (cmd_function)add_path_usr, 2,
+		fixup_spve_spve, fixup_free_spve_spve, REQUEST_ROUTE},
+	{"add_path_received", (cmd_function)add_path_received, 0,
+		0, 0, REQUEST_ROUTE},
+	{"add_path_received", (cmd_function)add_path_received_usr, 1,
+		fixup_spve_null, fixup_free_spve_null, REQUEST_ROUTE},
+	{"add_path_received", (cmd_function)add_path_received_usr, 2,
+		fixup_spve_spve, fixup_free_spve_spve, REQUEST_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /*! \brief
  * Exported parameters
  */
 static param_export_t params[] = {
-		{"use_received", INT_PARAM, &path_use_received},
-		{"received_format", INT_PARAM, &path_received_format},
-		{"enable_r2", INT_PARAM, &path_enable_r2},
-		{"sockname_mode", INT_PARAM, &path_sockname_mode},
-		{"received_name", PARAM_STR, &path_received_name}, {0, 0, 0}};
-
+	{"use_received", PARAM_INT, &path_use_received},
+	{"received_format", PARAM_INT, &path_received_format},
+	{"enable_r2", PARAM_INT, &path_enable_r2},
+	{"sockname_mode", PARAM_INT, &path_sockname_mode},
+	{"received_name", PARAM_STR, &path_received_name},
+	{0, 0, 0}
+};
 
 /*! \brief
  * Module interface
  */
 struct module_exports exports = {
-		"path",			 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* Exported functions */
-		params,			 /* Exported parameters */
-		0,				 /* RPC method exports */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response function */
-		mod_init,		 /* module initialization function */
-		0,				 /* child initialization function */
-		0				 /* destroy function */
+	"path",          /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	0,               /* per-child init function */
+	0                /* module destroy function */
 };
-
+/* clang-format on */
 
 static int mod_init(void)
 {

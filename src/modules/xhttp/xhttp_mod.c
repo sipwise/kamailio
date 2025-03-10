@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -55,7 +57,7 @@ static int w_xhttp_send_reply(
 static int mod_init(void);
 
 static int fixup_xhttp_reply(void **param, int param_no);
-
+static int fixup_free_xhttp_reply(void **param, int param_no);
 static int pv_get_huri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 
 static int xhttp_route_no = DEFAULT_RT;
@@ -94,7 +96,7 @@ static param_export_t params[] = {
 
 static cmd_export_t cmds[] = {
 	{"xhttp_reply",    (cmd_function)w_xhttp_send_reply,
-		4, fixup_xhttp_reply,  0, REQUEST_ROUTE},
+		4, fixup_xhttp_reply, fixup_free_xhttp_reply, REQUEST_ROUTE},
 	{"bind_xhttp",     (cmd_function)bind_xhttp,
 		0, 0, 0, ANY_ROUTE},
 	{0, 0, 0, 0, 0}
@@ -502,6 +504,23 @@ static int fixup_xhttp_reply(void **param, int param_no)
 		return fixup_spve_null(param, 1);
 	} else if(param_no == 4) {
 		return fixup_spve_null(param, 1);
+	}
+	return 0;
+}
+
+/**
+ *
+ */
+static int fixup_free_xhttp_reply(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return fixup_free_igp_null(param, 1);
+	} else if(param_no == 2) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 3) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 4) {
+		return fixup_free_spve_null(param, 1);
 	}
 	return 0;
 }

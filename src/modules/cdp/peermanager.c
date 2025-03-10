@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -72,7 +74,7 @@ int peer_manager_init(dp_config *config)
 {
 	int i;
 	peer *p;
-	LM_DBG("peer_manager_init(): Peer Manager initialization...\n");
+	LM_DBG("Peer Manager initialization...\n");
 	peer_list = shm_malloc(sizeof(peer_list_t));
 	peer_list->head = 0;
 	peer_list->tail = 0;
@@ -130,7 +132,7 @@ void peer_manager_destroy()
 	shm_free(peer_list);
 	lock_destroy(peer_list_lock);
 	lock_dealloc((void *)peer_list_lock);
-	LM_DBG("peer_manager_init(): ...Peer Manager destroyed\n");
+	LM_DBG("Peer Manager destroyed\n");
 }
 
 /**
@@ -279,7 +281,7 @@ int peer_timer(time_t now, void *ptr)
 {
 	peer *p, *n;
 	int i;
-	LM_DBG("peer_timer(): taking care of peers...\n");
+	LM_DBG("taking care of peers...\n");
 	lock_get(peer_list_lock);
 	p = peer_list->head;
 	while(p) {
@@ -300,8 +302,7 @@ int peer_timer(time_t now, void *ptr)
 		}
 
 		if(p->activity + config->tc <= now) {
-			LM_DBG("peer_timer(): Peer %.*s State %d \n", p->fqdn.len,
-					p->fqdn.s, p->state);
+			LM_DBG("Peer %.*s State %d \n", p->fqdn.len, p->fqdn.s, p->state);
 			switch(p->state) {
 				/* initiating connection */
 				case Closed:
@@ -351,8 +352,8 @@ int peer_timer(time_t now, void *ptr)
 					/* ignored states */
 					/* unknown states */
 				default:
-					LM_ERR("peer_timer(): Peer %.*s inactive  in state %d\n",
-							p->fqdn.len, p->fqdn.s, p->state);
+					LM_ERR("Peer %.*s inactive  in state %d\n", p->fqdn.len,
+							p->fqdn.s, p->state);
 			}
 		}
 		lock_release(p->lock);

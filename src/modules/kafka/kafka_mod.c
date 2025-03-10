@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -45,6 +47,7 @@
 #include "../../core/kemi.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
+#include "../../core/counters.h"
 
 #include "kfk.h"
 
@@ -64,6 +67,12 @@ static int w_kafka_send_key(
 /*
  * Variables and functions to deal with module parameters.
  */
+stat_var *total_messages;
+stat_var *total_messages_err;
+int child_init_ok = 0;
+int init_without_kafka = 0;
+int log_without_overflow = 0;
+int metadata_timeout = 2000;
 char *brokers_param = NULL; /**< List of brokers. */
 static int kafka_conf_param(modparam_t type, void *val);
 static int kafka_topic_param(modparam_t type, void *val);
@@ -81,10 +90,12 @@ static cmd_export_t cmds[] = {{"kafka_send", (cmd_function)w_kafka_send, 2,
  * \brief Structure for module parameters.
  */
 static param_export_t params[] = {{"brokers", PARAM_STRING, &brokers_param},
-		{"configuration", PARAM_STRING | USE_FUNC_PARAM,
+		{"configuration", PARAM_STRING | PARAM_USE_FUNC,
 				(void *)kafka_conf_param},
-		{"topic", PARAM_STRING | USE_FUNC_PARAM, (void *)kafka_topic_param},
-		{0, 0, 0}};
+		{"topic", PARAM_STRING | PARAM_USE_FUNC, (void *)kafka_topic_param},
+		{"init_without_kafka", PARAM_INT, &init_without_kafka},
+		{"log_without_overflow", PARAM_INT, &log_without_overflow},
+		{"metadata_timeout", PARAM_INT, &metadata_timeout}, {0, 0, 0}};
 
 /**
  * \brief Kafka :: Module interface
@@ -98,6 +109,10 @@ struct module_exports exports = {
 		child_init,				  /* per child init function */
 		mod_destroy				  /* destroy function */
 };
+
+/*! \brief We expose internal variables via the statistic framework below.*/
+stat_export_t mod_stats[] = {{"total_messages", 0, &total_messages},
+		{"total_messages_err", 0, &total_messages_err}, {0, 0, 0}};
 
 static int mod_init(void)
 {
@@ -113,22 +128,35 @@ static int mod_init(void)
 		return -1;
 	}
 
+#ifdef STATISTICS
+	/* register statistics */
+	if(register_module_stats("kafka", mod_stats) != 0) {
+		LM_ERR("Failed to register core statistics\n");
+		return -1;
+	}
+#endif
+
 	return 0;
 }
 
 static int child_init(int rank)
 {
-	/* skip child init for non-worker process ranks */
-	/* if (rank==PROC_INIT || rank==PROC_MAIN || rank==PROC_TCP_MAIN) */
-	/* We execute kfk_init in PROC_MAIN so it cleans messages, etc right
-	   when destroying the module. */
-	if(rank == PROC_INIT || rank == PROC_TCP_MAIN)
+	/* call kfk_init() only for timer processes and routing processes */
+	/* Note that only these processes will be able to send kafka messages */
+	if(rank != PROC_TIMER && rank <= PROC_MAIN)
 		return 0;
 
+	child_init_ok = 1;
 	if(kfk_init(brokers_param)) {
-		LM_ERR("Failed to initialize Kafka\n");
-		return -1;
+		child_init_ok = 0;
+		if(init_without_kafka) {
+			LM_ERR("Failed to initialize Kafka - continue\n");
+		} else {
+			LM_ERR("Failed to initialize Kafka\n");
+			return -1;
+		}
 	}
+
 	return 0;
 }
 

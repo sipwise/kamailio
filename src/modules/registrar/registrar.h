@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -81,8 +83,8 @@ extern int received_avp;
 extern int reg_use_domain;
 extern float def_q;
 
-extern unsigned short rcv_avp_type;
-extern int_str rcv_avp_name;
+extern avp_flags_t rcv_avp_type;
+extern avp_name_t rcv_avp_name;
 
 extern str match_callid_name;
 extern str match_received_name;

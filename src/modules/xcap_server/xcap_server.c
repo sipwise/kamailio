@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -64,6 +66,7 @@ static int w_xcaps_put(sip_msg_t *msg, char *puri, char *ppath, char *pbody);
 static int w_xcaps_get(sip_msg_t *msg, char *puri, char *ppath);
 static int w_xcaps_del(sip_msg_t *msg, char *puri, char *ppath);
 static int fixup_xcaps_put(void **param, int param_no);
+static int fixup_free_xcaps_put(void **param, int param_no);
 static int check_preconditions(sip_msg_t *msg, str etag_hdr);
 static int check_match_header(str body, str *etag);
 
@@ -106,42 +109,45 @@ db_func_t xcaps_dbf;
 /** SL API structure */
 sl_api_t slb;
 
+/* clang-format off */
 static pv_export_t mod_pvs[] = {
-		{{"xcapuri", sizeof("xcapuri") - 1}, PVT_OTHER, pv_get_xcap_uri,
-				pv_set_xcap_uri, pv_parse_xcap_uri_name, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
+	{{"xcapuri", sizeof("xcapuri") - 1}, PVT_OTHER, pv_get_xcap_uri,
+			pv_set_xcap_uri, pv_parse_xcap_uri_name, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t params[] = {{"db_url", PARAM_STR, &xcaps_db_url},
-		{"xcap_table", PARAM_STR, &xcaps_db_table},
-		{"xcap_root", PARAM_STR, &xcaps_root},
-		{"buf_size", INT_PARAM, &xcaps_buf.len},
-		{"xml_ns", PARAM_STRING | USE_FUNC_PARAM, (void *)xcaps_xpath_ns_param},
-		{"directory_scheme", INT_PARAM, &xcaps_directory_scheme},
-		{"directory_hostname", PARAM_STR, &xcaps_directory_hostname},
-		{0, 0, 0}};
+static param_export_t params[] = {
+	{"db_url", PARAM_STR, &xcaps_db_url},
+	{"xcap_table", PARAM_STR, &xcaps_db_table},
+	{"xcap_root", PARAM_STR, &xcaps_root},
+	{"buf_size", PARAM_INT, &xcaps_buf.len},
+	{"xml_ns", PARAM_STRING | PARAM_USE_FUNC, (void *)xcaps_xpath_ns_param},
+	{"directory_scheme", PARAM_INT, &xcaps_directory_scheme},
+	{"directory_hostname", PARAM_STR, &xcaps_directory_hostname},
+	{0, 0, 0}
+};
 
-static cmd_export_t cmds[] = {{"xcaps_put", (cmd_function)w_xcaps_put, 3,
-									  fixup_xcaps_put, 0, REQUEST_ROUTE},
-		{"xcaps_get", (cmd_function)w_xcaps_get, 2, fixup_xcaps_put, 0,
-				REQUEST_ROUTE},
-		{"xcaps_del", (cmd_function)w_xcaps_del, 2, fixup_xcaps_put, 0,
-				REQUEST_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
+static cmd_export_t cmds[] = {
+	{"xcaps_put", (cmd_function)w_xcaps_put, 3, fixup_xcaps_put, fixup_free_xcaps_put, REQUEST_ROUTE},
+	{"xcaps_get", (cmd_function)w_xcaps_get, 2, fixup_xcaps_put, fixup_free_xcaps_put, REQUEST_ROUTE},
+	{"xcaps_del", (cmd_function)w_xcaps_del, 2, fixup_xcaps_put, fixup_free_xcaps_put, REQUEST_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"xcap_server",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* exported rpc functions */
-		mod_pvs,		 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* per-child init function */
-		destroy			 /* destroy function */
+	"xcap_server",   /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* exported rpc functions */
+	mod_pvs,         /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per-child init function */
+	destroy          /* destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function
@@ -1488,6 +1494,21 @@ static int fixup_xcaps_put(void **param, int param_no)
 		}
 		*param = (void *)xm;
 		return 0;
+	}
+	return 0;
+}
+
+/**
+ *
+ */
+static int fixup_free_xcaps_put(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 2) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 3) {
+		pv_elem_free_all((pv_elem_t *)*param);
 	}
 	return 0;
 }

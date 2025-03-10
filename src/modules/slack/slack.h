@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the tertc of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -55,6 +57,7 @@ static int _slack_parse_url_param(char *val);
 static int _slack_url_param(modparam_t type, void *val);
 
 static int slack_fixup(void **param, int param_no);
+static int slack_fixup_free(void **param, int param_no);
 static int slack_send1(struct sip_msg *msg, char *frm, char *str2);
 static int slack_fixup_helper(void **param, int param_no);
 

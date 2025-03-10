@@ -186,7 +186,7 @@ static param_export_t params[] = {
 	{"context", PARAM_STR, &_tps_context_param},
 	{"methods_nocontact", PARAM_STR, &_tps_methods_nocontact_list},
 	{"methods_noinitial", PARAM_STR, &_tps_methods_noinitial_list},
-	{"version_table", INT_PARAM, &_tps_version_table_check},
+	{"version_table", PARAM_INT, &_tps_version_table_check},
 
 	{0, 0, 0}
 };
@@ -288,6 +288,9 @@ static int mod_init(void)
 			_tpsdbf.close(topos_db_con);
 			topos_db_con = NULL;
 		}
+	} else if(_tps_storage.len == 6
+			  && strncmp(_tps_storage.s, "htable", 6) == 0) {
+		// use htable module api
 	} else {
 		if(_tps_storage.len != 7 && strncmp(_tps_storage.s, "redis", 5) != 0) {
 			LM_ERR("unknown storage type: %.*s\n", _tps_storage.len,

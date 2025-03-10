@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -70,10 +72,16 @@ static int mod_init(void);
  * Remove used credentials from a SIP message header
  */
 int w_consume_credentials(struct sip_msg *msg, char *s1, char *s2);
+
 /*
  * Check for credentials with given realm
  */
 int w_has_credentials(struct sip_msg *msg, char *s1, char *s2);
+
+/*
+ * Set authentication algorithm
+ */
+int w_auth_algorithm(struct sip_msg *msg, char *alg, char *s2);
 
 static int pv_proxy_authenticate(
 		struct sip_msg *msg, char *realm, char *passwd, char *flags);
@@ -129,6 +137,17 @@ static struct qp auth_qauthint = {STR_STATIC_INIT("auth-int"), QOP_AUTHINT};
 
 /* Hash algorithm used for digest authentication, MD5 if empty */
 str auth_algorithm = {"", 0};
+
+#define AUTH_ALG_MD5_IDX 0
+#define AUTH_ALG_SHA256_IDX 1
+/* clang-format off */
+static str auth_algorithm_list[] = {
+	{"MD5", 3},
+	{"SHA-256", 7},
+	{NULL, 0}
+};
+/* clang-format on */
+
 int hash_hex_len;
 int add_authinfo_hdr =
 		0; /* should an Authentication-Info header be added on 200 OK responses? */
@@ -170,6 +189,8 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE},
 	{"pv_auth_check", (cmd_function)w_pv_auth_check, 4, fixup_pv_auth_check,
 			0, REQUEST_ROUTE},
+	{"auth_algorithm", w_auth_algorithm, 1, fixup_spve_null, 0,
+			REQUEST_ROUTE},
 	{"bind_auth_s", (cmd_function)bind_auth_s, 0, 0, 0},
 
 	{0, 0, 0, 0, 0, 0}
@@ -202,7 +223,7 @@ static param_export_t params[] = {
 	{"realm_prefix", PARAM_STRING, &auth_realm_prefix.s},
 	{"use_domain", PARAM_INT, &auth_use_domain},
 	{"algorithm", PARAM_STR, &auth_algorithm},
-	{"add_authinfo_hdr", INT_PARAM, &add_authinfo_hdr},
+	{"add_authinfo_hdr", PARAM_INT, &add_authinfo_hdr},
 
 	{0, 0, 0}
 };
@@ -365,10 +386,12 @@ static int mod_init(void)
 	}
 
 	if(auth_algorithm.len == 0 || strcmp(auth_algorithm.s, "MD5") == 0) {
+		auth_algorithm = auth_algorithm_list[AUTH_ALG_MD5_IDX];
 		hash_hex_len = HASHHEXLEN;
 		calc_HA1 = calc_HA1_md5;
 		calc_response = calc_response_md5;
 	} else if(strcmp(auth_algorithm.s, "SHA-256") == 0) {
+		auth_algorithm = auth_algorithm_list[AUTH_ALG_SHA256_IDX];
 		hash_hex_len = HASHHEXLEN_SHA256;
 		calc_HA1 = calc_HA1_sha256;
 		calc_response = calc_response_sha256;
@@ -475,6 +498,47 @@ int w_has_credentials(sip_msg_t *msg, char *realm, char *s2)
 		return -1;
 	}
 	return ki_has_credentials(msg, &srealm);
+}
+
+/**
+ *
+ */
+static int ki_auth_algorithm(sip_msg_t *msg, str *alg)
+{
+	auth_algorithm = *alg;
+
+	if(strcmp(auth_algorithm.s, "MD5") == 0) {
+		auth_algorithm = auth_algorithm_list[AUTH_ALG_MD5_IDX];
+		hash_hex_len = HASHHEXLEN;
+		calc_HA1 = calc_HA1_md5;
+		calc_response = calc_response_md5;
+	} else if(strcmp(auth_algorithm.s, "SHA-256") == 0) {
+		auth_algorithm = auth_algorithm_list[AUTH_ALG_SHA256_IDX];
+		hash_hex_len = HASHHEXLEN_SHA256;
+		calc_HA1 = calc_HA1_sha256;
+		calc_response = calc_response_sha256;
+	} else {
+		LM_ERR("Invalid algorithm provided."
+			   " Possible values are \"\", \"MD5\" or \"SHA-256\"\n");
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+int w_auth_algorithm(sip_msg_t *msg, char *alg, char *s2)
+{
+	str salg = str_init("");
+
+	if(fixup_get_svalue(msg, (gparam_t *)alg, &salg) < 0) {
+		LM_ERR("failed to get algorithm value\n");
+		return -1;
+	}
+
+	return ki_auth_algorithm(msg, &salg);
 }
 
 #ifdef USE_NC
@@ -1392,6 +1456,11 @@ static sr_kemi_t sr_kemi_auth_exports[] = {
 	{ str_init("auth"), str_init("auth_get_www_authenticate"),
 		SR_KEMIP_INT, ki_auth_get_www_authenticate,
 		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("auth"), str_init("auth_algorithm"),
+		SR_KEMIP_INT, ki_auth_algorithm,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

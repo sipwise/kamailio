@@ -71,11 +71,11 @@ static cmd_export_t cmds[]={
 	{"dlgs_count", (cmd_function)w_dlgs_count, 3, fixup_spve_all,
 		fixup_free_spve_all, ANY_ROUTE},
 	{"dlgs_tags_add", (cmd_function)w_dlgs_tags_add, 1, fixup_spve_null,
-		fixup_spve_null, ANY_ROUTE},
+		fixup_free_spve_null, ANY_ROUTE},
 	{"dlgs_tags_rm", (cmd_function)w_dlgs_tags_rm, 1, fixup_spve_null,
-		fixup_spve_null, ANY_ROUTE},
+		fixup_free_spve_null, ANY_ROUTE},
 	{"dlgs_tags_count", (cmd_function)w_dlgs_tags_count, 1, fixup_spve_null,
-		fixup_spve_null, ANY_ROUTE},
+		fixup_free_spve_null, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -341,7 +341,7 @@ static int ki_dlgs_tags_count(sip_msg_t *msg, str *vtags)
 	int ret;
 
 	ret = dlgs_tags_count(msg, vtags);
-	return (ret <= 0) ? (ret - 1) : ret;
+	return (ret == 0 || ret == -1) ? (ret - 1) : ret;
 }
 
 /**

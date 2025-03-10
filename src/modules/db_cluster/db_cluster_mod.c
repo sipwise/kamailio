@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -49,10 +51,10 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-		{"connection", PARAM_STRING | USE_FUNC_PARAM, (void *)dbcl_con_param},
-		{"cluster", PARAM_STRING | USE_FUNC_PARAM, (void *)dbcl_cls_param},
-		{"inactive_interval", INT_PARAM, &dbcl_inactive_interval},
-		{"max_query_length", INT_PARAM, &dbcl_max_query_length}, {0, 0, 0}};
+		{"connection", PARAM_STRING | PARAM_USE_FUNC, (void *)dbcl_con_param},
+		{"cluster", PARAM_STRING | PARAM_USE_FUNC, (void *)dbcl_cls_param},
+		{"inactive_interval", PARAM_INT, &dbcl_inactive_interval},
+		{"max_query_length", PARAM_INT, &dbcl_max_query_length}, {0, 0, 0}};
 
 static rpc_export_t rpc_methods[];
 

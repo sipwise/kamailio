@@ -713,6 +713,26 @@ modparam("http_client", "netinterface", "eth0")
 				</programlisting>
 			</example>
 		</section>
+		<section id="http_client.p.response_headers">
+			<title><varname>response_headers</varname> (int)</title>
+			<para>
+			Set to 1 in order to store HTTP response headers. A header value
+			can be retrieved with $httprhdr(name).
+			</para>
+			<para>
+			<emphasis>
+				Default value is 0.
+			</emphasis>
+			</para>
+			<example>
+			<title>Set <varname>response_headers</varname> parameter</title>
+				<programlisting format="linespecific">
+...
+modparam("http_client", "response_headers", 1)
+...
+				</programlisting>
+			</example>
+		</section>
 
 	</section>
 
@@ -964,9 +984,96 @@ switch ($rc) {
 				</programlisting>
 			</example>
 		</section>
+		<section id="http_client.f.http_client_request">
+			<title>
+				<function moreinfo="none">http_client_request(met, url, body, hdrs, respv)</function>
+			</title>
+			<para>
+				Perform a HTTP request to "url", storing the response body
+				in the "respv" variable. The method of the request is set by "met".
+				The "body" and "hdrs" can be empty strings to skip setting them.
+				The first four parameters can contain variables that are evaluated
+				at runtime. The "respv" has to be the name of a writable variable.
+			</para>
+			<example>
+				<title><function>http_client_request()</function> usage</title>
+				<programlisting format="linespecific">
+...
+http_client_request("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
+	   "", "X-Token: abc", "$var(result)");
+switch ($rc) {
+    ...
+}
+...
+				</programlisting>
+			</example>
+		</section>
+		<section id="http_client.f.http_client_request_v2pk">
+			<title>
+				<function moreinfo="none">http_client_request_v2pk(met, url, body, hdrs, respv)</function>
+			</title>
+			<para>
+				Similar to http_client_request(), but using HTTP/2 prior-knowledge
+				that the server does not need HTTP/1.1-Upgrade (direct HTTP/2 by
+				seting libcurl option CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE).
+			</para>
+			<example>
+				<title><function>http_client_request_v2pk()</function> usage</title>
+				<programlisting format="linespecific">
+...
+http_client_request_v2pk("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
+	   "", "X-Token: abc", "$var(result)");
+switch ($rc) {
+    ...
+}
+...
+				</programlisting>
+			</example>
+		</section>
+		<section id="http_client.f.http_client_response_headers_set">
+			<title>
+				<function moreinfo="none">http_client_response_headers_set(mode)</function>
+			</title>
+			<para>
+				Set if the HTTP response header should be stored (when mode is 1)
+				or not (when mode is 0). If mode is 0, then it also clears previously
+				stored response headers.
+			</para>
+			<example>
+				<title><function>http_client_response_headers_set()</function> usage</title>
+				<programlisting format="linespecific">
+...
+http_client_response_headers_set("1");
+http_client_request_v2pk("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
+	   "", "X-Token: abc", "$var(result)");
+xinfo("response header: $httprhdr(X-Header)\n");
+...
+				</programlisting>
+			</example>
+		</section>
+		<section id="http_client.f.http_client_response_headers_clear">
+			<title>
+				<function moreinfo="none">http_client_response_headers_clear()</function>
+			</title>
+			<para>
+				Clear stored response headers, if not explicitely done, it happens
+				when the next HTTP request is performed.
+			</para>
+			<example>
+				<title><function>http_client_response_headers_clear()</function> usage</title>
+				<programlisting format="linespecific">
+...
+http_client_request_v2pk("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
+	   "", "X-Token: abc", "$var(result)");
+xinfo("response header: $httprhdr(X-Header)\n");
+http_client_response_headers_clear();
+...
+				</programlisting>
+			</example>
+		</section>
 	</section>
 	<section>
-	<title>Pseudovariables</title>
+	<title>Pseudo-Variables</title>
 		<section >
 			<title>
 				<function moreinfo="none">$curlerror(error)</function>
@@ -977,6 +1084,15 @@ switch ($rc) {
 			The $curlerror pv returns a text string representing the error.
 			For more information on cURL error codes, please visit
 			http://curl.haxx.se/libcurl/c/libcurl-errors.html
+			</para>
+		</section>
+		<section >
+			<title>
+				<function moreinfo="none">$httprhdr(name)</function>
+			</title>
+			<para>
+			Return response header value. It requires response_headers parameter
+			to be set to 1.
 			</para>
 		</section>
 	</section>

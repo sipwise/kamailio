@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,8 +79,7 @@ int get_auth_session_state(AAAMessage *msg)
 	return get_4bytes(rc->data.s);
 
 error:
-	LM_DBG("get_auth_session_state(): no AAAMessage or Auth Session State not "
-		   "found\n");
+	LM_DBG("no AAAMessage or Auth Session State not found\n");
 	return STATE_MAINTAINED;
 }
 
@@ -279,9 +280,7 @@ int auth_client_statefull_sm_process(
 				Send_ASA(0, msg);
 				break;
 			default:
-				LM_ERR("auth_client_statefull_sm_process(): Received invalid "
-					   "event %d with no session!\n",
-						event);
+				LM_ERR("Received invalid event %d with no session!\n", event);
 		}
 		return rv;
 	}
@@ -291,7 +290,7 @@ int auth_client_statefull_sm_process(
 		(s->cb)(event, s);
 	LM_INFO("after callback of event %i\n", event);
 
-	//if (x && x->state && msg) LM_ERR("auth_client_statefull_sm_process [event %i] [state %i] endtoend %u hopbyhop %u\n",event,x->state,msg->endtoendId,msg->hopbyhopId);
+	//if (x && x->state && msg) LM_ERR("[event %i] [state %i] endtoend %u hopbyhop %u\n",event,x->state,msg->endtoendId,msg->hopbyhopId);
 
 	switch(x->state) {
 		case AUTH_ST_IDLE:
@@ -319,16 +318,15 @@ int auth_client_statefull_sm_process(
 				/* Just in case we have some lost sessions */
 				case AUTH_EV_SESSION_TIMEOUT:
 				case AUTH_EV_SESSION_GRACE_TIMEOUT:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "TIMEOUT - clean up session to avoid stale "
+					LM_ERR("Received TIMEOUT - clean up session to avoid stale "
 						   "sessions\n");
 					cdp_session_cleanup(s, msg);
 					s = 0;
 					break;
 
 				default:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "invalid event %d while in state %s!(data %p)\n",
+					LM_ERR("Received invalid event %d while in state %s!(data "
+						   "%p)\n",
 							event, auth_states[x->state], x->generic_data);
 			}
 			break;
@@ -366,8 +364,7 @@ int auth_client_statefull_sm_process(
 					break;
 
 				default:
-					LM_ERR("auth_client_stateless_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
@@ -384,7 +381,7 @@ int auth_client_statefull_sm_process(
 
 			switch(event) {
 				case AUTH_EV_SEND_REQ:
-					// if the request is STR i should move to Discon ..
+					// if the request is STR I should move to Discon ..
 					// this is not in the state machine but I (Alberto Diez) need it
 					if(msg->commandCode == IMS_STR)
 						s->u.auth.state = AUTH_ST_DISCON;
@@ -394,41 +391,46 @@ int auth_client_statefull_sm_process(
 					}
 					break;
 
+				case AUTH_EV_SEND_ANS:
+					LM_DBG("Sending answer while in state %s\n",
+							auth_states[x->state]);
+					break;
+
+
+				case AUTH_EV_RECV_REQ:
+					LM_DBG("Received request while in state %s\n",
+							auth_states[x->state]);
+					break;
+
 				case AUTH_EV_RECV_ANS_SUCCESS:
 					x->state = AUTH_ST_OPEN;
 					update_auth_session_timers(x, msg);
-					//LM_INFO("state machine: i was in open and i am going to open\n");
 					break;
 
 				case AUTH_EV_RECV_ANS_UNSUCCESS:
 					x->state = AUTH_ST_DISCON;
-					//LM_INFO("state machine: i was in open and i am going to discon\n");
 					break;
 
 				case AUTH_EV_SESSION_TIMEOUT:
 				case AUTH_EV_SERVICE_TERMINATED:
 				case AUTH_EV_SESSION_GRACE_TIMEOUT:
 					x->state = AUTH_ST_DISCON;
-					//LM_INFO("state machine: i was in open and i am going to discon\n");
-
 					Send_STR(s, msg);
 					break;
 
 				case AUTH_EV_SEND_ASA_SUCCESS:
 					x->state = AUTH_ST_DISCON;
-					//LM_INFO("state machine: i was in open and i am going to discon\n");
 					Send_STR(s, msg);
 					break;
 
 				case AUTH_EV_SEND_ASA_UNSUCCESS:
 					x->state = AUTH_ST_OPEN;
 					update_auth_session_timers(x, msg);
-					//LM_INFO("state machine: i was in open and i am going to open\n");
 					break;
 
 				case AUTH_EV_RECV_ASR:
 					// two cases , client will comply or will not
-					// our client is very nice and always complys.. because
+					// our client is very nice and always complies.. because
 					// our brain is in the PCRF... if he says to do this , we do it
 					// Alberto Diez , (again this is not Diameter RFC)
 					x->state = AUTH_ST_DISCON;
@@ -437,8 +439,7 @@ int auth_client_statefull_sm_process(
 					break;
 
 				default:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
@@ -472,15 +473,13 @@ int auth_client_statefull_sm_process(
 					break;
 
 				default:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
 		default:
-			LM_ERR("auth_client_statefull_sm_process(): Received event %d "
-				   "while in invalid state %d!\n",
-					event, x->state);
+			LM_ERR("Received event %d while in invalid state %d!\n", event,
+					x->state);
 	}
 	if(s) {
 		if(s->cb)
@@ -543,8 +542,7 @@ void auth_server_statefull_sm_process(
 					break;
 
 				default:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
@@ -591,8 +589,7 @@ void auth_server_statefull_sm_process(
 					s = 0;
 					break;
 				default:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
@@ -617,16 +614,14 @@ void auth_server_statefull_sm_process(
 					s = 0;
 					break;
 				default:
-					LM_ERR("auth_client_statefull_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
 
 		default:
-			LM_ERR("auth_client_statefull_sm_process(): Received event %d "
-				   "while in invalid state %d!\n",
-					event, x->state);
+			LM_ERR("Received event %d while in invalid state %d!\n", event,
+					x->state);
 	}
 	if(s) {
 		if(s->cb)
@@ -657,8 +652,7 @@ void auth_client_stateless_sm_process(
 					x->state = AUTH_ST_PENDING;
 					break;
 				default:
-					LM_ERR("auth_client_stateless_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
@@ -680,8 +674,7 @@ void auth_client_stateless_sm_process(
 					x->state = AUTH_ST_IDLE;
 					break;
 				default:
-					LM_ERR("auth_client_stateless_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
@@ -695,16 +688,14 @@ void auth_client_stateless_sm_process(
 					x->state = AUTH_ST_IDLE;
 					break;
 				default:
-					LM_ERR("auth_client_stateless_sm_process(): Received "
-						   "invalid event %d while in state %s!\n",
+					LM_ERR("Received invalid event %d while in state %s!\n",
 							event, auth_states[x->state]);
 			}
 			break;
 
 		default:
-			LM_ERR("auth_client_stateless_sm_process(): Received event %d "
-				   "while in invalid state %d!\n",
-					event, x->state);
+			LM_ERR("Received event %d while in invalid state %d!\n", event,
+					x->state);
 	}
 	if(s)
 		AAASessionsUnlock(s->hash);
@@ -731,12 +722,12 @@ void auth_server_stateless_sm_process(
 	   case AUTH_ST_IDLE:
 	   switch(event){
 	   default:
-	   LM_ERR("auth_server_stateless_sm_process(): Received invalid event %d while in state %s!\n",
+	   LM_ERR("Received invalid event %d while in state %s!\n",
 	   event,auth_state[x->state]);
 	   }
 	   break;
 	   default:
-	   LM_ERR("auth_server_stateless_sm_process(): Received event %d while in invalid state %d!\n",
+	   LM_ERR("Received event %d while in invalid state %d!\n",
 	   event,x->state);
 	   }
 	   */
@@ -760,17 +751,17 @@ int dup_routing_avps(AAAMessage *src, AAAMessage *dest)
 	/* Removed By Jason to facilitate use of Diameter clustering (MUX) in SLEE architecture (Realm-routing only) - TODO - check spec */
 	/*avp = AAAFindMatchingAVP(src,src->avpList.head,AVP_Origin_Host,0,AAA_FORWARD_SEARCH);
 	  if(avp && avp->data.s && avp->data.len) {
-	  LM_DBG("dup_routing_avps: Origin Host AVP present, duplicating %.*s\n",
+	  LM_DBG("Origin Host AVP present, duplicating %.*s\n",
 	  avp->data.len, avp->data.s);
 	  dest_host = avp->data;
 	  avp = AAACreateAVP(AVP_Destination_Host,AAA_AVP_FLAG_MANDATORY,0,
 	  dest_host.s,dest_host.len,AVP_DUPLICATE_DATA);
 	  if (!avp) {
-	  LM_ERR("dup_routing_avps: Failed creating Destination Host avp\n");
+	  LM_ERR("Failed creating Destination Host avp\n");
 	  goto error;
 	  }
 	  if (AAAAddAVPToMessage(dest,avp,dest->avpList.tail)!=AAA_ERR_SUCCESS) {
-	  LM_ERR("dup_routing_avps: Failed adding Destination Host avp to message\n");
+	  LM_ERR("Failed adding Destination Host avp to message\n");
 	  AAAFreeAVP(&avp);
 	  goto error;
 	  }
@@ -779,8 +770,8 @@ int dup_routing_avps(AAAMessage *src, AAAMessage *dest)
 	avp = AAAFindMatchingAVP(
 			src, src->avpList.head, AVP_Origin_Realm, 0, AAA_FORWARD_SEARCH);
 	if(avp && avp->data.s && avp->data.len) {
-		LM_DBG("dup_routing_avps: Origin Realm AVP present, duplicating %.*s\n",
-				avp->data.len, avp->data.s);
+		LM_DBG("Origin Realm AVP present, duplicating %.*s\n", avp->data.len,
+				avp->data.s);
 		dest_realm = avp->data;
 		avp2 = AAAFindMatchingAVP(src, src->avpList.head, AVP_Destination_Realm,
 				0, AAA_FORWARD_SEARCH);
@@ -788,15 +779,12 @@ int dup_routing_avps(AAAMessage *src, AAAMessage *dest)
 			avp = AAACreateAVP(AVP_Destination_Realm, AAA_AVP_FLAG_MANDATORY, 0,
 					dest_realm.s, dest_realm.len, AVP_DUPLICATE_DATA);
 			if(!avp) {
-				LM_ERR("dup_routing_avps: Failed creating Destination Realm "
-					   "avp\n");
+				LM_ERR("Failed creating Destination Realm avp\n");
 				goto error;
 			}
 			if(AAAAddAVPToMessage(dest, avp, dest->avpList.tail)
 					!= AAA_ERR_SUCCESS) {
-				LM_ERR("dup_routing_avps: Failed adding Destination Realm avp "
-					   "to "
-					   "message\n");
+				LM_ERR("Failed adding Destination Realm avp to message\n");
 				AAAFreeAVP(&avp);
 				goto error;
 			}
@@ -813,7 +801,7 @@ void Send_ASA(cdp_session_t *s, AAAMessage *msg)
 	AAAMessage *asa;
 	char x[4];
 	AAA_AVP *avp;
-	LM_INFO("Send_ASA():  sending ASA\n");
+	LM_INFO("sending ASA\n");
 	if(!s) {
 		//send an ASA for UNKNOWN_SESSION_ID - use AAASendMessage()
 		// msg is the ASR received
@@ -853,7 +841,7 @@ void Send_ASA(cdp_session_t *s, AAAMessage *msg)
 				LM_INFO("success sending ASA\n");
 			}
 		} else if(!AAASendMessage(asa, 0, 0)) {
-			LM_ERR("Send_ASA() : error sending ASA\n");
+			LM_ERR("error sending ASA\n");
 		}
 	}
 }
@@ -916,21 +904,32 @@ void Send_STR(cdp_session_t *s, AAAMessage *msg)
 	str = AAACreateRequest(s->application_id, IMS_STR, Flag_Proxyable, s);
 
 	if(!str) {
-		LM_ERR("Send_STR(): error creating STR!\n");
+		LM_ERR("error creating STR!\n");
 		return;
 	}
 	if(!dup_routing_avps(msg, str)) {
-		LM_ERR("Send_STR(): error duplicating routing AVPs!\n");
+		LM_ERR("error duplicating routing AVPs!\n");
 		AAAFreeMessage(&str);
 		return;
 	}
 	if(s->vendor_id != 0
 			&& !add_vendor_specific_application_id_group(
 					str, s->vendor_id, s->application_id)) {
-		LM_ERR("Send_STR(): error adding Vendor-Id-Specific-Application-Id "
-			   "Group!\n");
+		LM_ERR("error adding Vendor-Id-Specific-Application-Id Group!\n");
 		AAAFreeMessage(&str);
 		return;
+	}
+
+	if(s->dest_host.len) {
+		/* Add Destination-Host AVP, if not already there */
+		avp = AAAFindMatchingAVP(str, str->avpList.head, AVP_Destination_Host,
+				0, AAA_FORWARD_SEARCH);
+		if(!avp) {
+			// Add Destination-Host AVP
+			avp = AAACreateAVP(AVP_Destination_Host, AAA_AVP_FLAG_MANDATORY, 0,
+					s->dest_host.s, s->dest_host.len, AVP_DUPLICATE_DATA);
+			AAAAddAVPToMessage(str, avp, str->avpList.tail);
+		}
 	}
 
 	//Richard added this - if timers expire dest realm is not here!

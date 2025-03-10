@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,6 +56,7 @@
 #include "../../modules/sl/sl.h"
 #include "../cdp/cdp_load.h"
 #include "../tm/tm_load.h"
+#include "../gcrypt/api.h"
 #include "authorize.h"
 #include "ims_auth_mod.h"
 #include "cxdx_mar.h"
@@ -70,12 +73,17 @@ static void destroy(void);
 static int mod_init(void);
 
 static int auth_fixup(void **param, int param_no);
+static int auth_fixup_free(void **param, int param_no);
 static int challenge_fixup_async(void **param, int param_no);
+static int challenge_fixup_async_free(void **param, int param_no);
 
-struct cdp_binds cdpb;
+struct cdp_binds cdpb = {0};
 
 /*! API structures */
-struct tm_binds tmb; /**< Structure with pointers to tm funcs 				*/
+struct tm_binds tmb = {
+		0}; /**< Structure with pointers to tm funcs 				*/
+
+gcrypt_api_t gcryptapi = {0};
 
 extern auth_hash_slot_t
 		*auth_data; /**< authentication vectors hast table 					*/
@@ -129,65 +137,81 @@ str scscf_name_str = str_init(
 /* used mainly in testing - load balancing with SIPP where we don't want to worry about auth */
 int ignore_failed_auth = 0;
 
+/* authentication vectors mode: 0 - diameter/hss; 1 - local */
+int ims_auth_av_mode = 0;
+
+static int w_ims_auth_data_set(
+		sip_msg_t *msg, char *_k, char *_op, char *_op_c, char *_amf);
+static int w_ims_auth_data_reset(sip_msg_t *msg, char *_p1, char *_p2);
+
+/* clang-format off */
 /*
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-		{"ims_www_authenticate", (cmd_function)www_authenticate, 1, auth_fixup,
-				0, REQUEST_ROUTE},
-		{"ims_www_challenge", (cmd_function)www_challenge2, 2,
-				challenge_fixup_async, 0, REQUEST_ROUTE},
-		{"ims_www_challenge", (cmd_function)www_challenge3, 3,
-				challenge_fixup_async, 0, REQUEST_ROUTE},
-		{"ims_www_resync_auth", (cmd_function)www_resync_auth, 2,
-				challenge_fixup_async, 0, REQUEST_ROUTE},
-		{"ims_proxy_authenticate", (cmd_function)proxy_authenticate, 1,
-				auth_fixup, 0, REQUEST_ROUTE},
-		{"ims_proxy_challenge", (cmd_function)proxy_challenge, 3,
-				challenge_fixup_async, 0, REQUEST_ROUTE},
-		{"bind_ims_auth", (cmd_function)bind_ims_auth, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0}};
+	{"ims_www_authenticate", (cmd_function)www_authenticate, 1,
+			auth_fixup, auth_fixup_free, REQUEST_ROUTE},
+	{"ims_www_challenge", (cmd_function)www_challenge2, 2,
+			challenge_fixup_async, challenge_fixup_async_free, REQUEST_ROUTE},
+	{"ims_www_challenge", (cmd_function)www_challenge3, 3,
+			challenge_fixup_async, challenge_fixup_async_free, REQUEST_ROUTE},
+	{"ims_www_resync_auth", (cmd_function)www_resync_auth, 2,
+			challenge_fixup_async, challenge_fixup_async_free, REQUEST_ROUTE},
+	{"ims_proxy_authenticate", (cmd_function)proxy_authenticate, 1,
+			auth_fixup, auth_fixup_free, REQUEST_ROUTE},
+	{"ims_proxy_challenge", (cmd_function)proxy_challenge, 3,
+			challenge_fixup_async, challenge_fixup_async_free, REQUEST_ROUTE},
+	{"ims_auth_data_set", (cmd_function)w_ims_auth_data_set, 4,
+			fixup_spve_all, fixup_free_spve_all, REQUEST_ROUTE},
+	{"ims_auth_data_reset", (cmd_function)w_ims_auth_data_reset, 0,
+			0, 0, REQUEST_ROUTE},
+	{"bind_ims_auth", (cmd_function)bind_ims_auth, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /*
  * Exported parameters
  */
 static param_export_t params[] = {{"name", PARAM_STR, &scscf_name_str},
-		{"auth_data_hash_size", INT_PARAM, &auth_data_hash_size},
-		{"auth_vector_timeout", INT_PARAM, &auth_vector_timeout},
-		{"auth_used_vector_timeout", INT_PARAM, &auth_used_vector_timeout},
-		{"auth_data_timeout", INT_PARAM, &auth_data_timeout},
-		{"max_nonce_reuse", INT_PARAM, &max_nonce_reuse},
-		{"add_authinfo_hdr", INT_PARAM, &add_authinfo_hdr},
-		{"av_request_at_once", INT_PARAM, &av_request_at_once},
-		{"av_request_at_sync", INT_PARAM, &av_request_at_sync},
-		{"registration_default_algorithm", PARAM_STR,
-				&registration_default_algorithm},
-		{"registration_qop", PARAM_STR, &registration_qop},
-		{"invite_qop", PARAM_STR, &invite_qop},
-		{"ignore_failed_auth", INT_PARAM, &ignore_failed_auth},
-		{"av_check_only_impu", INT_PARAM, &av_check_only_impu},
-		{"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
-		{"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
-		{"cxdx_dest_host", PARAM_STR, &cxdx_dest_host}, {0, 0, 0}};
+	{"auth_data_hash_size", PARAM_INT, &auth_data_hash_size},
+	{"auth_vector_timeout", PARAM_INT, &auth_vector_timeout},
+	{"auth_used_vector_timeout", PARAM_INT, &auth_used_vector_timeout},
+	{"auth_data_timeout", PARAM_INT, &auth_data_timeout},
+	{"max_nonce_reuse", PARAM_INT, &max_nonce_reuse},
+	{"add_authinfo_hdr", PARAM_INT, &add_authinfo_hdr},
+	{"av_request_at_once", PARAM_INT, &av_request_at_once},
+	{"av_request_at_sync", PARAM_INT, &av_request_at_sync},
+	{"av_mode", PARAM_INT, &ims_auth_av_mode},
+	{"registration_default_algorithm", PARAM_STR, &registration_default_algorithm},
+	{"registration_qop", PARAM_STR, &registration_qop},
+	{"invite_qop", PARAM_STR, &invite_qop},
+	{"ignore_failed_auth", PARAM_INT, &ignore_failed_auth},
+	{"av_check_only_impu", PARAM_INT, &av_check_only_impu},
+	{"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
+	{"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
+	{"cxdx_dest_host", PARAM_STR, &cxdx_dest_host}, {0, 0, 0}
+};
 
-stat_export_t mod_stats[] = {{"mar_avg_response_time", STAT_IS_FUNC,
-									 (stat_var **)get_avg_mar_response_time},
-		{"mar_timeouts", 0, (stat_var **)&stat_mar_timeouts}, {0, 0, 0}};
+stat_export_t mod_stats[] = {
+	{"mar_avg_response_time", STAT_IS_FUNC, (stat_var **)get_avg_mar_response_time},
+	{"mar_timeouts", 0, (stat_var **)&stat_mar_timeouts}, {0, 0, 0}
+};
 
 /*
  * Module interface
  */
 struct module_exports exports = {
-		"ims_auth", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,						 /* Exported functions */
-		params,						 /* Exported parameters */
-		0,							 /* exported RPC methods */
-		0,							 /* exported pseudo-variables */
-		0,							 /* response function */
-		mod_init,					 /* module initialization function */
-		0,							 /* child initialization function */
-		destroy						 /* destroy function */
+	"ims_auth", DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,						 /* Exported functions */
+	params,						 /* Exported parameters */
+	0,							 /* exported RPC methods */
+	0,							 /* exported pseudo-variables */
+	0,							 /* response function */
+	mod_init,					 /* module initialization function */
+	0,							 /* child initialization function */
+	destroy						 /* destroy function */
 };
+/* clang-format on */
 
 static int mod_init(void)
 {
@@ -224,16 +248,26 @@ static int mod_init(void)
 		max_nonce_reuse = 0;
 	}
 
-	/* load the CDP API */
-	if(load_cdp_api(&cdpb) != 0) {
-		LM_ERR("can't load CDP API\n");
-		return -1;
+	if(ims_auth_av_mode == 0) {
+		/* load the CDP API */
+		if(load_cdp_api(&cdpb) != 0) {
+			LM_ERR("can't load CDP API\n");
+			return -1;
+		}
 	}
 
 	/* load the TM API */
 	if(load_tm_api(&tmb) != 0) {
 		LM_ERR("can't load TM API\n");
 		return -1;
+	}
+
+	if(ims_auth_av_mode == 1) {
+		/* load the GCrypt API */
+		if(gcrypt_load_api(&gcryptapi) != 0) {
+			LM_ERR("can't load GCrypt API\n");
+			return -1;
+		}
 	}
 
 	/* Init the authorization data storage */
@@ -326,6 +360,18 @@ static int challenge_fixup_async(void **param, int param_no)
 	return 0;
 }
 
+static int challenge_fixup_async_free(void **param, int param_no)
+{
+
+	if(param_no == 1) {
+		fixup_free_spve_null(param, param_no);
+	} else {
+		fixup_free_fparam_all(param, 1);
+	}
+
+	return 0;
+}
+
 /*
  * Convert the char* parameters
  */
@@ -344,4 +390,48 @@ static int auth_fixup(void **param, int param_no)
 	}
 
 	return 0;
+}
+
+static int auth_fixup_free(void **param, int param_no)
+{
+	if(param_no == 1) {
+		fixup_free_fparam_all(param, param_no);
+	}
+
+	return 0;
+}
+
+static int w_ims_auth_data_set(
+		sip_msg_t *msg, char *_k, char *_op, char *_op_c, char *_amf)
+{
+	str k = STR_NULL;
+	str op = STR_NULL;
+	str op_c = STR_NULL;
+	str amf = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t *)_k, &k) != 0) {
+		LM_ERR("failed to get k parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)_op, &op) != 0) {
+		LM_ERR("failed to get op parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)_op_c, &op_c) != 0) {
+		LM_ERR("failed to get op_c parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)_amf, &amf) != 0) {
+		LM_ERR("failed to get amf parameter\n");
+		return -1;
+	}
+
+
+	return ims_auth_data_set(&k, &op, &op_c, &amf);
+}
+
+static int w_ims_auth_data_reset(sip_msg_t *msg, char *_p1, char *_p2)
+{
+	ims_auth_data_reset();
+	return 1;
 }

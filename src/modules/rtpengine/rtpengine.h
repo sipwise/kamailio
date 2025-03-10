@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -29,6 +31,19 @@
 
 #define RTPENGINE_MIN_RECHECK_TICKS 0
 #define RTPENGINE_MAX_RECHECK_TICKS ((unsigned int)-1)
+#define RTPENGINE_ALL_BRANCHES -1
+
+#define RTPENGINE_CALLER 0
+#define RTPENGINE_CALLEE 1
+
+#define RTP_SUBSCRIBE_MODE_SIPREC (1 << 0)
+#define RTP_SUBSCRIBE_MODE_DISABLE (1 << 1)
+
+#define RTP_SUBSCRIBE_LEG_CALLER (1 << 2)
+#define RTP_SUBSCRIBE_LEG_CALLEE (1 << 3)
+#define RTP_SUBSCRIBE_LEG_BOTH \
+	(RTP_SUBSCRIBE_LEG_CALLER | RTP_SUBSCRIBE_LEG_CALLEE)
+#define RTP_SUBSCRIBE_MAX_STREAMS 32
 
 enum rtpe_operation
 {
@@ -50,6 +65,9 @@ enum rtpe_operation
 	OP_PLAY_MEDIA,
 	OP_STOP_MEDIA,
 	OP_PLAY_DTMF,
+	OP_SUBSCRIBE_REQUEST,
+	OP_SUBSCRIBE_ANSWER,
+	OP_UNSUBSCRIBE,
 
 	OP_ANY,
 };
@@ -122,6 +140,28 @@ enum hash_algo_t
 	RTP_HASH_CALLID,
 	RTP_HASH_SHA1_CALLID,
 	RTP_HASH_CRC32_CALLID
+};
+
+struct rtpengine_session
+{
+	struct sip_msg *msg;
+	int branch;
+	str *callid;
+	str *from_tag;
+	str *to_tag;
+};
+
+struct rtpengine_stream
+{
+	int leg;	  /* corresponds to participant, 0: caller , 1: callee */
+	int medianum; /* sequentially numbered index of the media for each participant, starting with one */
+	int label;	  /* label of media stream */
+};
+
+struct rtpengine_streams
+{
+	int count;
+	struct rtpengine_stream streams[RTP_SUBSCRIBE_MAX_STREAMS];
 };
 
 #endif

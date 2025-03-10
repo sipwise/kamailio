@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -212,22 +214,22 @@ static pcre2_compile_context *lcr_ctx = NULL;
  * Other module types and variables
  */
 /* clang-format off */
-static int     gw_uri_avp_type;
-static int_str gw_uri_avp;
-static int     ruri_user_avp_type;
-static int_str ruri_user_avp;
-static int     tag_avp_type;
-static int_str tag_avp;
-static int     flags_avp_type;
-static int_str flags_avp;
-static int     rule_id_avp_type;
-static int_str rule_id_avp;
-static int     defunct_gw_avp_type;
-static int_str defunct_gw_avp;
-static int     lcr_id_avp_type;
-static int_str lcr_id_avp;
-static int     mt_pv_values_avp_type;
-static int_str mt_pv_values_avp;
+static avp_flags_t gw_uri_avp_type;
+static avp_name_t  gw_uri_avp;
+static avp_flags_t ruri_user_avp_type;
+static avp_name_t  ruri_user_avp;
+static avp_flags_t tag_avp_type;
+static avp_name_t  tag_avp;
+static avp_flags_t flags_avp_type;
+static avp_name_t  flags_avp;
+static avp_flags_t rule_id_avp_type;
+static avp_name_t  rule_id_avp;
+static avp_flags_t defunct_gw_avp_type;
+static avp_name_t  defunct_gw_avp;
+static avp_flags_t lcr_id_avp_type;
+static avp_name_t  lcr_id_avp;
+static avp_flags_t mt_pv_values_avp_type;
+static avp_name_t  mt_pv_values_avp;
 /* clang-format on */
 
 /* Pointer to rule hash table pointer table */
@@ -345,19 +347,19 @@ static param_export_t params[] = {
     {"tag_avp",                  PARAM_STRING, &tag_avp_param},
     {"flags_avp",                PARAM_STRING, &flags_avp_param},
     {"rule_id_avp",              PARAM_STRING, &rule_id_avp_param},
-    {"defunct_capability",       INT_PARAM, &defunct_capability_param},
+    {"defunct_capability",       PARAM_INT, &defunct_capability_param},
     {"defunct_gw_avp",           PARAM_STRING, &defunct_gw_avp_param},
     {"lcr_id_avp",               PARAM_STRING, &lcr_id_avp_param},
     {"mt_pv_values",             PARAM_STRING, &mt_pv_values_param},
     {"mtree",                    PARAM_STRING, &mtree_param},
-    {"lcr_count",                INT_PARAM, &lcr_count_param},
-    {"lcr_rule_hash_size",       INT_PARAM, &lcr_rule_hash_size_param},
-    {"lcr_gw_count",             INT_PARAM, &lcr_gw_count_param},
-    {"dont_strip_or_prefix_flag",INT_PARAM, &dont_strip_or_prefix_flag_param},
-    {"priority_ordering",        INT_PARAM, &priority_ordering_param},
-    {"fetch_rows",               INT_PARAM, &fetch_rows_param},
-    {"ping_interval",            INT_PARAM, &ping_interval_param},
-    {"ping_inactivate_threshold",  INT_PARAM, &ping_inactivate_threshold_param},
+    {"lcr_count",                PARAM_INT, &lcr_count_param},
+    {"lcr_rule_hash_size",       PARAM_INT, &lcr_rule_hash_size_param},
+    {"lcr_gw_count",             PARAM_INT, &lcr_gw_count_param},
+    {"dont_strip_or_prefix_flag",PARAM_INT, &dont_strip_or_prefix_flag_param},
+    {"priority_ordering",        PARAM_INT, &priority_ordering_param},
+    {"fetch_rows",               PARAM_INT, &fetch_rows_param},
+    {"ping_interval",            PARAM_INT, &ping_interval_param},
+    {"ping_inactivate_threshold",  PARAM_INT, &ping_inactivate_threshold_param},
     {"ping_valid_reply_codes",   PARAM_STR, &ping_valid_reply_codes_param},
     {"ping_from",                PARAM_STR, &ping_from_param},
     {"ping_socket",              PARAM_STR, &ping_socket_param},
@@ -446,7 +448,7 @@ static int mod_init(void)
 {
 	pv_spec_t *avp_spec;
 	str s;
-	unsigned short avp_flags;
+	avp_flags_t avp_flags;
 	unsigned int i;
 	char *at, *past, *sep;
 

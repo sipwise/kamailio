@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -785,7 +787,7 @@ int dlg_send_ka(dlg_cell_t *dlg, int dir)
 	if(di->loc_seq.value > 1)
 		di->loc_seq.value -= 2;
 	else
-		di->loc_seq.value -= 1;
+		di->loc_seq.value = 0;
 
 	LM_DBG("sending OPTIONS to %s\n",
 			(dir == DLG_CALLER_LEG) ? "caller" : "callee");

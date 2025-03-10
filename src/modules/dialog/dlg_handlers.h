@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -48,12 +50,11 @@
 /*!
  * \brief Initialize the dialog handlers
  * \param rr_param_p added record-route parameter
- * \param dlg_flag_p dialog flag
  * \param timeout_avp_p AVP for timeout setting
  * \param default_timeout_p default timeout
  * \param seq_match_mode_p matching mode
  */
-void init_dlg_handlers(char *rr_param, int dlg_flag, pv_spec_t *timeout_avp,
+void init_dlg_handlers(char *rr_param, pv_spec_t *timeout_avp,
 		int default_timeout, int seq_match_mode, int keep_proxy_rr);
 
 
@@ -179,5 +180,15 @@ void dlg_iuid_sfree(void *iuid);
  *
  */
 int dlg_manage(sip_msg_t *msg);
+
+/*!
+ *
+ */
+int dlg_set_state(sip_msg_t *msg, int istate);
+
+/*!
+ *
+ */
+int dlg_update_state(sip_msg_t *msg);
 
 #endif

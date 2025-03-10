@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -111,10 +113,13 @@ static int w_contact_param_check(sip_msg_t *msg, char *pnparam, char *p2);
 
 static int w_hdr_date_check(sip_msg_t *msg, char *ptdiff, char *p2);
 
+static int w_sip_parse_headers(sip_msg_t *msg, char *p1, char *p2);
+
 /* Fixup functions to be defined later */
 static int fixup_set_uri(void **param, int param_no);
 static int fixup_free_set_uri(void **param, int param_no);
 static int fixup_tel2sip(void **param, int param_no);
+static int fixup_free_tel2sip(void **param, int param_no);
 static int fixup_get_uri_param(void **param, int param_no);
 static int free_fixup_get_uri_param(void **param, int param_no);
 static int fixup_option(void **param, int param_no);
@@ -126,24 +131,24 @@ char *contact_flds_separator = DEFAULT_SEPARATOR;
 /* clang-format off */
 static cmd_export_t cmds[] = {
 	{"options_reply", (cmd_function)opt_reply, 0, 0, 0, REQUEST_ROUTE},
-	{"is_user", (cmd_function)is_user, 1, fixup_spve_null, 0,
+	{"is_user", (cmd_function)is_user, 1, fixup_spve_null, fixup_free_spve_null,
 			REQUEST_ROUTE | LOCAL_ROUTE},
 	{"has_totag", (cmd_function)w_has_totag, 0, 0, 0, ANY_ROUTE},
-	{"uri_param", (cmd_function)uri_param_1, 1, fixup_spve_null, 0,
+	{"uri_param", (cmd_function)uri_param_1, 1, fixup_spve_null, fixup_free_spve_null,
 			REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE},
-	{"uri_param", (cmd_function)uri_param_2, 2, fixup_spve_spve, 0,
+	{"uri_param", (cmd_function)uri_param_2, 2, fixup_spve_spve, fixup_free_spve_spve,
 			REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE},
-	{"uri_param_any", (cmd_function)w_uri_param_any, 1, fixup_spve_null, 0,
+	{"uri_param_any", (cmd_function)w_uri_param_any, 1, fixup_spve_null, fixup_free_spve_null,
 			REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE},
-	{"add_uri_param", (cmd_function)add_uri_param, 1, fixup_str_null, 0,
+	{"add_uri_param", (cmd_function)add_uri_param, 1, fixup_str_null, fixup_free_str_null,
 			REQUEST_ROUTE},
 	{"get_uri_param", (cmd_function)get_uri_param, 2, fixup_get_uri_param,
 			free_fixup_get_uri_param, REQUEST_ROUTE | LOCAL_ROUTE},
-	{"uri_param_rm", (cmd_function)w_uri_param_rm, 1, fixup_spve_null, 0,
+	{"uri_param_rm", (cmd_function)w_uri_param_rm, 1, fixup_spve_null, fixup_free_spve_null,
 			REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE},
-	{"tel2sip", (cmd_function)tel2sip, 3, fixup_tel2sip, 0,
+	{"tel2sip", (cmd_function)tel2sip, 3, fixup_tel2sip, fixup_free_tel2sip,
 			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
-	{"tel2sip2", (cmd_function)tel2sip2, 3, fixup_tel2sip, 0,
+	{"tel2sip2", (cmd_function)tel2sip2, 3, fixup_tel2sip, fixup_free_tel2sip,
 			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
 	{"is_uri", (cmd_function)is_uri, 1, fixup_spve_null,
 			fixup_free_spve_null, ANY_ROUTE},
@@ -158,15 +163,15 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE},
 	{"decode_contact_header", (cmd_function)decode_contact_header, 0, 0, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-	{"cmp_uri", (cmd_function)w_cmp_uri, 2, fixup_spve_spve, 0, ANY_ROUTE},
-	{"cmp_aor", (cmd_function)w_cmp_aor, 2, fixup_spve_spve, 0, ANY_ROUTE},
-	{"cmp_hdr_name", (cmd_function)w_cmp_hdr_name, 2, fixup_spve_spve, 0,
+	{"cmp_uri", (cmd_function)w_cmp_uri, 2, fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{"cmp_aor", (cmd_function)w_cmp_aor, 2, fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{"cmp_hdr_name", (cmd_function)w_cmp_hdr_name, 2, fixup_spve_spve, fixup_free_spve_spve,
 			ANY_ROUTE},
 	{"is_rpid_user_e164", (cmd_function)is_rpid_user_e164, 0, 0, 0,
 			REQUEST_ROUTE},
 	{"append_rpid_hf", (cmd_function)append_rpid_hf, 0, 0, 0,
 			REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE},
-	{"append_rpid_hf", (cmd_function)append_rpid_hf_p, 2, fixup_str_str, 0,
+	{"append_rpid_hf", (cmd_function)append_rpid_hf_p, 2, fixup_str_str, fixup_free_str_str,
 			REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE},
 	{"set_uri_user", (cmd_function)set_uri_user, 2, fixup_set_uri,
 			fixup_free_set_uri, ANY_ROUTE},
@@ -174,21 +179,23 @@ static cmd_export_t cmds[] = {
 			fixup_free_set_uri, ANY_ROUTE},
 	{"is_request", (cmd_function)w_is_request, 0, 0, 0, ANY_ROUTE},
 	{"is_reply", (cmd_function)w_is_reply, 0, 0, 0, ANY_ROUTE},
+	{"is_sip", (cmd_function)w_is_sip, 0, 0, 0, ANY_ROUTE},
+	{"is_http", (cmd_function)w_is_http, 0, 0, 0, ANY_ROUTE},
 	{"is_gruu", (cmd_function)w_is_gruu, 0, 0, 0, ANY_ROUTE},
-	{"is_gruu", (cmd_function)w_is_gruu, 1, fixup_spve_null, 0, ANY_ROUTE},
+	{"is_gruu", (cmd_function)w_is_gruu, 1, fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"is_supported", (cmd_function)w_is_supported, 1, fixup_option, 0,
 			ANY_ROUTE},
 	{"is_first_hop", (cmd_function)w_is_first_hop, 0, 0, 0, ANY_ROUTE},
 	{"is_first_hop", (cmd_function)w_is_first_hop, 1, fixup_igp_null,
 			fixup_free_igp_null, ANY_ROUTE},
-	{"is_tel_number", (cmd_function)is_tel_number, 1, fixup_spve_null, 0,
+	{"is_tel_number", (cmd_function)is_tel_number, 1, fixup_spve_null, fixup_free_spve_null,
 			ANY_ROUTE},
-	{"is_numeric", (cmd_function)is_numeric, 1, fixup_spve_null, 0,
+	{"is_numeric", (cmd_function)is_numeric, 1, fixup_spve_null, fixup_free_spve_null,
 			ANY_ROUTE},
-	{"is_alphanum", (cmd_function)ksr_is_alphanum, 1, fixup_spve_null, 0,
+	{"is_alphanum", (cmd_function)ksr_is_alphanum, 1, fixup_spve_null, fixup_free_spve_null,
 			ANY_ROUTE},
 	{"is_alphanumex", (cmd_function)ksr_is_alphanumex, 2, fixup_spve_spve,
-			0, ANY_ROUTE},
+			fixup_free_spve_spve, ANY_ROUTE},
 	{"sip_p_charging_vector", (cmd_function)sip_handle_pcv, 1,
 			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"contact_param_encode", (cmd_function)w_contact_param_encode, 2,
@@ -206,6 +213,7 @@ static cmd_export_t cmds[] = {
 			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"hdr_date_check", (cmd_function)w_hdr_date_check, 1, fixup_igp_null,
 			fixup_free_igp_null, ANY_ROUTE},
+	{"sip_parse_headers", (cmd_function)w_sip_parse_headers, 0, 0, 0, ANY_ROUTE},
 
 	{"bind_siputils", (cmd_function)bind_siputils, 1, 0, 0, 0},
 
@@ -357,6 +365,17 @@ static int fixup_tel2sip(void **param, int param_no)
 
 	LM_ERR("invalid parameter number <%d>\n", param_no);
 	return -1;
+}
+
+static int fixup_free_tel2sip(void **param, int param_no)
+{
+	if((param_no == 1) || (param_no == 2)) {
+		fixup_free_fparam_all(param, 1);
+	}
+	if(param_no == 3) {
+		fixup_free_pvar_null(param, 1);
+	}
+	return 0;
 }
 
 /* */
@@ -606,6 +625,28 @@ static int w_hdr_date_check(sip_msg_t *msg, char *ptdiff, char *p2)
 /**
  *
  */
+static int ki_sip_parse_headers(sip_msg_t *msg)
+{
+	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
+		return -1;
+	}
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_sip_parse_headers(sip_msg_t *msg, char *p1, char *p2)
+{
+	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
+		return -1;
+	}
+	return 1;
+}
+
+/**
+ *
+ */
 /* clang-format off */
 static sr_kemi_t sr_kemi_siputils_exports[] = {
 	{ str_init("siputils"), str_init("has_totag"),
@@ -620,6 +661,16 @@ static sr_kemi_t sr_kemi_siputils_exports[] = {
 	},
 	{ str_init("siputils"), str_init("is_reply"),
 		SR_KEMIP_INT, is_reply,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("siputils"), str_init("is_sip"),
+		SR_KEMIP_INT, ki_is_sip,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("siputils"), str_init("is_http"),
+		SR_KEMIP_INT, ki_is_http,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
@@ -756,6 +807,11 @@ static sr_kemi_t sr_kemi_siputils_exports[] = {
 	{ str_init("siputils"), str_init("add_uri_param"),
 		SR_KEMIP_INT, ki_add_uri_param,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("siputils"), str_init("sip_parse_headers"),
+		SR_KEMIP_INT, ki_sip_parse_headers,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

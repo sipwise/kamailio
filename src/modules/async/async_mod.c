@@ -43,6 +43,7 @@ MODULE_VERSION
 static int async_workers = 1;
 static int async_ms_timer = 0;
 static int async_return = 0;
+static int async_mode = 0;
 
 static int mod_init(void);
 static int child_init(int);
@@ -62,6 +63,9 @@ static int w_async_task_data(sip_msg_t *msg, char *rt, char *pdata);
 static int w_async_task_group_data(
 		sip_msg_t *msg, char *rt, char *gr, char *pdata);
 static int fixup_async_task_route(void **param, int param_no);
+
+static int w_async_tkv_emit(
+		sip_msg_t *msg, char *ptype, char *pkey, char *pval);
 
 /* tm */
 struct tm_binds tmb;
@@ -84,14 +88,17 @@ static cmd_export_t cmds[]={
 		0, ANY_ROUTE},
 	{"async_task_group_data", (cmd_function)w_async_task_group_data, 3, fixup_async_task_route,
 		0, ANY_ROUTE},
+	{"async_tkv_emit", (cmd_function)w_async_tkv_emit, 3, fixup_iss,
+		fixup_free_iss, ANY_ROUTE},
 
 	{0, 0, 0, 0, 0, 0}
 };
 
 static param_export_t params[]={
-	{"workers",     INT_PARAM,   &async_workers},
-	{"ms_timer",    INT_PARAM,   &async_ms_timer},
-	{"return",      INT_PARAM,   &async_return},
+	{"workers",     PARAM_INT,   &async_workers},
+	{"ms_timer",    PARAM_INT,   &async_ms_timer},
+	{"return",      PARAM_INT,   &async_return},
+	{"mode",        PARAM_INT,   &async_mode},
 	{0, 0, 0}
 };
 
@@ -127,13 +134,18 @@ static int mod_init(void)
 		return -1;
 	}
 
-	if(load_tm_api(&tmb) == -1) {
-		LM_ERR("cannot load the TM-functions. Missing TM module?\n");
-		return -1;
+	if(async_mode == 0) {
+		if(load_tm_api(&tmb) == -1) {
+			LM_ERR("cannot load the TM-functions. Missing TM module?\n");
+			return -1;
+		}
+	} else {
+		memset(&tmb, 0, sizeof(struct tm_binds));
 	}
 
-	if(async_workers <= 0)
+	if(async_workers <= 0) {
 		return 0;
+	}
 
 	if(async_init_timer_list() < 0) {
 		LM_ERR("cannot initialize internal structure\n");
@@ -168,8 +180,9 @@ static int child_init(int rank)
 	if(rank != PROC_MAIN)
 		return 0;
 
-	if(async_workers <= 0)
+	if(async_workers <= 0) {
 		return 0;
+	}
 
 	for(i = 0; i < async_workers; i++) {
 		if(fork_basic_timer(PROC_TIMER, "ASYNC MOD TIMER", 1 /*socks flag*/,
@@ -577,7 +590,7 @@ int ki_async_task_group_data(sip_msg_t *msg, str *rn, str *gn, str *sdata)
 		}
 	}
 
-	if(async_send_data(msg, act, rn, gn, sdata) < 0)
+	if(async_send_data(act, rn, gn, sdata) < 0)
 		return -1;
 	/* ok */
 	return 1;
@@ -642,6 +655,34 @@ static int w_async_task_group_data(
 	}
 
 	return ki_async_task_group_data(msg, &rn, &gn, &sdata);
+}
+
+/**
+ *
+ */
+static int w_async_tkv_emit(sip_msg_t *msg, char *ptype, char *pkey, char *pval)
+{
+	int ret = -1;
+	int vtype = 0;
+	str skey = STR_NULL;
+	str sval = STR_NULL;
+
+	if(fixup_get_ivalue(msg, (gparam_t *)ptype, &vtype) != 0) {
+		LM_ERR("failed getting type parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)pkey, &skey) != 0) {
+		LM_ERR("failed getting key parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)pval, &sval) != 0) {
+		LM_ERR("failed getting value parameter\n");
+		return -1;
+	}
+
+	ret = async_tkv_emit(vtype, skey.s, "%s", sval.s);
+
+	return (ret == 0) ? 1 : ret;
 }
 
 /**

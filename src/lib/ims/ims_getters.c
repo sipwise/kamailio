@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -538,6 +540,21 @@ str cscf_get_contact_from_requri(struct sip_msg *msg)
 done:
 	return pu;
 }
+
+/**
+ * Get the host from the Request URI of the message.
+ * Useful for example on MT, to get the destination from the Request URI, if P-Called-Party-ID is not present.
+ */
+str cscf_get_host_from_requri(struct sip_msg *msg)
+{
+	if(msg->first_line.type != SIP_REQUEST || parse_sip_msg_uri(msg) < 0
+			|| msg->parsed_uri.type == TEL_URI_T) {
+		str empty = {0};
+		return empty;
+	}
+	return msg->parsed_uri.host;
+}
+
 
 /**
  * Finds if the message contains the orig parameter in the first Route header
@@ -1286,20 +1303,21 @@ int cscf_get_p_charging_vector(
 	if(!header->body.s || !header->body.len)
 		return 0;
 
-	str_dup(header_body, header->body, pkg);
+	ims_str_dup(header_body, header->body, pkg);
 
 	LM_DBG("p_charging_vector body is %.*s\n", header_body.len, header_body.s);
 
 	p = strtok(header_body.s, " ;:\r\t\n\"=");
 loop:
-	if(p == NULL || p > (header_body.s + header_body.len))
+	if(p == NULL || p > (header_body.s + header_body.len)) {
 		return 1;
+	}
 
 	if(strncmp(p, "icid-value", 10) == 0) {
 		p = strtok(NULL, " ;:\r\t\n\"=");
 		if(p == NULL || p > (header_body.s + header_body.len)) {
 			LM_ERR("cscf_get_p_charging_vector: no value for icid\n");
-			return 0;
+			goto error;
 		}
 		temp.s = p;
 		temp.len = 0;
@@ -1315,11 +1333,10 @@ loop:
 		p = strtok(NULL, " ;:\r\t\n\"=");
 		goto loop;
 	} else if(strncmp(p, "orig-ioi", 8) == 0) {
-
 		p = strtok(NULL, " ;:\r\t\n\"=");
 		if(p == NULL || p > (header_body.s + header_body.len)) {
 			LM_ERR("cscf_get_p_charging_vector: no value for icid\n");
-			return 0;
+			goto error;
 		}
 		temp.s = p;
 		temp.len = 0;
@@ -1335,11 +1352,10 @@ loop:
 		p = strtok(NULL, " ;:\r\t\n\"=");
 		goto loop;
 	} else if(strncmp(p, "term-ioi", 8) == 0) {
-
 		p = strtok(NULL, " ;:\r\t\n\"=");
 		if(p == NULL || p > (header_body.s + header_body.len)) {
 			LM_ERR("cscf_get_p_charging_vector: no value for icid\n");
-			return 0;
+			goto error;
 		}
 		temp.s = p;
 		temp.len = 0;
@@ -1357,10 +1373,12 @@ loop:
 	}
 
 	LM_DBG("end\n");
-	str_free(header_body, pkg);
+	ims_str_free(header_body, pkg);
 	return 1;
 out_of_memory:
 	PKG_MEM_ERROR;
+error:
+	ims_str_free(header_body, pkg);
 	return 0;
 }
 
@@ -1638,7 +1656,7 @@ str *cscf_get_service_route(struct sip_msg *msg, int *size, int is_shm)
 			}
 			x = pkg_reallocxf(x, (*size + k) * sizeof(str));
 			if(!x) {
-				LM_ERR("Error our of pkg memory");
+				LM_ERR("Error out of pkg memory");
 				return 0;
 			}
 			r2 = r;

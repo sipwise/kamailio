@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -29,8 +31,8 @@ typedef int (*siputils_is_uri_user_e164_t)(str *);
 /*! Siputils module API */
 typedef struct siputils_api
 {
-	int_str rpid_avp;  /*!< Name of AVP containing Remote-Party-ID */
-	int rpid_avp_type; /*!< type of the RPID AVP */
+	avp_name_t rpid_avp;	   /*!< Name of AVP containing Remote-Party-ID */
+	avp_flags_t rpid_avp_type; /*!< type of the RPID AVP */
 	siputils_has_totag_t has_totag;
 	siputils_is_uri_user_e164_t is_uri_user_e164;
 } siputils_api_t;

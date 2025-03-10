@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -121,11 +123,11 @@ static param_export_t params[] = {{"db_url", PARAM_STR, &db_url},
 		{"domain_column", PARAM_STR, &domain_column},
 		{"password_column", PARAM_STR, &pass_column},
 		{"password_column_2", PARAM_STR, &pass_column_2},
-		{"calculate_ha1", INT_PARAM, &calc_ha1},
-		{"use_domain", INT_PARAM, &use_domain},
+		{"calculate_ha1", PARAM_INT, &calc_ha1},
+		{"use_domain", PARAM_INT, &use_domain},
 		{"load_credentials", PARAM_STRING, &credentials_list},
-		{"version_table", INT_PARAM, &version_table_check},
-		{"force_generate_avps", INT_PARAM, &force_generate_avps}, {0, 0, 0}};
+		{"version_table", PARAM_INT, &version_table_check},
+		{"force_generate_avps", PARAM_INT, &force_generate_avps}, {0, 0, 0}};
 
 
 /*

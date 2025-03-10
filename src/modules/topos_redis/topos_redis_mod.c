@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -47,24 +49,29 @@ topos_api_t _tps_api = {0};
 
 ndb_redis_api_t _tps_redis_api = {0};
 
-static cmd_export_t cmds[] = {{0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {
-		{"serverid", PARAM_STR, &_topos_redis_serverid}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"topos_redis",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* exported rpc functions */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* per child init function */
-		mod_destroy		 /* destroy function */
+/* clang-format off */
+static cmd_export_t cmds[] = {
+	{0, 0, 0, 0, 0, 0}
 };
 
+static param_export_t params[] = {
+	{"serverid", PARAM_STR, &_topos_redis_serverid},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"topos_redis",   /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			       /* exported functions */
+	params,          /* exported parameters */
+	0,               /* exported rpc functions */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per child init function */
+	mod_destroy      /* destroy function */
+};
+/* clang-format on */
 
 /**
  *

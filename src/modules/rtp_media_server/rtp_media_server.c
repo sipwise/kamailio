@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -43,8 +45,11 @@ static int child_init(int);
 static rms_dialog_info_t *rms_dialog_create_leg(
 		rms_dialog_info_t *di, struct sip_msg *msg);
 static int fixup_rms_action_play(void **param, int param_no);
+static int fixup_free_rms_action_play(void **param, int param_no);
 static int fixup_rms_bridge(void **param, int param_no);
+static int fixup_free_rms_bridge(void **param, int param_no);
 static int fixup_rms_answer(void **param, int param_no);
+static int fixup_free_rms_answer(void **param, int param_no);
 static int rms_hangup_call(rms_dialog_info_t *di);
 static int rms_bridging_call(rms_dialog_info_t *di, rms_action_t *a);
 static int rms_bridged_call(rms_dialog_info_t *di, rms_action_t *a);
@@ -59,20 +64,21 @@ static int rms_bridge_f(struct sip_msg *, char *, char *);
 static int rms_update_media_sockets(
 		struct sip_msg *msg, rms_dialog_info_t *di, rms_sdp_info_t *sdp_info);
 
-static cmd_export_t cmds[] = {{"rms_answer", (cmd_function)rms_answer_f, 1,
-									  fixup_rms_answer, 0, EVENT_ROUTE},
-		{"rms_sip_request", (cmd_function)rms_sip_request_f, 0, 0, 0,
-				EVENT_ROUTE},
-		{"rms_play", (cmd_function)rms_action_play_f, 2, fixup_rms_action_play,
-				0, ANY_ROUTE},
-		{"rms_dialog_check", (cmd_function)rms_dialog_check_f, 0, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"rms_hangup", (cmd_function)rms_hangup_f, 0, 0, 0, EVENT_ROUTE},
-		{"rms_bridge", (cmd_function)rms_bridge_f, 2, fixup_rms_bridge, 0,
-				ANY_ROUTE},
-		{"rms_dialogs_dump", (cmd_function)rms_dialogs_dump_f, 0, 0, 0,
-				ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+/* clang-format off */
+static cmd_export_t cmds[] = {
+	{"rms_answer", (cmd_function)rms_answer_f, 1,
+		fixup_rms_answer, fixup_free_rms_answer, EVENT_ROUTE},
+	{"rms_sip_request", (cmd_function)rms_sip_request_f, 0, 0, 0, EVENT_ROUTE},
+	{"rms_play", (cmd_function)rms_action_play_f, 2,
+		fixup_rms_action_play, fixup_free_rms_action_play, ANY_ROUTE},
+	{"rms_dialog_check", (cmd_function)rms_dialog_check_f, 0,
+		0, 0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"rms_hangup", (cmd_function)rms_hangup_f, 0, 0, 0, EVENT_ROUTE},
+	{"rms_bridge", (cmd_function)rms_bridge_f, 2,
+		fixup_rms_bridge, fixup_free_rms_bridge, ANY_ROUTE},
+	{"rms_dialogs_dump", (cmd_function)rms_dialogs_dump_f, 0, 0, 0, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t mod_params[] = {
 		{"log_file_name", PARAM_STR, &log_fn}, {0, 0, 0}};
@@ -89,6 +95,7 @@ struct module_exports exports = {
 		child_init,
 		mod_destroy,
 };
+/* clang-format on */
 
 static void run_action_route(rms_dialog_info_t *di, char *route)
 {
@@ -154,6 +161,13 @@ static int fixup_rms_bridge(void **param, int param_no)
 	return -1;
 }
 
+static int fixup_free_rms_bridge(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2)
+		return fixup_free_spve_null(param, 1);
+	return 0;
+}
+
 static int fixup_rms_answer(void **param, int param_no)
 {
 	if(param_no == 1 || param_no == 2)
@@ -162,12 +176,26 @@ static int fixup_rms_answer(void **param, int param_no)
 	return -1;
 }
 
+static int fixup_free_rms_answer(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2)
+		return fixup_free_spve_null(param, 1);
+	return 0;
+}
+
 static int fixup_rms_action_play(void **param, int param_no)
 {
 	if(param_no == 1 || param_no == 2 || param_no == 3)
 		return fixup_spve_null(param, 1);
 	LM_ERR("invalid parameter count [%d]\n", param_no);
 	return -1;
+}
+
+static int fixup_free_rms_action_play(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2)
+		return fixup_free_spve_null(param, 1);
+	return 0;
 }
 
 /**

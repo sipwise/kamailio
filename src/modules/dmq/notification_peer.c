@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -389,7 +391,9 @@ int extract_node_list(dmq_node_list_t *update_list, struct sip_msg *msg)
 	end = body.s + body.len;
 
 	/* acquire big list lock */
+	LM_DBG("trying to acquire dmq_node_list->lock\n");
 	lock_get(&update_list->lock);
+	LM_DBG("acquired dmq_node_list->lock\n");
 	while(tmp < end) {
 		match = q_memchr(tmp, '\n', end - tmp);
 		if(match) {
@@ -441,9 +445,11 @@ int extract_node_list(dmq_node_list_t *update_list, struct sip_msg *msg)
 
 	/* release big list lock */
 	lock_release(&update_list->lock);
+	LM_DBG("released dmq_node_list->lock\n");
 	return total_nodes;
 error:
 	lock_release(&update_list->lock);
+	LM_DBG("released dmq_node_list->lock\n");
 	return -1;
 }
 
@@ -549,7 +555,9 @@ str *build_notification_body()
 		return NULL;
 	}
 	/* we add each server to the body - each on a different line */
+	LM_DBG("trying to acquire dmq_node_list->lock\n");
 	lock_get(&dmq_node_list->lock);
+	LM_DBG("acquired dmq_node_list->lock\n");
 	cur_node = dmq_node_list->nodes;
 	while(cur_node) {
 		if(cur_node->local || cur_node->status == DMQ_NODE_ACTIVE) {
@@ -568,10 +576,12 @@ str *build_notification_body()
 		cur_node = cur_node->next;
 	}
 	lock_release(&dmq_node_list->lock);
+	LM_DBG("released dmq_node_list->lock\n");
 	body->len = clen;
 	return body;
 error:
 	lock_release(&dmq_node_list->lock);
+	LM_DBG("released dmq_node_list->lock\n");
 	pkg_free(body->s);
 	pkg_free(body);
 	return NULL;

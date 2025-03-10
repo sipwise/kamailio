@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -92,6 +94,7 @@ static db_param_list_t *db_param_list_new(const char *db_filename)
 	if(!e->database.s)
 		goto error;
 	strcpy(e->database.s, db_filename);
+	e->busy_timeout = -1;
 
 	db_param_list_add(e);
 	return e;
@@ -163,7 +166,8 @@ int db_set_journal_mode(modparam_t type, void *val)
 		goto error;
 	// PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
 	for(pit = params_list; pit; pit = pit->next) {
-		LM_DBG("[param][%.*s]\n", pit->name.len, pit->name.s);
+		LM_DBG("parsing journal mode [param][%.*s][%.*s]\n", pit->name.len,
+				pit->name.s, pit->body.len, pit->body.s);
 		if(pit->body.len == 3 && strncasecmp(pit->body.s, "WAL", 3)) {
 			db_set_journal_mode_entry(pit->name, pit->body);
 		} else if(pit->body.len == 6 && strncasecmp(pit->body.s, "DELETE", 6)) {
@@ -206,11 +210,59 @@ int db_set_readonly(modparam_t type, void *val)
 	return 1;
 }
 
+int db_set_busy_timeout(modparam_t type, void *val)
+{
+	param_t *params_list = NULL;
+	param_hooks_t phooks;
+	param_t *pit = NULL;
+	str s;
+
+	if(val == NULL)
+		return -1;
+
+	s.s = (char *)val;
+	s.len = strlen(s.s);
+	if(s.len <= 0)
+		return -1;
+	if(s.s[s.len - 1] == ';')
+		s.len--;
+
+	if(parse_params(&s, CLASS_ANY, &phooks, &params_list) < 0)
+		goto error;
+	for(pit = params_list; pit; pit = pit->next) {
+		LM_DBG("parsing busy timeout [%.*s][%.*s]\n", pit->name.len,
+				pit->name.s, pit->body.len, pit->body.s);
+
+		db_param_list_t *e = db_param_list_search(pit->name);
+		if(!e)
+			e = db_param_list_new(pit->name.s);
+		if(!e) {
+			LM_ERR("can't create a new db_param for [%s]\n", pit->name.s);
+			return -1;
+		}
+		if(str2int(&(pit->body), (unsigned int *)&(e->busy_timeout)) != 0) {
+			LM_ERR("can't convert db_param busy_timeout to int\n");
+			goto error;
+		}
+		LM_DBG("parsed busy_timeout value '%d'\n", e->busy_timeout);
+	}
+
+	if(params_list != NULL)
+		free_params(params_list);
+	return 1;
+error:
+	if(params_list != NULL)
+		free_params(params_list);
+	return -1;
+}
+
 static param_export_t params[] = {
-		{"db_set_readonly", PARAM_STRING | USE_FUNC_PARAM,
+		{"db_set_readonly", PARAM_STRING | PARAM_USE_FUNC,
 				(void *)db_set_readonly},
-		{"db_set_journal_mode", PARAM_STRING | USE_FUNC_PARAM,
+		{"db_set_journal_mode", PARAM_STRING | PARAM_USE_FUNC,
 				(void *)db_set_journal_mode},
+		{"db_set_busy_timeout", PARAM_STRING | PARAM_USE_FUNC,
+				(void *)db_set_busy_timeout},
 		{0, 0, 0}};
 
 static cmd_export_t cmds[] = {

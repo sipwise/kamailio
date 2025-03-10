@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -123,7 +125,9 @@ static int alter_mediaip(struct sip_msg *, str *, str *, int, str *, int, int);
 static int fix_nated_register_f(struct sip_msg *, char *, char *);
 static int fixup_fix_nated_register(void **param, int param_no);
 static int fixup_fix_sdp(void **param, int param_no);
+static int fixup_free_fix_sdp(void **param, int param_no);
 static int fixup_add_contact_alias(void **param, int param_no);
+static int fixup_free_add_contact_alias(void **param, int param_no);
 static int add_rcv_param_f(struct sip_msg *, char *, char *);
 static int nh_sip_reply_received(sip_msg_t *msg);
 static int test_sdp_cline(struct sip_msg *msg);
@@ -184,8 +188,8 @@ static int natping_processes = 1;
 static str nortpproxy_str = str_init("a=nortpproxy:yes");
 
 static char *rcv_avp_param = NULL;
-static unsigned short rcv_avp_type = 0;
-static int_str rcv_avp_name;
+static avp_flags_t rcv_avp_type = 0;
+static avp_name_t rcv_avp_name;
 
 static char *natping_socket = NULL;
 static int udpping_from_path = 0;
@@ -212,7 +216,7 @@ static cmd_export_t cmds[] = {
 		0, 0,
 		REQUEST_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
 	{"add_contact_alias",  (cmd_function)add_contact_alias_3_f,  3,
-		fixup_add_contact_alias, 0,
+		fixup_add_contact_alias, fixup_free_add_contact_alias,
 		REQUEST_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
 	{"set_contact_alias",  (cmd_function)set_contact_alias_f,  0,
 		0, 0,
@@ -226,13 +230,13 @@ static cmd_export_t cmds[] = {
 		fixup_igp_null, fixup_free_igp_null,
 		REQUEST_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
 	{"fix_nated_sdp",      (cmd_function)fix_nated_sdp_f,        1,
-		fixup_fix_sdp,  0,
+		fixup_fix_sdp,  fixup_free_fix_sdp,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
 	{"fix_nated_sdp",      (cmd_function)fix_nated_sdp_f,        2,
-		fixup_fix_sdp, 0,
+		fixup_fix_sdp, fixup_free_fix_sdp,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
 	{"nat_uac_test",       (cmd_function)nat_uac_test_f,         1,
-		fixup_igp_null, 0,
+		fixup_igp_null, fixup_free_igp_null,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
 	{"fix_nated_register", (cmd_function)fix_nated_register_f,   0,
 		fixup_fix_nated_register, 0,
@@ -241,10 +245,10 @@ static cmd_export_t cmds[] = {
 		0, 0,
 		REQUEST_ROUTE },
 	{"add_rcv_param",      (cmd_function)add_rcv_param_f,        1,
-		fixup_igp_null, 0,
+		fixup_igp_null, fixup_free_igp_null,
 		REQUEST_ROUTE },
 	{"is_rfc1918",         (cmd_function)is_rfc1918_f,           1,
-		fixup_spve_null, 0,
+		fixup_spve_null, fixup_free_spve_null,
 		ANY_ROUTE },
 		{"set_alias_to_pv",   (cmd_function)w_set_alias_to_pv,     1,
 		0, 0, ANY_ROUTE },
@@ -260,22 +264,22 @@ static pv_export_t mod_pvs[] = {
 };
 
 static param_export_t params[] = {
-	{"natping_interval",      INT_PARAM, &natping_interval      },
-	{"ping_nated_only",       INT_PARAM, &ping_nated_only       },
+	{"natping_interval",      PARAM_INT, &natping_interval      },
+	{"ping_nated_only",       PARAM_INT, &ping_nated_only       },
 	{"nortpproxy_str",        PARAM_STR, &nortpproxy_str      },
 	{"received_avp",          PARAM_STRING, &rcv_avp_param         },
 	{"force_socket",          PARAM_STR, &force_socket_str      },
 	{"sipping_from",          PARAM_STR, &sipping_from        },
 	{"sipping_method",        PARAM_STR, &sipping_method      },
-	{"sipping_bflag",         INT_PARAM, &sipping_flag          },
-	{"natping_disable_bflag", INT_PARAM, &natping_disable_flag  },
-	{"natping_processes",     INT_PARAM, &natping_processes     },
+	{"sipping_bflag",         PARAM_INT, &sipping_flag          },
+	{"natping_disable_bflag", PARAM_INT, &natping_disable_flag  },
+	{"natping_processes",     PARAM_INT, &natping_processes     },
 	{"natping_socket",        PARAM_STRING, &natping_socket        },
-	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
-	{"udpping_from_path",     INT_PARAM, &udpping_from_path     },
-	{"append_sdp_oldmediaip", INT_PARAM, &sdp_oldmediaip        },
-	{"filter_server_id",      INT_PARAM, &nh_filter_srvid },
-	{"nat_addr_mode",         INT_PARAM, &nh_nat_addr_mode },
+	{"keepalive_timeout",     PARAM_INT, &nh_keepalive_timeout  },
+	{"udpping_from_path",     PARAM_INT, &udpping_from_path     },
+	{"append_sdp_oldmediaip", PARAM_INT, &sdp_oldmediaip        },
+	{"filter_server_id",      PARAM_INT, &nh_filter_srvid },
+	{"nat_addr_mode",         PARAM_INT, &nh_nat_addr_mode },
 	{"alias_name",            PARAM_STR, &nh_alias_name    },
 
 	{0, 0, 0}
@@ -331,6 +335,20 @@ static int fixup_fix_sdp(void **param, int param_no)
 	return -1;
 }
 
+static int fixup_free_fix_sdp(void **param, int param_no)
+{
+	if(param_no == 1) {
+		/* flags */
+		return fixup_free_igp_null(param, param_no);
+	}
+	if(param_no == 2) {
+		/* new IP */
+		return fixup_free_spve_all(param, param_no);
+	}
+	LM_ERR("unexpected param no: %d\n", param_no);
+	return -1;
+}
+
 static int fixup_fix_nated_register(void **param, int param_no)
 {
 	if(rcv_avp_name.n == 0) {
@@ -345,6 +363,15 @@ static int fixup_add_contact_alias(void **param, int param_no)
 {
 	if((param_no >= 1) && (param_no <= 3))
 		return fixup_spve_null(param, 1);
+
+	LM_ERR("invalid parameter number <%d>\n", param_no);
+	return -1;
+}
+
+static int fixup_free_add_contact_alias(void **param, int param_no)
+{
+	if((param_no >= 1) && (param_no <= 3))
+		return fixup_free_spve_null(param, 1);
 
 	LM_ERR("invalid parameter number <%d>\n", param_no);
 	return -1;

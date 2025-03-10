@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -221,8 +223,7 @@ static bool test_private_via(struct sip_msg *msg);
 static int mod_init(void);
 static int child_init(int rank);
 static void mod_destroy(void);
-static int preprocess_request(
-		struct sip_msg *msg, unsigned int flags, void *param);
+
 static int reply_filter(struct sip_msg *reply);
 
 static int pv_parse_nat_contact_name(pv_spec_p sp, str *in);
@@ -248,7 +249,6 @@ struct tm_binds tm_api;
 struct dlg_binds dlg_api;
 bool have_dlg_api = false;
 
-static int dialog_flag = -1;
 static unsigned dialog_default_timeout = 12 * 3600; // 12 hours
 static int natt_contact_match = 0;
 
@@ -257,69 +257,81 @@ stat_var *registered_endpoints = 0;
 stat_var *subscribed_endpoints = 0;
 stat_var *dialog_endpoints = 0;
 
-static NetInfo rfc1918nets[] = {{"10.0.0.0", 0x0a000000UL, 0xff000000UL},
-		{"172.16.0.0", 0xac100000UL, 0xfff00000UL},
-		{"192.168.0.0", 0xc0a80000UL, 0xffff0000UL},
-		{"100.64.0.0", 0x64400000UL,
-				0xffc00000UL}, // include rfc6598 shared address space as technically the same for our purpose
-		{"192.0.0.0", 0xc0000000UL,
-				0xfffffff8UL}, // include rfc7335 IPv4 Service Continuity Prefix
-		{NULL, 0UL, 0UL}};
-
-static NatTest NAT_Tests[] = {{NTPrivateContact, test_private_contact},
-		{NTSourceAddress, test_source_address},
-		{NTPrivateVia, test_private_via}, {NTNone, NULL}};
-
 /** SL API structure */
 sl_api_t slb;
 
+/* clang-format off */
+static NetInfo rfc1918nets[] = {
+	{"10.0.0.0", 0x0a000000UL, 0xff000000UL},
+	{"172.16.0.0", 0xac100000UL, 0xfff00000UL},
+	{"192.168.0.0", 0xc0a80000UL, 0xffff0000UL},
+	// include rfc6598 shared address space as technically the same for our purpose
+	{"100.64.0.0", 0x64400000UL, 0xffc00000UL},
+	// include rfc7335 IPv4 Service Continuity Prefix
+	{"192.0.0.0", 0xc0000000UL, 0xfffffff8UL},
+	{NULL, 0UL, 0UL}
+};
+
+static NatTest NAT_Tests[] = {
+	{NTPrivateContact, test_private_contact},
+	{NTSourceAddress, test_source_address},
+	{NTPrivateVia, test_private_via},
+	{NTNone, NULL}
+};
+
 static cmd_export_t commands[] = {
-		{"nat_keepalive", (cmd_function)w_NAT_Keepalive, 0, NULL, 0,
-				REQUEST_ROUTE},
-		{"fix_contact", (cmd_function)w_FixContact, 0, NULL, 0, ANY_ROUTE},
-		{"client_nat_test", (cmd_function)w_ClientNatTest, 1, fixup_igp_null, 0,
-				ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"nat_keepalive", (cmd_function)w_NAT_Keepalive, 0,
+		0, 0, REQUEST_ROUTE},
+	{"fix_contact", (cmd_function)w_FixContact, 0,
+		0, 0, ANY_ROUTE},
+	{"client_nat_test", (cmd_function)w_ClientNatTest, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t parameters[] = {
-		{"keepalive_interval", INT_PARAM, &keepalive_interval},
-		{"keepalive_method", PARAM_STRING, &keepalive_params.method},
-		{"keepalive_from", PARAM_STRING, &keepalive_params.from},
-		{"keepalive_extra_headers", PARAM_STRING,
-				&keepalive_params.extra_headers},
-		{"keepalive_state_file", PARAM_STRING, &keepalive_state_file},
-		{"contact_match", PARAM_INT, &natt_contact_match},
+	{"keepalive_interval", PARAM_INT, &keepalive_interval},
+	{"keepalive_method", PARAM_STRING, &keepalive_params.method},
+	{"keepalive_from", PARAM_STRING, &keepalive_params.from},
+	{"keepalive_extra_headers", PARAM_STRING, &keepalive_params.extra_headers},
+	{"keepalive_state_file", PARAM_STRING, &keepalive_state_file},
+	{"contact_match", PARAM_INT, &natt_contact_match},
 
-		{0, 0, 0}};
+	{0, 0, 0}
+};
 
 static pv_export_t pvars[] = {
-		{str_init("keepalive.socket"), PVT_OTHER, pv_get_keepalive_socket, NULL,
-				pv_parse_nat_contact_name, NULL, NULL, 0},
-		{str_init("source_uri"), PVT_OTHER, pv_get_source_uri, NULL, NULL, NULL,
-				NULL, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
+	{str_init("keepalive.socket"), PVT_OTHER, pv_get_keepalive_socket, NULL,
+		pv_parse_nat_contact_name, NULL, NULL, 0},
+	{str_init("source_uri"), PVT_OTHER, pv_get_source_uri, NULL, NULL, NULL,
+		NULL, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
 
 #ifdef STATISTICS
 static stat_export_t statistics[] = {
-		{"keepalive_endpoints", STAT_NO_RESET, &keepalive_endpoints},
-		{"registered_endpoints", STAT_NO_RESET, &registered_endpoints},
-		{"subscribed_endpoints", STAT_NO_RESET, &subscribed_endpoints},
-		{"dialog_endpoints", STAT_NO_RESET, &dialog_endpoints}, {0, 0, 0}};
+	{"keepalive_endpoints", STAT_NO_RESET, &keepalive_endpoints},
+	{"registered_endpoints", STAT_NO_RESET, &registered_endpoints},
+	{"subscribed_endpoints", STAT_NO_RESET, &subscribed_endpoints},
+	{"dialog_endpoints", STAT_NO_RESET, &dialog_endpoints},
+	{0, 0, 0}
+};
 #endif
 
 struct module_exports exports = {
-		"nat_traversal", // module name
-		DEFAULT_DLFLAGS, // dlopen flags
-		commands,		 // exported functions
-		parameters,		 // exported parameters
-		0,				 // exported RPC methods
-		pvars,			 // exported pseudo-variables
-		reply_filter,	 // reply processing function
-		mod_init,	// module init function (before fork. kids will inherit)
-		child_init, // child init function
-		mod_destroy // destroy function
+	"nat_traversal", // module name
+	DEFAULT_DLFLAGS, // dlopen flags
+	commands,		 // exported functions
+	parameters,		 // exported parameters
+	0,				 // exported RPC methods
+	pvars,			 // exported pseudo-variables
+	reply_filter,	 // reply processing function
+	mod_init,	// module init function (before fork. kids will inherit)
+	child_init, // child init function
+	mod_destroy // destroy function
 };
-
+/* clang-format on */
 
 // SIP_Dialog structure handling functions
 //
@@ -1415,8 +1427,6 @@ static int NAT_Keepalive(struct sip_msg *msg)
 				return -1;
 			}
 			msg->msg_flags |= FL_DO_KEEPALIVE;
-			setflag(msg,
-					dialog_flag); // have the dialog module trace this dialog
 			return 1;
 
 		default:
@@ -1813,36 +1823,24 @@ static int mod_init(void)
 
 	// bind to the dialog API
 	if(load_dlg_api(&dlg_api) == 0) {
-		// load dlg_flag and default_timeout parameters from the dialog module
-		param = find_param_export(
-				find_module_by_name("dialog"), "dlg_flag", INT_PARAM, &type);
-		if(param) {
+		// load default_timeout parameters from the dialog module
+		param = find_param_export(find_module_by_name("dialog"),
+				"default_timeout", PARAM_INT, &type);
+		if(!param) {
+			LM_ERR("cannot find default_timeout parameter in the dialog "
+				   "module\n");
+			return -1;
+		} else {
 			have_dlg_api = true;
 
-			dialog_flag = *param;
-
-			param = find_param_export(find_module_by_name("dialog"),
-					"default_timeout", INT_PARAM, &type);
-			if(!param) {
-				LM_ERR("cannot find default_timeout parameter in the dialog "
-					   "module\n");
-				return -1;
-			}
 			dialog_default_timeout = *param;
+
 
 			// register dialog creation callback
 			if(dlg_api.register_dlgcb(
 					   NULL, DLGCB_CREATED, __dialog_created, NULL, NULL)
 					!= 0) {
 				LM_ERR("cannot register callback for dialog creation\n");
-				return -1;
-			}
-
-			// register a pre-script callback to automatically enable dialog tracing
-			if(register_script_cb(
-					   preprocess_request, PRE_SCRIPT_CB | REQUEST_CB, 0)
-					!= 0) {
-				LM_ERR("could not register request preprocessing callback\n");
 				return -1;
 			}
 		}
@@ -1911,41 +1909,6 @@ static void mod_destroy(void)
 		nat_table = NULL;
 	}
 }
-
-
-// Preprocess a request before it is processed in the main script route
-//
-// Here we enable dialog tracing to be able to automatically extend an
-// existing registration keepalive to a destination, for the duration of
-// the dialog, even if the dialog source is not kept alive by explicitly
-// calling nat_keepalive(). This is needed to still be able to forward
-// messages to the callee, even if the registration keepalive expires
-// during the dialog and it is not renewed.
-//
-static int preprocess_request(
-		struct sip_msg *msg, unsigned int flags, void *_param)
-{
-	str totag;
-
-	if(msg->first_line.u.request.method_value != METHOD_INVITE)
-		return 1;
-
-	if(parse_headers(msg, HDR_TO_F, 0) == -1) {
-		LM_ERR("failed to parse To header\n");
-		return -1;
-	}
-	if(!msg->to) {
-		LM_ERR("missing To header\n");
-		return -1;
-	}
-	totag = get_to(msg)->tag_value;
-	if(totag.s == 0 || totag.len == 0) {
-		setflag(msg, dialog_flag);
-	}
-
-	return 1;
-}
-
 
 // Filter out replies to keepalive messages
 //

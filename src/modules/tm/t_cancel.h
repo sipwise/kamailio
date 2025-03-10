@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -67,8 +69,8 @@
 void prepare_to_cancel(struct cell *t, branch_bm_t *cancel_bm, branch_bm_t s);
 int cancel_uacs(struct cell *t, struct cancel_info *cancel_data, int flags);
 int cancel_all_uacs(struct cell *trans, int how);
-int cancel_branch(
-		struct cell *t, int branch, struct cancel_reason *reason, int flags);
+int cancel_branch(struct cell *t, int branch, sip_msg_t *cancel_msg,
+		struct cancel_reason *reason, int flags);
 
 typedef int (*cancel_uacs_f)(
 		struct cell *t, struct cancel_info *cancel_data, int flags);

@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -113,38 +115,44 @@ static void hashT_clean(unsigned int ticks, void *param);
 
 static int pua_rpc_init(void);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"pua_update_contact", (cmd_function)w_pua_update_contact, 0, 0, 0,
-				REQUEST_ROUTE},
-		{"bind_libxml_api", (cmd_function)bind_libxml_api, 1, 0, 0, 0},
-		{"bind_pua", (cmd_function)bind_pua, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0}};
+	{"pua_update_contact", (cmd_function)w_pua_update_contact, 0, 0, 0, REQUEST_ROUTE},
+	{"bind_libxml_api", (cmd_function)bind_libxml_api, 1, 0, 0, 0},
+	{"bind_pua", (cmd_function)bind_pua, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t params[] = {{"hash_size", INT_PARAM, &HASH_SIZE},
-		{"db_url", PARAM_STR, &db_url}, {"db_table", PARAM_STR, &db_table},
-		{"min_expires", INT_PARAM, &min_expires},
-		{"default_expires", INT_PARAM, &pua_default_expires},
-		{"update_period", INT_PARAM, &update_period},
-		{"outbound_proxy", PARAM_STR, &outbound_proxy},
-		{"dlginfo_increase_version", INT_PARAM, &dlginfo_increase_version},
-		{"reginfo_increase_version", INT_PARAM, &reginfo_increase_version},
-		{"check_remote_contact", INT_PARAM, &check_remote_contact},
-		{"db_mode", INT_PARAM, &dbmode},
-		{"fetch_rows", INT_PARAM, &pua_fetch_rows},
-		{"db_table_lock_write", INT_PARAM, &db_table_lock_write}, {0, 0, 0}};
+static param_export_t params[] = {
+	{"hash_size", PARAM_INT, &HASH_SIZE},
+	{"db_url", PARAM_STR, &db_url}, {"db_table", PARAM_STR, &db_table},
+	{"min_expires", PARAM_INT, &min_expires},
+	{"default_expires", PARAM_INT, &pua_default_expires},
+	{"update_period", PARAM_INT, &update_period},
+	{"outbound_proxy", PARAM_STR, &outbound_proxy},
+	{"dlginfo_increase_version", PARAM_INT, &dlginfo_increase_version},
+	{"reginfo_increase_version", PARAM_INT, &reginfo_increase_version},
+	{"check_remote_contact", PARAM_INT, &check_remote_contact},
+	{"db_mode", PARAM_INT, &dbmode},
+	{"fetch_rows", PARAM_INT, &pua_fetch_rows},
+	{"db_table_lock_write", PARAM_INT, &db_table_lock_write},
+	{0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
 		"pua",			 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* RPC method exports */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* per-child init function */
-		destroy			 /* module destroy function */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per-child init function */
+	destroy          /* module destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function
@@ -296,21 +304,13 @@ static int child_init(int rank)
 
 static void destroy(void)
 {
-	if(puacb_list)
-		destroy_puacb_list();
-
 	/* if dbmode is PUA_DB_ONLY, then HashT will be NULL
 	 * so db_update and destroy_htable won't get called */
 	if(pua_db && HashT)
 		db_update(0, 0);
 
-	if(HashT)
-		destroy_htable();
-
 	if(pua_db)
 		pua_dbf.close(pua_db);
-	if(pua_evlist)
-		destroy_pua_evlist();
 
 	return;
 }

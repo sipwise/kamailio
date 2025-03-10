@@ -314,7 +314,7 @@ int extract_candidate(str *body, sdp_stream_cell_t *stream)
 	int len, fl;
 	sdp_ice_attr_t *ice_attr;
 
-	if((body->len < 12) || (strncasecmp(body->s, "a=candidate:", 12) != 0)) {
+	if((body->len <= 12) || (strncasecmp(body->s, "a=candidate:", 12) != 0)) {
 		/*LM_DBG("We are not pointing to an a=candidate: attribute =>`%.*s'\n", body->len, body->s); */
 		return -1;
 	}
@@ -332,6 +332,10 @@ int extract_candidate(str *body, sdp_stream_cell_t *stream)
 
 	start = space + 1;
 	len = len - (space - start + 1);
+	if(start + len > body->s + body->len) {
+		LM_ERR("no component in `a=candidate'\n");
+		return -1;
+	}
 	space = memchr(start, 32, len);
 	if(space == NULL) {
 		LM_ERR("no component in `a=candidate'\n");
@@ -557,7 +561,7 @@ int extract_mediaip(str *body, str *mediaip, int *pf, char *line)
 	 * - for length, at least 6: ' IP[4|6] x...'
 	 * - white space after
 	 */
-	if(cp + 6 > mediaip->s + mediaip->len && cp[4] != ' ') {
+	if(cp + 6 > mediaip->s + mediaip->len || cp[4] != ' ') {
 		LM_ERR("invalid content for `%s' line\n", line);
 		return -1;
 	}
@@ -749,9 +753,10 @@ int extract_sess_version(str *oline, str *sess_version)
 
 /*
  * Auxiliary for some functions.
+ * - smode: if 1, pstart is pointing inside msg body
  * Returns pointer to first character of found line, or NULL if no such line.
  */
-char *find_sdp_line(char *pstart, char *plimit, char linechar)
+char *find_sdp_line_start(char *pstart, char *plimit, char linechar, int smode)
 {
 	static char linehead[3] = "x=";
 	char *cp, *cp1;
@@ -765,11 +770,14 @@ char *find_sdp_line(char *pstart, char *plimit, char linechar)
 		if(cp1 == NULL)
 			return NULL;
 		/*
-		 * As it is body, we assume it has previous line and we can
-		 * lookup previous character.
+		 * smode==1 means it is msg body, thus it has previous line and it can
+		 * lookup previous character even when cp1==pstart.
 		 */
-		if(cp1[-1] == '\n' || cp1[-1] == '\r')
-			return cp1;
+		if(cp1 > pstart || smode == 1) {
+			if(cp1[-1] == '\n' || cp1[-1] == '\r') {
+				return cp1;
+			}
+		}
 		/*
 		 * Having such data, but not at line beginning.
 		 * Skip them and reiterate. ser_memmem() will find next
@@ -781,6 +789,14 @@ char *find_sdp_line(char *pstart, char *plimit, char linechar)
 	}
 }
 
+/*
+ * Auxiliary for some functions - expect pstart to point inside SIP message body.
+ * Returns pointer to first character of found line, or NULL if no such line.
+ */
+char *find_sdp_line(char *pstart, char *plimit, char linechar)
+{
+	return find_sdp_line_start(pstart, plimit, linechar, 1);
+}
 
 /* This function assumes pstart points to a line of requested type. */
 char *find_next_sdp_line(

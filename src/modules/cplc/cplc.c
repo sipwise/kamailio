@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -125,21 +127,21 @@ static cmd_export_t cmds[] = {
 static param_export_t params[] = {{"db_url", PARAM_STR, &db_url},
 		{"db_table", PARAM_STR, &db_table},
 		{"cpl_dtd_file", PARAM_STRING, &dtd_file},
-		{"proxy_recurse", INT_PARAM, &cpl_env.proxy_recurse},
+		{"proxy_recurse", PARAM_INT, &cpl_env.proxy_recurse},
 		{"proxy_route", PARAM_STR, &proxy_route},
 		{"redirect_route", PARAM_STR, &redirect_route},
-		{"ignore3xx", INT_PARAM, &cpl_env.ignore3xx},
+		{"ignore3xx", PARAM_INT, &cpl_env.ignore3xx},
 		{"log_dir", PARAM_STRING, &cpl_env.log_dir},
-		{"case_sensitive", INT_PARAM, &cpl_env.case_sensitive},
+		{"case_sensitive", PARAM_INT, &cpl_env.case_sensitive},
 		{"realm_prefix", PARAM_STR, &cpl_env.realm_prefix},
 		{"lookup_domain", PARAM_STRING, &lookup_domain},
-		{"lookup_append_branches", INT_PARAM, &cpl_env.lu_append_branches},
+		{"lookup_append_branches", PARAM_INT, &cpl_env.lu_append_branches},
 		{"timer_avp", PARAM_STR, &timer_avp},
 		{"username_column", PARAM_STR, &cpl_username_col},
 		{"domain_column", PARAM_STR, &cpl_domain_col},
 		{"cpl_xml_column", PARAM_STR, &cpl_xml_col},
 		{"cpl_bin_column", PARAM_STR, &cpl_bin_col},
-		{"use_domain", INT_PARAM, &cpl_env.use_domain}, {0, 0, 0}};
+		{"use_domain", PARAM_INT, &cpl_env.use_domain}, {0, 0, 0}};
 
 
 struct module_exports exports = {
@@ -206,7 +208,7 @@ static int cpl_init(void)
 	char *ptr;
 	int val;
 	pv_spec_t avp_spec;
-	unsigned short avp_type;
+	avp_flags_t avp_type;
 
 	if(cpl_rpc_init() < 0) {
 		LM_ERR("failed to register RPC commands\n");

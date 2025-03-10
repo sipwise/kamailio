@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -49,12 +51,12 @@ extern int *failover_reply_codes_cnt;
 #endif
 
 /* fr_timer AVP specs */
-static int fr_timer_avp_type = 0;
-static int_str fr_timer_avp = {0};
+static avp_flags_t fr_timer_avp_type = 0;
+static avp_name_t fr_timer_avp = {0};
 static str fr_timer_str;
 static int fr_timer_index = 0;
-int fr_inv_timer_avp_type = 0;
-int_str fr_inv_timer_avp = {0};
+avp_flags_t fr_inv_timer_avp_type = 0;
+avp_name_t fr_inv_timer_avp = {0};
 static str fr_inv_timer_str;
 static int fr_inv_timer_index = 0;
 
@@ -87,23 +89,6 @@ int send_pr_buffer(struct retr_buf *rb, void *buf, int len
 
 void tm_shutdown()
 {
-
-	LM_DBG("start\n");
-
-#ifdef USE_DNS_FAILOVER
-	if(failover_reply_codes)
-		shm_free(failover_reply_codes);
-	if(failover_reply_codes_cnt)
-		shm_free(failover_reply_codes_cnt);
-#endif
-	/* destroy the hash table */
-	LM_DBG("emptying hash table\n");
-	free_hash_table();
-	LM_DBG("removing semaphores\n");
-	lock_cleanup();
-	LM_DBG("destroying tmcb lists\n");
-	destroy_tmcb_lists();
-	free_tm_stats();
 	LM_DBG("done\n");
 }
 
@@ -408,7 +393,7 @@ done:
 int init_avp_params(char *fr_timer_param, char *fr_inv_timer_param)
 {
 	pv_spec_t avp_spec;
-	unsigned short avp_type;
+	avp_flags_t avp_type;
 
 	if(fr_timer_param && *fr_timer_param) {
 		fr_timer_str.s = fr_timer_param;
@@ -483,7 +468,8 @@ int init_avp_params(char *fr_timer_param, char *fr_inv_timer_param)
  * @return 0 on success (use *timer) or 1 on failure (avp non-existent,
  *  avp present  but empty/0, avp value not numeric).
  */
-static inline int avp2timer(unsigned int *timer, int type, int_str name)
+static inline int avp2timer(
+		unsigned int *timer, avp_flags_t type, avp_name_t name)
 {
 	struct usr_avp *avp;
 	int_str val_istr;

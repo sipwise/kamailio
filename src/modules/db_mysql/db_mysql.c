@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -96,10 +98,10 @@ static param_export_t params[] = {
 		{"retries", PARAM_INT, &my_retries},
 		{"server_timezone", PARAM_INT, &my_server_timezone},
 
-		{"timeout_interval", INT_PARAM, &db_mysql_timeout_interval},
-		{"auto_reconnect", INT_PARAM, &db_mysql_auto_reconnect},
-		{"insert_delayed", INT_PARAM, &db_mysql_insert_all_delayed},
-		{"update_affected_found", INT_PARAM, &db_mysql_update_affected_found},
+		{"timeout_interval", PARAM_INT, &db_mysql_timeout_interval},
+		{"auto_reconnect", PARAM_INT, &db_mysql_auto_reconnect},
+		{"insert_delayed", PARAM_INT, &db_mysql_insert_all_delayed},
+		{"update_affected_found", PARAM_INT, &db_mysql_update_affected_found},
 		{"unsigned_type", PARAM_INT, &db_mysql_unsigned_type},
 		{"opt_ssl_ca", PARAM_STRING, &db_mysql_opt_ssl_ca},
 		{"opt_ssl_mode", PARAM_INT, &db_mysql_opt_ssl_mode}, {0, 0, 0}};

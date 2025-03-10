@@ -2,8 +2,11 @@
  * pua_db headers - presence user agent db headers
  *
  * Copyright (C) 2011 Crocodile RCS Ltd
+ * Copyright (C) 2024 Victor Seva (Sipwise)
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,8 +61,8 @@ int update_dialog_puadb(ua_pres_t *pres, int expires, str *contact);
 list_entry_t *get_subs_list_puadb(str *did);
 
 int insert_record_puadb(ua_pres_t *pres);
-ua_pres_t *get_record_puadb(
-		str pres_id, str *etag, ua_pres_t *result, db1_res_t **res);
+ua_pres_t *get_record_puadb(str *pres_uri, str pres_id, str *etag,
+		ua_pres_t *result, db1_res_t **res);
 int delete_record_puadb(ua_pres_t *pres);
 int update_record_puadb(ua_pres_t *pres, int expires, str *contact);
 int update_version_puadb(ua_pres_t *pres);

@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -114,14 +116,16 @@ static int single_fixup(void **param, int param_no);
  */
 static int double_fixup(void **param, int param_no);
 
-static int fixup_allow_address(void **param, int param_no);
-
 static int allow_routing_0(struct sip_msg *msg, char *str1, char *str2);
 static int allow_routing_1(struct sip_msg *msg, char *basename, char *str2);
 static int allow_routing_2(
 		struct sip_msg *msg, char *allow_file, char *deny_file);
 static int allow_register_1(struct sip_msg *msg, char *basename, char *s);
 static int allow_register_2(
+		struct sip_msg *msg, char *allow_file, char *deny_file);
+static int allow_register_include_port_1(
+		struct sip_msg *msg, char *basename, char *s);
+static int allow_register_include_port_2(
 		struct sip_msg *msg, char *allow_file, char *deny_file);
 static int allow_uri(struct sip_msg *msg, char *basename, char *uri);
 
@@ -131,80 +135,89 @@ static int child_init(int rank);
 static int permissions_init_rpc(void);
 
 
+/* clang-format off */
 /* Exported functions */
 static cmd_export_t cmds[] = {
-		{"allow_routing", (cmd_function)allow_routing_0, 0, 0, 0, ANY_ROUTE},
-		{"allow_routing", (cmd_function)allow_routing_1, 1, single_fixup, 0,
-				ANY_ROUTE},
-		{"allow_routing", (cmd_function)allow_routing_2, 2, load_fixup, 0,
-				ANY_ROUTE},
-		{"allow_register", (cmd_function)allow_register_1, 1, single_fixup, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"allow_register", (cmd_function)allow_register_2, 2, load_fixup, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"allow_trusted", (cmd_function)allow_trusted_0, 0, 0, 0, ANY_ROUTE},
-		{"allow_trusted", (cmd_function)allow_trusted_2, 2, fixup_spve_spve,
-				fixup_free_spve_spve, ANY_ROUTE},
-		{"allow_trusted", (cmd_function)allow_trusted_3, 3, fixup_spve_all,
-				fixup_free_spve_all, ANY_ROUTE},
-		{"allow_uri", (cmd_function)allow_uri, 2, double_fixup, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"allow_address", (cmd_function)w_allow_address, 3, fixup_allow_address,
-				0, ANY_ROUTE},
-		{"allow_source_address", (cmd_function)w_allow_source_address, 1,
-				fixup_igp_null, 0, ANY_ROUTE},
-		{"allow_source_address", (cmd_function)w_allow_source_address, 0, 0, 0,
-				ANY_ROUTE},
-		{"allow_source_address_group", (cmd_function)allow_source_address_group,
-				0, 0, 0, ANY_ROUTE},
-		{"allow_address_group", (cmd_function)allow_address_group, 2,
-				fixup_spve_igp, fixup_free_spve_igp, ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"allow_routing", (cmd_function)allow_routing_0, 0, 0, 0, ANY_ROUTE},
+	{"allow_routing", (cmd_function)allow_routing_1, 1, single_fixup, 0,
+			ANY_ROUTE},
+	{"allow_routing", (cmd_function)allow_routing_2, 2, load_fixup, 0,
+			ANY_ROUTE},
+	{"allow_register", (cmd_function)allow_register_1, 1, single_fixup, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"allow_register", (cmd_function)allow_register_2, 2, load_fixup, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"allow_register_include_port",
+			(cmd_function)allow_register_include_port_1, 1, single_fixup, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"allow_register_include_port",
+			(cmd_function)allow_register_include_port_2, 2, load_fixup, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"allow_trusted", (cmd_function)allow_trusted_0, 0, 0, 0, ANY_ROUTE},
+	{"allow_trusted", (cmd_function)allow_trusted_2, 2, fixup_spve_spve,
+			fixup_free_spve_spve, ANY_ROUTE},
+	{"allow_trusted", (cmd_function)allow_trusted_3, 3, fixup_spve_all,
+			fixup_free_spve_all, ANY_ROUTE},
+	{"allow_uri", (cmd_function)allow_uri, 2, double_fixup, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"allow_address", (cmd_function)w_allow_address, 3, fixup_isi,
+			fixup_free_isi, ANY_ROUTE},
+	{"allow_source_address", (cmd_function)w_allow_source_address, 1,
+			fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+	{"allow_source_address", (cmd_function)w_allow_source_address, 0, 0, 0,
+			ANY_ROUTE},
+	{"allow_source_address_group", (cmd_function)allow_source_address_group,
+			0, 0, 0, ANY_ROUTE},
+	{"allow_address_group", (cmd_function)allow_address_group, 2,
+			fixup_spve_igp, fixup_free_spve_igp, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /* Exported parameters */
 static param_export_t params[] = {
-		{"default_allow_file", PARAM_STRING, &perm_default_allow_file},
-		{"default_deny_file", PARAM_STRING, &perm_default_deny_file},
-		{"check_all_branches", INT_PARAM, &perm_check_all_branches},
-		{"allow_suffix", PARAM_STRING, &perm_allow_suffix},
-		{"deny_suffix", PARAM_STRING, &perm_deny_suffix},
-		{"db_url", PARAM_STR, &perm_db_url},
-		{"db_mode", INT_PARAM, &perm_db_mode},
-		{"trusted_table", PARAM_STR, &perm_trusted_table},
-		{"source_col", PARAM_STR, &perm_source_col},
-		{"proto_col", PARAM_STR, &perm_proto_col},
-		{"from_col", PARAM_STR, &perm_from_col},
-		{"ruri_col", PARAM_STR, &perm_ruri_col},
-		{"tag_col", PARAM_STR, &perm_tag_col},
-		{"priority_col", PARAM_STR, &perm_priority_col},
-		{"peer_tag_avp", PARAM_STR, &perm_tag_avp_param},
-		{"peer_tag_mode", INT_PARAM, &perm_peer_tag_mode},
-		{"address_table", PARAM_STR, &perm_address_table},
-		{"address_file", PARAM_STR, &perm_address_file_param},
-		{"grp_col", PARAM_STR, &perm_grp_col},
-		{"ip_addr_col", PARAM_STR, &perm_ip_addr_col},
-		{"mask_col", PARAM_STR, &perm_mask_col},
-		{"port_col", PARAM_STR, &perm_port_col},
-		{"max_subnets", PARAM_INT, &_perm_max_subnets},
-		{"load_backends", PARAM_INT, &_perm_load_backends},
-		{"reload_delta", PARAM_INT, &perm_reload_delta},
-		{"trusted_cleanup_interval", PARAM_INT, &perm_trusted_table_interval},
-		{0, 0, 0}};
-
+	{"default_allow_file", PARAM_STRING, &perm_default_allow_file},
+	{"default_deny_file", PARAM_STRING, &perm_default_deny_file},
+	{"check_all_branches", PARAM_INT, &perm_check_all_branches},
+	{"allow_suffix", PARAM_STRING, &perm_allow_suffix},
+	{"deny_suffix", PARAM_STRING, &perm_deny_suffix},
+	{"db_url", PARAM_STR, &perm_db_url},
+	{"db_mode", PARAM_INT, &perm_db_mode},
+	{"trusted_table", PARAM_STR, &perm_trusted_table},
+	{"source_col", PARAM_STR, &perm_source_col},
+	{"proto_col", PARAM_STR, &perm_proto_col},
+	{"from_col", PARAM_STR, &perm_from_col},
+	{"ruri_col", PARAM_STR, &perm_ruri_col},
+	{"tag_col", PARAM_STR, &perm_tag_col},
+	{"priority_col", PARAM_STR, &perm_priority_col},
+	{"peer_tag_avp", PARAM_STR, &perm_tag_avp_param},
+	{"peer_tag_mode", PARAM_INT, &perm_peer_tag_mode},
+	{"address_table", PARAM_STR, &perm_address_table},
+	{"address_file", PARAM_STR, &perm_address_file_param},
+	{"grp_col", PARAM_STR, &perm_grp_col},
+	{"ip_addr_col", PARAM_STR, &perm_ip_addr_col},
+	{"mask_col", PARAM_STR, &perm_mask_col},
+	{"port_col", PARAM_STR, &perm_port_col},
+	{"max_subnets", PARAM_INT, &_perm_max_subnets},
+	{"load_backends", PARAM_INT, &_perm_load_backends},
+	{"reload_delta", PARAM_INT, &perm_reload_delta},
+	{"trusted_cleanup_interval", PARAM_INT, &perm_trusted_table_interval},
+	{0, 0, 0}
+};
 
 /* Module interface */
 struct module_exports exports = {
-		"permissions",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* Exported functions */
-		params,			 /* Exported parameters */
-		0,				 /* RPC method exports */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* child initialization function */
-		mod_exit		 /* destroy function */
+	"permissions",	 /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			 /* Exported functions */
+	params,			 /* Exported parameters */
+	0,				 /* RPC method exports */
+	0,				 /* exported pseudo-variables */
+	0,				 /* response function */
+	mod_init,		 /* module initialization function */
+	child_init,		 /* child initialization function */
+	mod_exit		 /* destroy function */
 };
+/* clang-format on */
 
 
 /*
@@ -285,7 +298,7 @@ static int find_index(rule_file_t *array, char *pathname)
  * sip:username@domain, resulting buffer is statically allocated and
  * zero terminated
  */
-static char *get_plain_uri(const str *uri)
+static char *get_plain_uri(const str *uri, int check_port)
 {
 	static char buffer[EXPRESSION_LENGTH + 1];
 	struct sip_uri puri;
@@ -300,9 +313,14 @@ static char *get_plain_uri(const str *uri)
 	}
 
 	if(puri.user.len) {
-		len = puri.user.len + puri.host.len + 5;
+		len = puri.user.len + puri.host.len + 5; /* +5 is 'sip:' and '@' */
 	} else {
-		len = puri.host.len + 4;
+		len = puri.host.len + 4; /* +4 is 'sip:' */
+	}
+
+	if(check_port && puri.port.len) {
+		LM_DBG("Port number will also be used to check the Contact value\n");
+		len += (puri.port.len + 1); /* +1 is ':' */
 	}
 
 	if(len > EXPRESSION_LENGTH) {
@@ -312,11 +330,22 @@ static char *get_plain_uri(const str *uri)
 
 	strcpy(buffer, "sip:");
 	if(puri.user.len) {
-		memcpy(buffer + 4, puri.user.s, puri.user.len);
+		memcpy(buffer + 4, puri.user.s, puri.user.len); /* +4 is 'sip:' */
 		buffer[puri.user.len + 4] = '@';
-		memcpy(buffer + puri.user.len + 5, puri.host.s, puri.host.len);
+		memcpy(buffer + puri.user.len + 5, puri.host.s,
+				puri.host.len); /* +5 is 'sip:' and '@' */
+		if(check_port && puri.port.len) {
+			buffer[puri.user.len + puri.host.len + 5] = ':';
+			memcpy(buffer + puri.user.len + puri.host.len + 6, puri.port.s,
+					puri.port.len); /* +6 is 'sip:', '@' and ':' */
+		}
 	} else {
 		memcpy(buffer + 4, puri.host.s, puri.host.len);
+		if(check_port && puri.port.len) {
+			buffer[puri.host.len + 4] = ':';
+			memcpy(buffer + puri.host.len + 5, puri.port.s,
+					puri.port.len); /* +5 is 'sip:' and ':' */
+		}
 	}
 
 	buffer[len] = '\0';
@@ -416,7 +445,7 @@ check_branches:
 							 br_idx, &branch.len, &q, 0, 0, 0, 0, 0, 0, 0))
 					!= 0;
 			br_idx++) {
-		uri_str = get_plain_uri(&branch);
+		uri_str = get_plain_uri(&branch, 0);
 		if(!uri_str) {
 			LM_ERR("failed to extract plain URI\n");
 			return -1;
@@ -719,9 +748,11 @@ static void mod_exit(void)
 			pkg_free(perm_deny[i].filename);
 	}
 
+#if 0
 	clean_trusted();
 
 	clean_addresses();
+#endif
 }
 
 
@@ -755,9 +786,11 @@ int allow_routing_2(struct sip_msg *msg, char *allow_file, char *deny_file)
  * against rules in allow and deny files passed as parameters. The function
  * iterates over all Contacts and creates a pair with To for each contact
  * found. That allows to restrict what IPs may be used in registrations, for
- * example
+ * example.
+ *
+ * If check_port is 0, then port isn't taken into account.
  */
-static int check_register(struct sip_msg *msg, int idx)
+static int check_register(struct sip_msg *msg, int idx, int check_port)
 {
 	int len;
 	static char to_str[EXPRESSION_LENGTH + 1];
@@ -821,7 +854,8 @@ static int check_register(struct sip_msg *msg, int idx)
 	}
 
 	while(c) {
-		contact_str = get_plain_uri(&c->uri);
+		/* if check_port = 1, then port is included into regex check */
+		contact_str = get_plain_uri(&c->uri, check_port);
 		if(!contact_str) {
 			LM_ERR("can't extract plain Contact URI\n");
 			return -1;
@@ -854,13 +888,23 @@ static int check_register(struct sip_msg *msg, int idx)
 
 int allow_register_1(struct sip_msg *msg, char *basename, char *s)
 {
-	return check_register(msg, (int)(long)basename);
+	return check_register(msg, (int)(long)basename, 0);
 }
-
 
 int allow_register_2(struct sip_msg *msg, char *allow_file, char *deny_file)
 {
-	return check_register(msg, (int)(long)allow_file);
+	return check_register(msg, (int)(long)allow_file, 0);
+}
+
+int allow_register_include_port_1(struct sip_msg *msg, char *basename, char *s)
+{
+	return check_register(msg, (int)(long)basename, 1);
+}
+
+int allow_register_include_port_2(
+		struct sip_msg *msg, char *allow_file, char *deny_file)
+{
+	return check_register(msg, (int)(long)allow_file, 1);
 }
 
 
@@ -999,58 +1043,58 @@ int allow_test(char *file, char *uri, char *contact)
 	return 1;
 }
 
-/**
- *
- */
-static int fixup_allow_address(void **param, int param_no)
-{
-	if(param_no == 1)
-		return fixup_igp_null(param, 1);
-	if(param_no == 2)
-		return fixup_spve_null(param, 1);
-	if(param_no == 3)
-		return fixup_igp_null(param, 1);
-	return 0;
-}
-
+/* clang-format off */
 static const char *rpc_trusted_reload_doc[2] = {
-		"Reload permissions trusted table", 0};
+	"Reload permissions trusted table",
+	0
+};
 
 static const char *rpc_address_reload_doc[2] = {
-		"Reload permissions address table", 0};
+	"Reload permissions address table",
+	0
+};
 
 static const char *rpc_trusted_dump_doc[2] = {
-		"Dump permissions trusted table", 0};
+	"Dump permissions trusted table",
+	0
+};
 
 static const char *rpc_address_dump_doc[2] = {
-		"Dump permissions address table", 0};
+	"Dump permissions address table",
+	0
+};
 
 static const char *rpc_subnet_dump_doc[2] = {
-		"Dump permissions subnet table", 0};
+	"Dump permissions subnet table",
+	0
+};
 
 static const char *rpc_domain_name_dump_doc[2] = {
-		"Dump permissions domain name table", 0};
-
+	"Dump permissions domain name table",
+	0
+};
 
 static const char *rpc_test_uri_doc[2] = {
-		"Tests if (URI, Contact) pair is allowed according to allow/deny files",
-		0};
+	"Tests if (URI, Contact) pair is allowed according to allow/deny files",
+	0
+};
 
 rpc_export_t permissions_rpc[] = {
-		{"permissions.trustedReload", rpc_trusted_reload,
-				rpc_trusted_reload_doc, RPC_EXEC_DELTA},
-		{"permissions.addressReload", rpc_address_reload,
-				rpc_address_reload_doc, RPC_EXEC_DELTA},
-		{"permissions.trustedDump", rpc_trusted_dump, rpc_trusted_dump_doc, 0},
-		{"permissions.addressDump", rpc_address_dump, rpc_address_dump_doc,
-				RET_ARRAY},
-		{"permissions.subnetDump", rpc_subnet_dump, rpc_subnet_dump_doc,
-				RET_ARRAY},
-		{"permissions.domainDump", rpc_domain_name_dump,
-				rpc_domain_name_dump_doc, 0},
-		{"permissions.testUri", rpc_test_uri, rpc_test_uri_doc, 0},
-		{"permissions.allowUri", rpc_test_uri, rpc_test_uri_doc, 0},
-		{0, 0, 0, 0}};
+	{"permissions.trustedReload", rpc_trusted_reload, rpc_trusted_reload_doc,
+			RPC_EXEC_DELTA},
+	{"permissions.addressReload", rpc_address_reload, rpc_address_reload_doc,
+			RPC_EXEC_DELTA},
+	{"permissions.trustedDump", rpc_trusted_dump, rpc_trusted_dump_doc, 0},
+	{"permissions.addressDump", rpc_address_dump, rpc_address_dump_doc,
+			RET_ARRAY},
+	{"permissions.subnetDump", rpc_subnet_dump, rpc_subnet_dump_doc, RET_ARRAY},
+	{"permissions.domainDump", rpc_domain_name_dump,
+			rpc_domain_name_dump_doc, 0},
+	{"permissions.testUri", rpc_test_uri, rpc_test_uri_doc, 0},
+	{"permissions.allowUri", rpc_test_uri, rpc_test_uri_doc, 0},
+	{0, 0, 0, 0}
+};
+/* clang-format on */
 
 static int permissions_init_rpc(void)
 {
