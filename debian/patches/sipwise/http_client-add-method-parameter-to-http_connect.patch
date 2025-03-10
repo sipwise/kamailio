@@ -4,10 +4,10 @@ Subject: http_client: add method parameter to http_connect()
 
 ---
  src/modules/http_client/curl_api.h    |  3 +-
- src/modules/http_client/functions.c   | 25 +++++----
+ src/modules/http_client/functions.c   | 18 ++++---
  src/modules/http_client/functions.h   |  5 +-
- src/modules/http_client/http_client.c | 97 +++++++++++++++++++++++++----------
- 4 files changed, 89 insertions(+), 41 deletions(-)
+ src/modules/http_client/http_client.c | 95 +++++++++++++++++++++++++----------
+ 4 files changed, 84 insertions(+), 37 deletions(-)
 
 diff --git a/src/modules/http_client/curl_api.h b/src/modules/http_client/curl_api.h
 index cbe4785..2938016 100644
@@ -30,7 +30,7 @@ index cbe4785..2938016 100644
  typedef int (*httpcapi_httpquery_f)(
  		struct sip_msg *_m, char *_url, str *_dst, char *_post, char *_hdrs);
 diff --git a/src/modules/http_client/functions.c b/src/modules/http_client/functions.c
-index dda4721..e3dc768 100644
+index 76034d6..072c9a2 100644
 --- a/src/modules/http_client/functions.c
 +++ b/src/modules/http_client/functions.c
 @@ -2,6 +2,7 @@
@@ -41,22 +41,7 @@ index dda4721..e3dc768 100644
   *
   * Based on functions from siputil
   * 	Copyright (C) 2008 Juha Heinanen
-@@ -268,10 +269,11 @@ static int curL_request_url(struct sip_msg *_m, const char *_met,
- 	 * - 1 (default) : timeout value is in seconds.
- 	 * - 2 : timeout value is in milliseconds.
- 	 */
--	if (timeout_mode == 1) { /* timeout is in seconds (default) */
-+	if(timeout_mode == 1) { /* timeout is in seconds (default) */
- 		res |= curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)params->timeout);
--	} else if (timeout_mode == 2) { /* timeout is in milliseconds */
--		res |= curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)params->timeout);
-+	} else if(timeout_mode == 2) { /* timeout is in milliseconds */
-+		res |= curl_easy_setopt(
-+				curl, CURLOPT_TIMEOUT_MS, (long)params->timeout);
- 	}
- 
- 	res |= curl_easy_setopt(
-@@ -525,11 +527,13 @@ int curl_get_redirect(struct sip_msg *_m, const str *connection, str *result)
+@@ -644,11 +645,13 @@ int curl_get_redirect(struct sip_msg *_m, const str *connection, str *result)
  
  /*! Run a query based on a connection definition */
  int curl_con_query_url_f(struct sip_msg *_m, const str *connection,
@@ -72,7 +57,7 @@ index dda4721..e3dc768 100644
  	char *urlbuf = NULL;
  	char *postdata = NULL;
  	char *failovercon = NULL;
-@@ -629,7 +633,7 @@ int curl_con_query_url_f(struct sip_msg *_m, const str *connection,
+@@ -748,7 +751,7 @@ int curl_con_query_url_f(struct sip_msg *_m, const str *connection,
  		LM_DBG("**** Curl HTTP_proxy not set \n");
  	}
  
@@ -81,7 +66,7 @@ index dda4721..e3dc768 100644
  
  	if(res > 1000 && conn->failover.s) {
  		int counter = failover + 1;
-@@ -639,8 +643,8 @@ int curl_con_query_url_f(struct sip_msg *_m, const str *connection,
+@@ -758,8 +761,8 @@ int curl_con_query_url_f(struct sip_msg *_m, const str *connection,
  			goto error;
  		}
  		/* Time for failover */
@@ -92,7 +77,7 @@ index dda4721..e3dc768 100644
  	}
  
  	LM_DBG("***** #### ***** CURL DONE: %s (%d)\n", urlbuf, res);
-@@ -659,10 +663,11 @@ error:
+@@ -778,10 +781,11 @@ error:
  
  /* Wrapper */
  int curl_con_query_url(struct sip_msg *_m, const str *connection,
@@ -107,7 +92,7 @@ index dda4721..e3dc768 100644
  
  /*!
 diff --git a/src/modules/http_client/functions.h b/src/modules/http_client/functions.h
-index 2739273..c49ef35 100644
+index 30c326b..09b0e94 100644
 --- a/src/modules/http_client/functions.h
 +++ b/src/modules/http_client/functions.h
 @@ -3,6 +3,7 @@
@@ -130,7 +115,7 @@ index 2739273..c49ef35 100644
  /*! Get redirect URL from last connection pkg memory storage */
  int curl_get_redirect(struct sip_msg *_m, const str *connection, str *result);
 diff --git a/src/modules/http_client/http_client.c b/src/modules/http_client/http_client.c
-index ca605ec..1cf26a4 100644
+index 6f2d54c..265c630 100644
 --- a/src/modules/http_client/http_client.c
 +++ b/src/modules/http_client/http_client.c
 @@ -1,6 +1,7 @@
@@ -141,7 +126,7 @@ index ca605ec..1cf26a4 100644
   *
   * Based on part of the utils module and part
   * of the json-rpc-c module
-@@ -141,7 +142,7 @@ static int fixup_curl_connect_post_raw(void **param, int param_no);
+@@ -133,7 +134,7 @@ static int fixup_curl_connect_post_raw(void **param, int param_no);
  static int fixup_free_curl_connect_post(void **param, int param_no);
  static int fixup_free_curl_connect_post_raw(void **param, int param_no);
  static int w_curl_connect_post(struct sip_msg *_m, char *_con, char *_url,
@@ -150,7 +135,7 @@ index ca605ec..1cf26a4 100644
  static int w_curl_connect_post_raw(struct sip_msg *_m, char *_con, char *_url,
  		char *_result, char *_ctype, char *_data);
  
-@@ -184,7 +185,7 @@ static cmd_export_t cmds[] = {
+@@ -192,7 +193,7 @@ static cmd_export_t cmds[] = {
  	{"http_connect", (cmd_function)w_curl_connect, 3, fixup_curl_connect,
  		fixup_free_curl_connect,
  		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
@@ -159,16 +144,7 @@ index ca605ec..1cf26a4 100644
  		fixup_free_curl_connect_post,
  		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
  	{"http_connect_raw", (cmd_function)w_curl_connect_post_raw, 5, fixup_curl_connect_post_raw,
-@@ -470,7 +471,7 @@ static int fixup_free_http_query_get(void **param, int param_no)
- 
- 
- /*
-- * Fix curl_connect params: connection(string/pvar) url (string that may contain pvars) and
-+ * Fix curl_connect params: connection(string) url (string that may contain pvars) and
-  * result (writable pvar).
-  */
- static int fixup_curl_connect(void **param, int param_no)
-@@ -480,7 +481,7 @@ static int fixup_curl_connect(void **param, int param_no)
+@@ -453,7 +454,7 @@ static int fixup_curl_connect(void **param, int param_no)
  		/* We want char * strings */
  		return 0;
  	}
@@ -177,7 +153,7 @@ index ca605ec..1cf26a4 100644
  	if(param_no == 2) {
  		return fixup_spve_null(param, 1);
  	}
-@@ -501,22 +502,24 @@ static int fixup_curl_connect(void **param, int param_no)
+@@ -474,22 +475,24 @@ static int fixup_curl_connect(void **param, int param_no)
  }
  
  /*
@@ -208,7 +184,7 @@ index ca605ec..1cf26a4 100644
  		if(fixup_pvar_null(param, 1) != 0) {
  			LM_ERR("failed to fixup result pseudo variable\n");
  			return -1;
-@@ -569,15 +572,15 @@ static int fixup_curl_connect_post_raw(void **param, int param_no)
+@@ -542,15 +545,15 @@ static int fixup_curl_connect_post_raw(void **param, int param_no)
   */
  static int fixup_free_curl_connect_post(void **param, int param_no)
  {
@@ -227,7 +203,7 @@ index ca605ec..1cf26a4 100644
  		return fixup_free_pvar_null(param, 1);
  	}
  
-@@ -631,13 +634,13 @@ static int fixup_free_curl_connect(void **param, int param_no)
+@@ -604,13 +607,13 @@ static int fixup_free_curl_connect(void **param, int param_no)
   * Wrapper for Curl_connect (GET)
   */
  static int ki_curl_connect_helper(
@@ -243,7 +219,7 @@ index ca605ec..1cf26a4 100644
  
  	val.rs = result;
  	val.flags = PV_VAL_STR;
-@@ -658,6 +661,7 @@ static int ki_curl_connect_helper(
+@@ -631,6 +634,7 @@ static int ki_curl_connect_helper(
   */
  static int ki_curl_connect(sip_msg_t *_m, str *con, str *url, str *dpv)
  {
@@ -251,7 +227,7 @@ index ca605ec..1cf26a4 100644
  	pv_spec_t *dst;
  
  	dst = pv_cache_get(dpv);
-@@ -670,7 +674,7 @@ static int ki_curl_connect(sip_msg_t *_m, str *con, str *url, str *dpv)
+@@ -643,7 +647,7 @@ static int ki_curl_connect(sip_msg_t *_m, str *con, str *url, str *dpv)
  		return -1;
  	}
  
@@ -260,7 +236,7 @@ index ca605ec..1cf26a4 100644
  }
  
  /*
-@@ -679,6 +683,7 @@ static int ki_curl_connect(sip_msg_t *_m, str *con, str *url, str *dpv)
+@@ -652,6 +656,7 @@ static int ki_curl_connect(sip_msg_t *_m, str *con, str *url, str *dpv)
  static int w_curl_connect(sip_msg_t *_m, char *_con, char *_url, char *_result)
  {
  	str con = {NULL, 0};
@@ -268,7 +244,7 @@ index ca605ec..1cf26a4 100644
  	str url = {NULL, 0};
  	pv_spec_t *dst;
  
-@@ -697,20 +702,20 @@ static int w_curl_connect(sip_msg_t *_m, char *_con, char *_url, char *_result)
+@@ -670,20 +675,20 @@ static int w_curl_connect(sip_msg_t *_m, char *_con, char *_url, char *_result)
  			_result);
  	dst = (pv_spec_t *)_result;
  
@@ -293,7 +269,7 @@ index ca605ec..1cf26a4 100644
  
  	val.rs = result;
  	val.flags = PV_VAL_STR;
-@@ -732,6 +737,7 @@ static int ki_curl_connect_post_helper(sip_msg_t *_m, str *con, str *url,
+@@ -705,6 +710,7 @@ static int ki_curl_connect_post_helper(sip_msg_t *_m, str *con, str *url,
  static int ki_curl_connect_post(
  		sip_msg_t *_m, str *con, str *url, str *ctype, str *data, str *dpv)
  {
@@ -301,7 +277,7 @@ index ca605ec..1cf26a4 100644
  	pv_spec_t *dst;
  
  	dst = pv_cache_get(dpv);
-@@ -744,7 +750,7 @@ static int ki_curl_connect_post(
+@@ -717,7 +723,7 @@ static int ki_curl_connect_post(
  		return -1;
  	}
  
@@ -310,7 +286,7 @@ index ca605ec..1cf26a4 100644
  }
  
  /*
-@@ -754,6 +760,7 @@ static int w_curl_connect_post_raw(struct sip_msg *_m, char *_con, char *_url,
+@@ -727,6 +733,7 @@ static int w_curl_connect_post_raw(struct sip_msg *_m, char *_con, char *_url,
  		char *_ctype, char *_data, char *_result)
  {
  	str con = {NULL, 0};
@@ -318,7 +294,7 @@ index ca605ec..1cf26a4 100644
  	str url = {NULL, 0};
  	str ctype = {NULL, 0};
  	str data = {NULL, 0};
-@@ -782,31 +789,64 @@ static int w_curl_connect_post_raw(struct sip_msg *_m, char *_con, char *_url,
+@@ -755,31 +762,64 @@ static int w_curl_connect_post_raw(struct sip_msg *_m, char *_con, char *_url,
  			_url, _result);
  	dst = (pv_spec_t *)_result;
  
@@ -389,7 +365,7 @@ index ca605ec..1cf26a4 100644
  		return -1;
  	}
  
-@@ -822,7 +862,8 @@ static int w_curl_connect_post(struct sip_msg *_m, char *_con, char *_url,
+@@ -795,7 +835,8 @@ static int w_curl_connect_post(struct sip_msg *_m, char *_con, char *_url,
  			_url, _result);
  	dst = (pv_spec_t *)_result;
  
@@ -398,4 +374,4 @@ index ca605ec..1cf26a4 100644
 +			_m, &con, &method, &url, &ctype, &data, dst);
  }
  
- /*!
+ 

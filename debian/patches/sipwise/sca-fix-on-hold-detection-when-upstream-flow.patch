@@ -7,10 +7,10 @@ Subject: sca-fix-on-hold-detection-when-upstream-flow
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index e28bfed..b2aa8bb 100644
+index 15a032b..74f091c 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -954,11 +954,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -955,11 +955,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	int state = SCA_APPEARANCE_STATE_UNKNOWN;
  	int rc = -1;
  	str *target_aor = from_aor;
@@ -24,7 +24,7 @@ index e28bfed..b2aa8bb 100644
  	}
  
  	LM_DBG("For From-AOR %.*s To-AOR: %.*s: From: <%.*s> To: <%.*s> "
-@@ -977,7 +979,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -978,7 +980,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  		goto done;
  	}
  

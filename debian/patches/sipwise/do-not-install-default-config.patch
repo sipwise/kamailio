@@ -8,10 +8,10 @@ Subject: do-not-install-default-config
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/Makefile b/src/Makefile
-index 41c3624..c1530e5 100644
+index 8de3eb2..63644c8 100644
 --- a/src/Makefile
 +++ b/src/Makefile
-@@ -649,7 +649,7 @@ sunpkg:
+@@ -650,7 +650,7 @@ sunpkg:
  
  .PHONY: install
  install: mk_params="compile_for_install=yes"

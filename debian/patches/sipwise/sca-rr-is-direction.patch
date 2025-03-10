@@ -10,18 +10,18 @@ Subject: sca-rr-is-direction
  4 files changed, 57 insertions(+), 11 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index 0298610..2c0dc32 100644
+index af090bb..315c78b 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
-@@ -62,6 +62,7 @@ sca_mod *sca = NULL;
+@@ -63,6 +63,7 @@ sca_mod *sca = NULL;
   */
  db_func_t dbf;		 // db api
  struct tm_binds tmb; // tm functions for sending messages
 +struct rr_binds rrb; // rr functions for detecting direction
  sl_api_t slb;		 // sl callback, function for getting to-tag
  
- /* avps */
-@@ -405,6 +406,12 @@ static int sca_mod_init(void)
+ /*
+@@ -417,6 +418,12 @@ static int sca_mod_init(void)
  	}
  	sca->tm_api = &tmb;
  
@@ -35,10 +35,10 @@ index 0298610..2c0dc32 100644
  		LM_ERR("Failed to initialize required sl API. Check that the \"sl\" "
  			   "module is loaded before this module.\n");
 diff --git a/src/modules/sca/sca.h b/src/modules/sca/sca.h
-index 7a80847..3d08921 100644
+index f1f8bf1..f57dcd6 100644
 --- a/src/modules/sca/sca.h
 +++ b/src/modules/sca/sca.h
-@@ -51,6 +51,7 @@ struct _sca_mod
+@@ -57,6 +57,7 @@ struct _sca_mod
  
  	db_func_t *db_api;
  	struct tm_binds *tm_api;
@@ -47,10 +47,10 @@ index 7a80847..3d08921 100644
  };
  typedef struct _sca_mod sca_mod;
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index a78d3c6..78cfc35 100644
+index 3d54711..aec5493 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1368,6 +1368,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1369,6 +1369,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  {
  	sca_appearance *app;
  	sca_to_body_t from, to;
@@ -58,7 +58,7 @@ index a78d3c6..78cfc35 100644
  	int slot_idx = -1;
  	int state = SCA_APPEARANCE_STATE_IDLE;
  
-@@ -1384,13 +1385,19 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1385,13 +1386,19 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  	}
  
  	if(sca_uri_lock_if_shared_appearance(sca, from_aor, &slot_idx)) {
@@ -81,7 +81,7 @@ index a78d3c6..78cfc35 100644
  			goto done;
  		}
  
-@@ -1435,11 +1442,15 @@ done:
+@@ -1436,11 +1443,15 @@ done:
  /* XXX needs extract routines */
  void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
  {
@@ -98,7 +98,7 @@ index a78d3c6..78cfc35 100644
  
  	memset(&to, 0, sizeof(to));
  
-@@ -1470,8 +1481,18 @@ void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
+@@ -1471,8 +1482,18 @@ void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
  	}
  
  	// on ACK, ensure SCA callee state is promoted to ACTIVE.
@@ -119,7 +119,7 @@ index a78d3c6..78cfc35 100644
  	if(app && app->state == SCA_APPEARANCE_STATE_ACTIVE_PENDING) {
  		LM_DBG("promoting %.*s appearance-index %d to active\n",
  				STR_FMT(&to_aor), app->index);
-@@ -1493,6 +1514,9 @@ done:
+@@ -1494,6 +1515,9 @@ done:
  	if(from_aor.s != NULL) {
  		pkg_free(from_aor.s);
  	}
@@ -129,7 +129,7 @@ index a78d3c6..78cfc35 100644
  	if(to.flags & SCA_UTIL_FLAG_TO_BODY_ALLOC) {
  		free_to(to.hdr);
  	}
-@@ -1557,6 +1581,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1558,6 +1582,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  	sca_appearance *app = NULL;
  	int slot_idx = -1;
  	int rc = -1;
@@ -137,7 +137,7 @@ index a78d3c6..78cfc35 100644
  
  	if(msg->first_line.type == SIP_REQUEST) {
  		if(SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
-@@ -1574,14 +1599,20 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1575,14 +1600,20 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  			}
  			if(app == NULL) {
  				// try to find it by tags
@@ -161,7 +161,7 @@ index a78d3c6..78cfc35 100644
  				goto done;
  			}
  
-@@ -1622,8 +1653,14 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1623,8 +1654,14 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  				goto done;
  			}
  

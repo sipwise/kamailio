@@ -7,10 +7,10 @@ Subject: usrloc_dbro_pinger
  1 file changed, 11 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/usrloc/dlist.c b/src/modules/usrloc/dlist.c
-index 57a9b4a..ceca3f4 100644
+index 34a2e46..c523d06 100644
 --- a/src/modules/usrloc/dlist.c
 +++ b/src/modules/usrloc/dlist.c
-@@ -307,6 +307,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -309,6 +309,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  	db_op_t ops1[4];
  	db_key_t keys2[6]; /* select */
  	int n[2] = {2, 6}; /* number of dynamic values used on key1/key2 */
@@ -19,7 +19,7 @@ index 57a9b4a..ceca3f4 100644
  
  	cp = buf;
  	shortage = 0;
-@@ -353,23 +355,27 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -355,23 +357,27 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  		vals1[n[0]].nul = 0;
  		vals1[n[0]].val.int_val = server_id;
  		n[0]++;
@@ -51,7 +51,7 @@ index 57a9b4a..ceca3f4 100644
  			continue;
  		}
  
-@@ -487,7 +493,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -489,7 +495,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  			len -= needed;
  		} /* row cycle */
  

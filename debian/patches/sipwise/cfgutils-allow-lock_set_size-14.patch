@@ -7,7 +7,7 @@ Subject: cfgutils: allow lock_set_size > 14
  1 file changed, 52 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/cfgutils/cfgutils.c b/src/modules/cfgutils/cfgutils.c
-index f20f3bb..aebc7b7 100644
+index fd0a5e5..ececa12 100644
 --- a/src/modules/cfgutils/cfgutils.c
 +++ b/src/modules/cfgutils/cfgutils.c
 @@ -4,6 +4,7 @@
@@ -18,7 +18,7 @@ index f20f3bb..aebc7b7 100644
   *
   * This file is part of Kamailio, a free SIP server.
   *
-@@ -674,6 +675,53 @@ static int ki_shm_summary(sip_msg_t *msg)
+@@ -688,6 +689,53 @@ static int ki_shm_summary(sip_msg_t *msg)
  	return 1;
  }
  
@@ -72,7 +72,7 @@ index f20f3bb..aebc7b7 100644
  static int cfg_lock_helper(str *lkey, str *lkey2, int mode)
  {
  	unsigned int pos;
-@@ -695,7 +743,7 @@ static int cfg_lock_helper(str *lkey, str *lkey2, int mode)
+@@ -709,7 +757,7 @@ static int cfg_lock_helper(str *lkey, str *lkey2, int mode)
  		}
  		return -1;
  	}
@@ -81,7 +81,7 @@ index f20f3bb..aebc7b7 100644
  	if(key2) {
  		LM_DBG("cfg_lock mode %d on %u (%.*s %.*s)\n", mode, pos, STR_FMT(lkey),
  				STR_FMT(lkey2));
-@@ -908,10 +956,10 @@ static int mod_init(void)
+@@ -922,10 +970,10 @@ static int mod_init(void)
  		return -1;
  	}
  	if(_cfg_lock_size > 0) {

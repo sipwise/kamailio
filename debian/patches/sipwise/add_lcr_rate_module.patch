@@ -13,7 +13,7 @@ Subject: add_lcr_rate_module
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 763a870..955fbec 100644
+index fae0dbd..f54d81d 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -109,6 +109,9 @@ mod_list_sctp=sctp
@@ -26,9 +26,9 @@ index 763a870..955fbec 100644
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -289,8 +292,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
- 			   $(mod_list_tls_wolfssl) \
+@@ -287,8 +290,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
  			   $(mod_list_microhttpd) \
+ 			   $(mod_list_nghttp2) \
  			   $(mod_list_gcrypt) \
 -			   $(mod_list_rtp_media_server)
 -
@@ -37,7 +37,7 @@ index 763a870..955fbec 100644
  
  
  ### --- Groups defined for source code compilation ###
-@@ -347,6 +350,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
+@@ -345,6 +348,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
@@ -47,7 +47,7 @@ index 763a870..955fbec 100644
  ### --- Groups defined for pacKaging ###
  
 diff --git a/src/core/mod_fix.c b/src/core/mod_fix.c
-index 10be560..80b6eea 100644
+index 767c6a4..d0f1841 100644
 --- a/src/core/mod_fix.c
 +++ b/src/core/mod_fix.c
 @@ -598,6 +598,7 @@ int fixup_free_igp_spve(void **param, int param_no)
@@ -68,7 +68,7 @@ index 10be560..80b6eea 100644
  }
  
 diff --git a/src/core/mod_fix.h b/src/core/mod_fix.h
-index 3143f06..37b6b97 100644
+index 6ec0280..26968a7 100644
 --- a/src/core/mod_fix.h
 +++ b/src/core/mod_fix.h
 @@ -138,6 +138,8 @@ int fixup_spve_uint(void **param, int param_no);

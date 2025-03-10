@@ -9,10 +9,10 @@ Subject: dialog: dlg_get_ttag()
  3 files changed, 211 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index f4eb18e..5dfdec1 100644
+index d74a36e..980ef3c 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -54,6 +54,7 @@
+@@ -56,6 +56,7 @@
  #include "../../core/error.h"
  #include "../../core/ut.h"
  #include "../../core/pvar.h"
@@ -20,7 +20,7 @@ index f4eb18e..5dfdec1 100644
  #include "../../core/mod_fix.h"
  #include "../../core/script_cb.h"
  #include "../../core/kemi.h"
-@@ -197,6 +198,9 @@ static int fixup_dlg_refer(void **param, int param_no);
+@@ -200,6 +201,9 @@ static int fixup_dlg_refer(void **param, int param_no);
  static int fixup_dlg_bridge(void **param, int param_no);
  static int w_dlg_get(struct sip_msg *, char *, char *, char *);
  static int w_is_known_dlg(struct sip_msg *);
@@ -30,7 +30,7 @@ index f4eb18e..5dfdec1 100644
  static int w_dlg_set_ruri(sip_msg_t *, char *, char *);
  static int w_dlg_db_load_callid(sip_msg_t *msg, char *ci, char *p2);
  static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2);
-@@ -260,6 +264,8 @@ static cmd_export_t cmds[]={
+@@ -271,6 +275,8 @@ static cmd_export_t cmds[]={
  			0, ANY_ROUTE },
  	{"is_known_dlg", (cmd_function)w_is_known_dlg,        0, NULL,
  			0, ANY_ROUTE },
@@ -39,7 +39,7 @@ index f4eb18e..5dfdec1 100644
  	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  1,fixup_igp_null,
  			0, ANY_ROUTE },
  	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  3,fixup_igp_all,
-@@ -1974,6 +1980,121 @@ static int fixup_dlg_set_var_free(void **param, int param_no)
+@@ -2066,6 +2072,121 @@ static int fixup_dlg_set_var_free(void **param, int param_no)
  	return -1;
  }
  
@@ -161,7 +161,7 @@ index f4eb18e..5dfdec1 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2555,6 +2676,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2657,6 +2778,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
@@ -174,10 +174,10 @@ index f4eb18e..5dfdec1 100644
  		SR_KEMIP_XVAL, ki_dlg_get_var,
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 diff --git a/src/modules/dialog/dlg_hash.c b/src/modules/dialog/dlg_hash.c
-index c5c5042..22346f3 100644
+index a37adee..a382ad5 100644
 --- a/src/modules/dialog/dlg_hash.c
 +++ b/src/modules/dialog/dlg_hash.c
-@@ -908,6 +908,49 @@ static inline struct dlg_cell *internal_get_dlg(unsigned int h_entry,
+@@ -910,6 +910,49 @@ static inline struct dlg_cell *internal_get_dlg(unsigned int h_entry,
  	return 0;
  }
  
@@ -227,7 +227,7 @@ index c5c5042..22346f3 100644
  
  /*!
   * \brief Get dialog that correspond to CallId, From Tag and To Tag
-@@ -944,6 +987,35 @@ struct dlg_cell *get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir)
+@@ -946,6 +989,35 @@ struct dlg_cell *get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir)
  	return dlg;
  }
  
@@ -264,10 +264,10 @@ index c5c5042..22346f3 100644
  /*!
   * \brief Search dialog that corresponds to CallId, From Tag and To Tag
 diff --git a/src/modules/dialog/dlg_hash.h b/src/modules/dialog/dlg_hash.h
-index 513ca58..0eb9d1d 100644
+index 5d19841..a0a919f 100644
 --- a/src/modules/dialog/dlg_hash.h
 +++ b/src/modules/dialog/dlg_hash.h
-@@ -394,6 +394,19 @@ dlg_cell_t *dlg_get_by_iuid(dlg_iuid_t *diuid);
+@@ -396,6 +396,19 @@ dlg_cell_t *dlg_get_by_iuid(dlg_iuid_t *diuid);
   */
  dlg_cell_t *get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir);
  

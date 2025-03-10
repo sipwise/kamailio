@@ -8,10 +8,10 @@ Subject: usrloc_dbro
  2 files changed, 65 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index b14fe72..1443953 100644
+index a1e1bc8..3d68a02 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
-@@ -200,6 +200,7 @@ str ulattrs_last_mod_col = str_init(
+@@ -202,6 +202,7 @@ str ulattrs_last_mod_col = str_init(
  		ULATTRS_LAST_MOD_COL); /*!< Name of column containing the last modified date */
  
  str ul_db_url = str_init(DEFAULT_DB_URL); /*!< Database URL */
@@ -19,7 +19,7 @@ index b14fe72..1443953 100644
  int ul_timer_interval = 60;				  /*!< Timer interval in seconds */
  int ul_db_mode =
  		0; /*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
-@@ -243,6 +244,8 @@ static cmd_export_t cmds[] = {
+@@ -245,6 +246,8 @@ static cmd_export_t cmds[] = {
  	{0, 0, 0, 0, 0, 0}
  };
  
@@ -28,15 +28,15 @@ index b14fe72..1443953 100644
  
  /*! \brief
   * Exported parameters
-@@ -259,6 +262,7 @@ static param_export_t params[] = {
+@@ -261,6 +264,7 @@ static param_export_t params[] = {
  	{"flags_column", PARAM_STR, &ul_flags_col},
  	{"cflags_column", PARAM_STR, &ul_cflags_col},
  	{"db_url", PARAM_STR, &ul_db_url},
 +	{"db_url_ro", PARAM_STR, &ul_db_url_ro.s},
- 	{"timer_interval", INT_PARAM, &ul_timer_interval},
- 	{"db_mode", INT_PARAM, &ul_db_mode},
- 	{"db_load", INT_PARAM, &ul_db_load},
-@@ -334,6 +338,39 @@ struct module_exports exports = {
+ 	{"timer_interval", PARAM_INT, &ul_timer_interval},
+ 	{"db_mode", PARAM_INT, &ul_db_mode},
+ 	{"db_load", PARAM_INT, &ul_db_load},
+@@ -336,6 +340,39 @@ struct module_exports exports = {
  };
  /* clang-format on */
  
@@ -76,7 +76,7 @@ index b14fe72..1443953 100644
  /*! \brief
   * Module initialization function
   */
-@@ -440,7 +477,22 @@ static int mod_init(void)
+@@ -442,7 +479,22 @@ static int mod_init(void)
  		}
  	}
  
@@ -100,7 +100,7 @@ index b14fe72..1443953 100644
  		ul_nat_bflag = 0;
  	} else if(ul_nat_bflag >= 8 * sizeof(ul_nat_bflag)) {
  		LM_ERR("bflag index (%d) too big!\n", ul_nat_bflag);
-@@ -534,6 +586,16 @@ static int child_init(int _rank)
+@@ -536,6 +588,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -118,10 +118,10 @@ index b14fe72..1443953 100644
  	if(_rank == ul_load_rank && ul_db_mode != DB_ONLY && ul_db_load) {
  		/* if cache is used, populate domains from DB */
 diff --git a/src/modules/usrloc/usrloc_mod.h b/src/modules/usrloc/usrloc_mod.h
-index 7192c9c..4fe237b 100644
+index ef4e4a4..1b9c4c9 100644
 --- a/src/modules/usrloc/usrloc_mod.h
 +++ b/src/modules/usrloc/usrloc_mod.h
-@@ -89,6 +89,8 @@ extern int ul_handle_lost_tcp;
+@@ -91,6 +91,8 @@ extern int ul_handle_lost_tcp;
  extern int ul_close_expired_tcp;
  extern int ul_skip_remote_socket;
  

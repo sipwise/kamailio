@@ -1,115 +1,78 @@
 From: Victor Seva <vseva@sipwise.com>
-Date: Thu, 3 Sep 2020 12:19:21 +0200
+Date: Tue, 11 Mar 2025 09:34:36 +0100
 Subject: sca: add pai_avp parameter
 
 Use the avp value when creating P-Asserted-Identity instead of
 values from Headers. If no value, skip header creation.
 ---
- src/modules/sca/sca.c           | 27 +++++++++++++++++++++------
+ src/modules/sca/sca.c           |  9 +++++++++
  src/modules/sca/sca.h           |  2 ++
- src/modules/sca/sca_call_info.c | 26 +++++++++++++++++++-------
+ src/modules/sca/sca_call_info.c | 27 ++++++++++++++++++++-------
  src/modules/sca/sca_util.h      |  2 ++
- 4 files changed, 44 insertions(+), 13 deletions(-)
+ 4 files changed, 33 insertions(+), 7 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index 2c0dc32..dc1e806 100644
+index 315c78b..57ccd77 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
-@@ -70,6 +70,8 @@ unsigned short from_uri_avp_type;
- int_str from_uri_avp;
- unsigned short to_uri_avp_type;
- int_str to_uri_avp;
-+unsigned short pai_avp_type;
-+int_str pai_avp;
- 
- /*
-  * PROTOTYPES
-@@ -159,6 +161,7 @@ int onhold_bflag = -1;
- str server_address = STR_NULL;
+@@ -102,6 +102,7 @@ str server_address = STR_NULL;
+ str contact_fallback = STR_NULL;
  str from_uri_avp_param = STR_NULL;
  str to_uri_avp_param = STR_NULL;
 +str pai_avp_param = STR_NULL;
  
- static param_export_t params[] = {
- 		{"outbound_proxy", PARAM_STR, &outbound_proxy},
-@@ -174,6 +177,7 @@ static param_export_t params[] = {
- 		{"server_address", PARAM_STR, &server_address},
- 		{"from_uri_avp", PARAM_STR, &from_uri_avp_param},
- 		{"to_uri_avp", PARAM_STR, &to_uri_avp_param},
-+		{"pai_avp", PARAM_STR, &pai_avp_param},
- 		{NULL, 0, NULL},
+ /* clang-format off */
+ /*
+@@ -170,6 +171,7 @@ static param_export_t params[] = {
+ 	{"server_address", PARAM_STR, &server_address},
+ 	{"from_uri_avp", PARAM_STR, &from_uri_avp_param},
+ 	{"to_uri_avp", PARAM_STR, &to_uri_avp_param},
++	{"pai_avp", PARAM_STR, &pai_avp_param},
+ 	{NULL, 0, NULL},
  };
  
-@@ -349,7 +353,7 @@ static int sca_child_init(int rank)
+@@ -355,6 +357,13 @@ static int sca_set_config(sca_mod *scam)
+ 				< 0)
+ 			return -1;
+ 	}
++
++	if(pai_avp_param.s) {
++		if(sca_process_avps(
++				   &pai_avp_param, &sca->cfg->pai_avp, &sca->cfg->pai_avp_type)
++				< 0)
++			return -1;
++	}
  	return (0);
  }
  
--static int sca_process_avps(
-+static int sca_process_avp(
- 		str *avp_param, int_str *avp, unsigned short *avp_type)
- {
- 	pv_spec_t *avp_spec;
-@@ -375,6 +379,21 @@ static int sca_process_avps(
- 	return 0;
- }
- 
-+static int sca_process_avps()
-+{
-+	if(sca_process_avp(&from_uri_avp_param, &from_uri_avp, &from_uri_avp_type)
-+			< 0) {
-+		return -1;
-+	}
-+	if(sca_process_avp(&to_uri_avp_param, &to_uri_avp, &to_uri_avp_type) < 0) {
-+		return -1;
-+	}
-+	if(sca_process_avp(&pai_avp_param, &pai_avp, &pai_avp_type) < 0) {
-+		return -1;
-+	}
-+	return 0;
-+}
-+
- static int sca_mod_init(void)
- {
- 	sca = (sca_mod *)shm_malloc(sizeof(sca_mod));
-@@ -441,11 +460,7 @@ static int sca_mod_init(void)
- 	// timer process forks in sca_child_init, above.
- 	register_dummy_timers(1);
- 
--	if(sca_process_avps(&from_uri_avp_param, &from_uri_avp, &from_uri_avp_type)
--					< 0
--			|| sca_process_avps(
--					   &to_uri_avp_param, &to_uri_avp, &to_uri_avp_type)
--					   < 0) {
-+	if(sca_process_avps() < 0) {
- 		goto error;
- 	}
- 
 diff --git a/src/modules/sca/sca.h b/src/modules/sca/sca.h
-index 3d08921..44b354e 100644
+index f57dcd6..18049cd 100644
 --- a/src/modules/sca/sca.h
 +++ b/src/modules/sca/sca.h
-@@ -63,5 +63,7 @@ extern unsigned short from_uri_avp_type;
- extern int_str from_uri_avp;
- extern unsigned short to_uri_avp_type;
- extern int_str to_uri_avp;
-+extern unsigned short pai_avp_type;
-+extern int_str pai_avp;
+@@ -46,6 +46,8 @@ struct _sca_config
+ 	avp_name_t from_uri_avp;
+ 	avp_flags_t to_uri_avp_type;
+ 	avp_name_t to_uri_avp;
++	avp_flags_t pai_avp_type;
++	avp_name_t pai_avp;
+ };
+ typedef struct _sca_config sca_config;
  
- #endif // SCA_H
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index dde6e1b..1e97a2f 100644
+index 0152847..37bed99 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1144,20 +1144,32 @@ static int sca_call_info_insert_asserted_identity(
+@@ -1145,20 +1145,33 @@ static int sca_call_info_insert_asserted_identity(
  	str aor = STR_NULL;
  	str hdr = STR_NULL;
  	int len;
 +	int aor_avp = 0;
  	int rc = -1;
  
-+	if(sca_get_avp_value(pai_avp_type, pai_avp, &aor) < 0) {
-+		if(pai_avp.s.len > 0) {
-+			LM_DBG("$avp(%.*s) has no value, skip PAI\n", STR_FMT(&pai_avp.s));
++	if(sca_get_avp_value(sca->cfg->pai_avp_type, sca->cfg->pai_avp, &aor) < 0) {
++		if(sca->cfg->pai_avp.s.len > 0) {
++			LM_DBG("$avp(%.*s) has no value, skip PAI\n",
++					STR_FMT(&sca->cfg->pai_avp.s));
 +			rc = 1;
 +			goto done;
 +		}
@@ -120,7 +83,7 @@ index dde6e1b..1e97a2f 100644
 +		}
 +	} else {
 +		aor_avp = 1;
-+		LM_DBG("using $avp(%.*s)[%.*s] as PAI\n", STR_FMT(&pai_avp.s),
++		LM_DBG("using $avp(%.*s)[%.*s] as PAI\n", STR_FMT(&sca->cfg->pai_avp.s),
 +				STR_FMT(&aor));
 +	}
 +
@@ -139,7 +102,7 @@ index dde6e1b..1e97a2f 100644
  #define SCA_P_ASSERTED_IDENTITY_HDR_PREFIX "P-Asserted-Identity: "
  #define SCA_P_ASSERTED_IDENTITY_HDR_PREFIX_LEN strlen("P-Asserted-Identity: ")
  
-@@ -1203,7 +1215,7 @@ static int sca_call_info_insert_asserted_identity(
+@@ -1204,7 +1217,7 @@ static int sca_call_info_insert_asserted_identity(
  	rc = 1;
  
  done:
@@ -149,10 +112,10 @@ index dde6e1b..1e97a2f 100644
  	}
  	if(rc < 0 && hdr.s != NULL) {
 diff --git a/src/modules/sca/sca_util.h b/src/modules/sca/sca_util.h
-index 563dedc..823e51d 100644
+index 6c1d92f..7660c4f 100644
 --- a/src/modules/sca/sca_util.h
 +++ b/src/modules/sca/sca_util.h
-@@ -76,4 +76,6 @@ int sca_create_canonical_aor(sip_msg_t *, str *);
+@@ -77,4 +77,6 @@ int sca_create_canonical_aor(sip_msg_t *, str *);
  // convenient call hold detection
  int sca_call_is_held(sip_msg_t *);
  

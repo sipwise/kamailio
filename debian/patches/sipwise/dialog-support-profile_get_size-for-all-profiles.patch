@@ -10,10 +10,10 @@ Subject: dialog: support profile_get_size for all profiles
  4 files changed, 69 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index f27cdf2..f4eb18e 100644
+index 4cdfe7a..d74a36e 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -3025,6 +3025,31 @@ static void internal_rpc_profile_get_size(
+@@ -3127,6 +3127,31 @@ static void internal_rpc_profile_get_size(
  	return;
  }
  
@@ -45,7 +45,7 @@ index f27cdf2..f4eb18e 100644
  /*!
   * \brief Helper function that outputs the dialogs belonging to a given profile via the RPC interface
   * \see rpc_profile_print_dlgs
-@@ -3109,6 +3134,8 @@ static const char *rpc_dlg_set_state_doc[3] = {
+@@ -3211,6 +3236,8 @@ static const char *rpc_dlg_set_state_doc[3] = {
  		0};
  static const char *rpc_profile_get_size_doc[2] = {
  		"Returns the number of dialogs belonging to a profile", 0};
@@ -54,7 +54,7 @@ index f27cdf2..f4eb18e 100644
  static const char *rpc_profile_print_dlgs_doc[2] = {
  		"Lists all the dialogs belonging to a profile", 0};
  static const char *rpc_dlg_bridge_doc[2] = {
-@@ -3325,6 +3352,11 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c)
+@@ -3427,6 +3454,11 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c)
  	}
  	return;
  }
@@ -66,7 +66,7 @@ index f27cdf2..f4eb18e 100644
  static void rpc_profile_print_dlgs(rpc_t *rpc, void *c)
  {
  	str profile_name = {NULL, 0};
-@@ -3742,6 +3774,8 @@ static rpc_export_t rpc_methods[] = {
+@@ -3844,6 +3876,8 @@ static rpc_export_t rpc_methods[] = {
  		{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
  		{"dlg.profile_get_size", rpc_profile_get_size, rpc_profile_get_size_doc,
  				0},
@@ -76,10 +76,10 @@ index f27cdf2..f4eb18e 100644
  				RET_ARRAY},
  		{"dlg.bridge_dlg", rpc_dlg_bridge, rpc_dlg_bridge_doc, 0},
 diff --git a/src/modules/dialog/dlg_profile.c b/src/modules/dialog/dlg_profile.c
-index 43aee62..dc334be 100644
+index 9fc1a97..76aa768 100644
 --- a/src/modules/dialog/dlg_profile.c
 +++ b/src/modules/dialog/dlg_profile.c
-@@ -127,6 +127,14 @@ int add_profile_definitions(char *profiledef, unsigned int has_value)
+@@ -129,6 +129,14 @@ int add_profile_definitions(char *profiledef, unsigned int has_value)
  	return 0;
  }
  
@@ -95,10 +95,10 @@ index 43aee62..dc334be 100644
  /*!
   * \brief Search a dialog profile in the global list
 diff --git a/src/modules/dialog/dlg_profile.h b/src/modules/dialog/dlg_profile.h
-index 4a6f6f1..38b5928 100644
+index 209c4ea..fd71c30 100644
 --- a/src/modules/dialog/dlg_profile.h
 +++ b/src/modules/dialog/dlg_profile.h
-@@ -112,6 +112,11 @@ int add_profile_definitions(char *profiles, unsigned int has_value);
+@@ -114,6 +114,11 @@ int add_profile_definitions(char *profiles, unsigned int has_value);
   */
  void destroy_dlg_profiles(void);
  
@@ -111,10 +111,10 @@ index 4a6f6f1..38b5928 100644
  /*!
   * \brief Search a dialog profile in the global list
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 07116e7..a2513cc 100644
+index 4a522cd..ee6933c 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
-@@ -3013,6 +3013,28 @@ dlg_reset_property("timeout-noreset");
+@@ -3067,6 +3067,28 @@ dlg_set_state("early");
  		</programlisting>
  		</section>
  

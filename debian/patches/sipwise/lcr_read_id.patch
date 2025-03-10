@@ -7,10 +7,10 @@ Subject: lcr_read_id
  1 file changed, 72 insertions(+), 19 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 2ef49e2..e28c363 100644
+index 66dbcdc..4ab536c 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
-@@ -173,6 +173,7 @@ static char *gw_uri_avp_param = NULL;
+@@ -175,6 +175,7 @@ static char *gw_uri_avp_param = NULL;
  static char *ruri_user_avp_param = NULL;
  static char *tag_avp_param = NULL;
  static char *flags_avp_param = NULL;
@@ -18,24 +18,24 @@ index 2ef49e2..e28c363 100644
  static char *rule_id_avp_param = NULL;
  static char *defunct_gw_avp_param = NULL;
  static char *lcr_id_avp_param = NULL;
-@@ -228,6 +229,8 @@ static int     tag_avp_type;
- static int_str tag_avp;
- static int     flags_avp_type;
- static int_str flags_avp;
-+static int     gw_id_avp_type;
-+static int_str gw_id_avp;
- static int     rule_id_avp_type;
- static int_str rule_id_avp;
- static int     defunct_gw_avp_type;
-@@ -359,6 +362,7 @@ static param_export_t params[] = {
+@@ -230,6 +231,8 @@ static avp_flags_t tag_avp_type;
+ static avp_name_t  tag_avp;
+ static avp_flags_t flags_avp_type;
+ static avp_name_t  flags_avp;
++static avp_flags_t gw_id_avp_type;
++static avp_name_t  gw_id_avp;
+ static avp_flags_t rule_id_avp_type;
+ static avp_name_t  rule_id_avp;
+ static avp_flags_t defunct_gw_avp_type;
+@@ -361,6 +364,7 @@ static param_export_t params[] = {
      {"ruri_user_avp",            PARAM_STRING, &ruri_user_avp_param},
      {"tag_avp",                  PARAM_STRING, &tag_avp_param},
      {"flags_avp",                PARAM_STRING, &flags_avp_param},
 +    {"gw_id_avp",                PARAM_STRING, &gw_id_avp_param},
      {"rule_id_avp",              PARAM_STRING, &rule_id_avp_param},
-     {"defunct_capability",       INT_PARAM, &defunct_capability_param},
+     {"defunct_capability",       PARAM_INT, &defunct_capability_param},
      {"defunct_gw_avp",           PARAM_STRING, &defunct_gw_avp_param},
-@@ -777,6 +781,21 @@ static int mod_init(void)
+@@ -779,6 +783,21 @@ static int mod_init(void)
  		flags_avp_type = avp_flags;
  	}
  
@@ -57,7 +57,7 @@ index 2ef49e2..e28c363 100644
  	if(rule_id_avp_param) {
  		s.s = rule_id_avp_param;
  		s.len = strlen(s.s);
-@@ -2133,7 +2152,7 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
+@@ -2135,7 +2154,7 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
  		struct ip_addr *ip_addr, char *hostname, unsigned int hostname_len,
  		unsigned int port, char *uparams, unsigned int uparams_len,
  		char *transport, unsigned int transport_len, unsigned int flags,
@@ -66,7 +66,7 @@ index 2ef49e2..e28c363 100644
  {
  	char *at, *string;
  	int len;
-@@ -2189,13 +2208,18 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
+@@ -2191,13 +2210,18 @@ static inline int encode_avp_value(char *value, unsigned int gw_index,
  	/* rule id */
  	string = int2str(rule_id, &len);
  	append_str(at, string, len);
@@ -86,7 +86,7 @@ index 2ef49e2..e28c363 100644
  {
  	unsigned int u = 0;
  	str s;
-@@ -2311,6 +2335,12 @@ static inline int decode_avp_value(char *value, unsigned int *gw_index,
+@@ -2313,6 +2337,12 @@ static inline int decode_avp_value(char *value, unsigned int *gw_index,
  	s.s = sep + 1;
  	s.len = strlen(s.s);
  	str2int(&s, rule_id);
@@ -99,7 +99,7 @@ index 2ef49e2..e28c363 100644
  
  	return 1;
  }
-@@ -2361,7 +2391,8 @@ void add_gws_into_avps(struct gw_info *gws, struct matched_gw_info *matched_gws,
+@@ -2363,7 +2393,8 @@ void add_gws_into_avps(struct gw_info *gws, struct matched_gw_info *matched_gws,
  				gws[index].tag, tag_len, &gws[index].ip_addr,
  				gws[index].hostname, hostname_len, gws[index].port,
  				gws[index].params, uparams_len, gws[index].transport,
@@ -109,7 +109,7 @@ index 2ef49e2..e28c363 100644
  		value.s = (char *)&(encoded_value[0]);
  		val.s = value;
  		add_avp(gw_uri_avp_type | AVP_VAL_STR, gw_uri_avp, val);
-@@ -2538,9 +2569,9 @@ done:
+@@ -2540,9 +2571,9 @@ done:
  		if(matched_gws[i].duplicate == 1)
  			continue;
  		gw_indexes[j] = matched_gws[i].gw_index;
@@ -121,7 +121,7 @@ index 2ef49e2..e28c363 100644
  			i = -1;
  		}
  		j++;
-@@ -2572,28 +2603,36 @@ void reset_gw_stats(struct gw_info *gw)
+@@ -2574,28 +2605,36 @@ void reset_gw_stats(struct gw_info *gw)
  
  	gw->rcv_gw_rpl = 0;
  	gw->rcv_gw_rpl_invite = 0;
@@ -166,7 +166,7 @@ index 2ef49e2..e28c363 100644
  
  	gw->rcv_gw_rpls_1xx = 0;
  	gw->rcv_gw_rpls_18x = 0;
-@@ -2805,7 +2844,7 @@ done:
+@@ -2807,7 +2846,7 @@ done:
  			} else if(matched_gws[i].stopper == 1) {
  				stopper_flag = 1;
  				LM_DBG("lcr_rule[%d] has stopper, skip the rest\n",
@@ -175,7 +175,7 @@ index 2ef49e2..e28c363 100644
  			}
  		}
  	}
-@@ -2904,7 +2943,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
+@@ -2906,7 +2945,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
  static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
  		unsigned int *r_uri_len, char *dst_uri, unsigned int *dst_uri_len,
  		struct ip_addr *addr, unsigned int *gw_index, unsigned int *flags,
@@ -184,7 +184,7 @@ index 2ef49e2..e28c363 100644
  {
  	int_str gw_uri_val;
  	struct usr_avp *gu_avp;
-@@ -2930,7 +2969,7 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
+@@ -2932,7 +2971,7 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
  
  	decode_avp_value(gw_uri_val.s.s, gw_index, &scheme, &strip, &prefix,
  			&tmp_tag, addr, &hostname, &port, &uparams, &transport, flags,
@@ -193,7 +193,7 @@ index 2ef49e2..e28c363 100644
  
  	if(addr->af != 0) {
  		addr_str.s = ip_addr2a(addr);
-@@ -3289,7 +3328,7 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3291,7 +3330,7 @@ static int ki_next_gw(sip_msg_t *_m)
  	int rval;
  	str uri_str, tag_str;
  	char tag[MAX_TAG_LEN];
@@ -202,7 +202,7 @@ index 2ef49e2..e28c363 100644
  	char r_uri[MAX_URI_LEN], dst_uri[MAX_URI_LEN];
  	struct ip_addr addr;
  
-@@ -3311,7 +3350,8 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3313,7 +3352,8 @@ static int ki_next_gw(sip_msg_t *_m)
  			return -1;
  		}
  		if(generate_uris(_m, r_uri, &(_m->parsed_uri.user), &r_uri_len, dst_uri,
@@ -212,7 +212,7 @@ index 2ef49e2..e28c363 100644
  				<= 0) {
  			return -1;
  		}
-@@ -3330,7 +3370,8 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3332,7 +3372,8 @@ static int ki_next_gw(sip_msg_t *_m)
           * and Destination URIs. */
  
  		if(generate_uris(_m, r_uri, &(ruri_user_val.s), &r_uri_len, dst_uri,
@@ -222,7 +222,7 @@ index 2ef49e2..e28c363 100644
  				<= 0) {
  			return -1;
  		}
-@@ -3363,6 +3404,13 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3365,6 +3406,13 @@ static int ki_next_gw(sip_msg_t *_m)
  		LM_DBG("added flags_avp <%u>\n", (unsigned int)val.n);
  	}
  
@@ -236,7 +236,7 @@ index 2ef49e2..e28c363 100644
  	/* Set tag_avp */
  	if(tag_avp_param) {
  		val.s = tag_str;
-@@ -3441,6 +3489,11 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -3443,6 +3491,11 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  			add_avp(flags_avp_type, flags_avp, val);
  			LM_DBG("added flags_avp <%u>\n", (unsigned int)val.n);
  		}

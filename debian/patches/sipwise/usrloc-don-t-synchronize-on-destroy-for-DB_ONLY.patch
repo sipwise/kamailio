@@ -7,10 +7,10 @@ Subject: usrloc: don't synchronize on destroy for DB_ONLY
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index 0093058..0df21d3 100644
+index 3d68a02..d144780 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
-@@ -620,7 +620,7 @@ static void destroy(void)
+@@ -622,7 +622,7 @@ static void destroy(void)
  {
  	/* we need to sync DB in order to flush the cache */
  	if(ul_dbh) {

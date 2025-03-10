@@ -7,10 +7,10 @@ Subject: pv_trans_eval_uri
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/pv/pv_trans.c b/src/modules/pv/pv_trans.c
-index 0cc6f8f..b36b55b 100644
+index f3432b1..c0bf413 100644
 --- a/src/modules/pv/pv_trans.c
 +++ b/src/modules/pv/pv_trans.c
-@@ -1544,7 +1544,8 @@ int tr_eval_uri(
+@@ -1635,7 +1635,8 @@ int tr_eval_uri(
  		}
  		/* parse uri -- params only when requested */
  		if(parse_uri(_tr_uri.s, _tr_uri.len - dlen, &_tr_parsed_uri) != 0) {

@@ -9,10 +9,10 @@ Subject: lcr: add stats per gw
  3 files changed, 828 insertions(+)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index bbfe3df..2ef49e2 100644
+index 6bf2cea..66dbcdc 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
-@@ -66,6 +66,7 @@
+@@ -68,6 +68,7 @@
  #include "../../core/pvar.h"
  #include "../../core/rand/kam_rand.h"
  #include "../../core/kemi.h"
@@ -20,7 +20,7 @@ index bbfe3df..2ef49e2 100644
  #include "hash.h"
  #include "lcr_rpc.h"
  #include "../../core/rpc_lookup.h"
-@@ -212,6 +213,9 @@ static pcre2_compile_context *lcr_ctx = NULL;
+@@ -214,6 +215,9 @@ static pcre2_compile_context *lcr_ctx = NULL;
  #define DEF_LCR_STOPPER_MODE 0
  unsigned int stopper_mode_param = DEF_LCR_STOPPER_MODE;
  
@@ -30,7 +30,7 @@ index bbfe3df..2ef49e2 100644
  /*
   * Other module types and variables
   */
-@@ -253,6 +257,9 @@ unsigned int ping_rc_count = 0;
+@@ -255,6 +259,9 @@ unsigned int ping_rc_count = 0;
  /* Mtree API var */
  mtree_api_t mtree_api;
  
@@ -40,7 +40,7 @@ index bbfe3df..2ef49e2 100644
  /*
   * Functions that are defined later
   */
-@@ -276,6 +283,10 @@ static int to_gw_1(struct sip_msg *_m, char *_s1, char *_s2);
+@@ -278,6 +285,10 @@ static int to_gw_1(struct sip_msg *_m, char *_s1, char *_s2);
  static int to_gw_3(struct sip_msg *_m, char *_s1, char *_s2, char *_s3);
  static int to_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2);
  static int to_any_gw_2(struct sip_msg *_m, char *_s1, char *_s2);
@@ -51,7 +51,7 @@ index bbfe3df..2ef49e2 100644
  
  /* clang-format off */
  /*
-@@ -366,6 +377,7 @@ static param_export_t params[] = {
+@@ -368,6 +379,7 @@ static param_export_t params[] = {
      {"ping_from",                PARAM_STR, &ping_from_param},
      {"ping_socket",              PARAM_STR, &ping_socket_param},
      {"stopper_mode",             PARAM_INT, &stopper_mode_param},
@@ -59,7 +59,7 @@ index bbfe3df..2ef49e2 100644
      {0, 0, 0}
  };
  
-@@ -444,6 +456,181 @@ static void pcre2_free(void *ptr, void *ext)
+@@ -446,6 +458,181 @@ static void pcre2_free(void *ptr, void *ext)
  	}
  }
  
@@ -241,7 +241,7 @@ index bbfe3df..2ef49e2 100644
  /*
   * Module initialization function that is called before the main process forks
   */
-@@ -455,6 +642,28 @@ static int mod_init(void)
+@@ -457,6 +644,28 @@ static int mod_init(void)
  	unsigned int i;
  	char *at, *past, *sep;
  
@@ -270,7 +270,7 @@ index bbfe3df..2ef49e2 100644
  	/* Register RPC commands */
  	if(rpc_register_array(lcr_rpc) != 0) {
  		LM_ERR("failed to register RPC commands\n");
-@@ -1056,6 +1265,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
+@@ -1058,6 +1267,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
  		append_str(at, transport, transport_len);
  	}
  	gws[i].uri_len = at - &(gws[i].uri[0]);
@@ -281,7 +281,7 @@ index bbfe3df..2ef49e2 100644
  	LM_DBG("inserted gw <%u, %.*s, %.*s> at index %u\n", gw_id, gw_name_len,
  			gw_name, gws[i].uri_len, gws[i].uri, i);
  	return 1;
-@@ -2336,6 +2549,65 @@ done:
+@@ -2338,6 +2551,65 @@ done:
  	return j;
  }
  
@@ -347,7 +347,7 @@ index bbfe3df..2ef49e2 100644
  
  /*
   * Load info of matching GWs into gw_uri_avps
-@@ -3795,3 +4067,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+@@ -3797,3 +4069,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
  	sr_kemi_modules_add(sr_kemi_lcr_exports);
  	return 0;
  }
@@ -404,10 +404,10 @@ index bbfe3df..2ef49e2 100644
 +	return NULL;
 +}
 diff --git a/src/modules/lcr/lcr_mod.h b/src/modules/lcr/lcr_mod.h
-index 131cb64..a1c7b00 100644
+index dbb75b6..24e9dec 100644
 --- a/src/modules/lcr/lcr_mod.h
 +++ b/src/modules/lcr/lcr_mod.h
-@@ -39,6 +39,7 @@
+@@ -41,6 +41,7 @@
  #include "../../core/locking.h"
  #include "../../core/parser/parse_uri.h"
  #include "../../core/ip_addr.h"
@@ -415,7 +415,7 @@ index 131cb64..a1c7b00 100644
  
  #define MAX_PREFIX_LEN 16
  #define MAX_URI_LEN 256
-@@ -136,6 +137,54 @@ struct gw_info
+@@ -138,6 +139,54 @@ struct gw_info
  	char uri[MAX_URI_LEN];
  	unsigned short uri_len;
  	unsigned int defunct_until;
@@ -470,7 +470,7 @@ index 131cb64..a1c7b00 100644
  };
  
  extern unsigned int lcr_rule_hash_size_param;
-@@ -152,5 +201,9 @@ extern int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri,
+@@ -154,5 +203,9 @@ extern int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri,
  		str *request_uri, unsigned int *gw_indexes);
  extern int reload_tables();
  extern int rpc_defunct_gw(unsigned int, unsigned int, unsigned int);
@@ -481,10 +481,10 @@ index 131cb64..a1c7b00 100644
  
  #endif /* LCR_MOD_H */
 diff --git a/src/modules/lcr/lcr_rpc.c b/src/modules/lcr/lcr_rpc.c
-index 614d027..755fe58 100644
+index 47d94c0..ff38e61 100644
 --- a/src/modules/lcr/lcr_rpc.c
 +++ b/src/modules/lcr/lcr_rpc.c
-@@ -102,6 +102,172 @@ static void dump_gw(rpc_t *rpc, void *st, struct gw_info *gw,
+@@ -104,6 +104,172 @@ static void dump_gw(rpc_t *rpc, void *st, struct gw_info *gw,
  			start);
  }
  
@@ -657,7 +657,7 @@ index 614d027..755fe58 100644
  static void dump_gws(rpc_t *rpc, void *c)
  {
  	void *st;
-@@ -303,6 +469,288 @@ static void load_gws(rpc_t *rpc, void *c)
+@@ -305,6 +471,288 @@ static void load_gws(rpc_t *rpc, void *c)
  	return;
  }
  
@@ -946,7 +946,7 @@ index 614d027..755fe58 100644
  /* clang-format off */
  rpc_export_t lcr_rpc[] = {
      {"lcr.reload", reload, reload_doc, 0},
-@@ -310,6 +758,9 @@ rpc_export_t lcr_rpc[] = {
+@@ -312,6 +760,9 @@ rpc_export_t lcr_rpc[] = {
      {"lcr.dump_rules", dump_rules, dump_rules_doc, 0},
      {"lcr.defunct_gw", defunct_gw, defunct_gw_doc, 0},
      {"lcr.load_gws", load_gws, load_gws_doc, 0},

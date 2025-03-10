@@ -47,10 +47,10 @@ index fcc94c4..79f56ba 100644
  		}
  	}
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index b2aa8bb..ef481a5 100644
+index 74f091c..b90b893 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -981,6 +981,8 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -982,6 +982,8 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  
  	if(!upstream && !SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
  		// caller isn't SCA, no more to do. update callee in reply handler.
@@ -59,7 +59,7 @@ index b2aa8bb..ef481a5 100644
  		rc = 1;
  		goto done;
  	}
-@@ -998,6 +1000,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -999,6 +1001,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	}
  
  	if(sca_call_is_held(msg)) {
@@ -67,7 +67,7 @@ index b2aa8bb..ef481a5 100644
  		state = SCA_APPEARANCE_STATE_HELD;
  		if(call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE) {
  			state = SCA_APPEARANCE_STATE_HELD_PRIVATE;
-@@ -1006,13 +1009,17 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -1007,13 +1010,17 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  		}
  	} else if(!SCA_STR_EMPTY(&to->tag_value)) {
  		// this is a reINVITE from an SCA line that put the call on hold
@@ -85,7 +85,7 @@ index b2aa8bb..ef481a5 100644
  		}
  	}
  
-@@ -1185,6 +1192,8 @@ static int sca_call_info_insert_asserted_identity(
+@@ -1186,6 +1193,8 @@ static int sca_call_info_insert_asserted_identity(
  	memcpy(hdr.s + hdr.len, CRLF, CRLF_LEN);
  	hdr.len += CRLF_LEN;
  
@@ -94,7 +94,7 @@ index b2aa8bb..ef481a5 100644
  	// append the PAI header before the sdp body
  	if(insert_new_lump_before(anchor, hdr.s, hdr.len, HDR_PAI_T) == NULL) {
  		LM_ERR("Failed to add PAI header %.*s\n", STR_FMT(&hdr));
-@@ -1226,11 +1235,19 @@ static int sca_call_info_invite_reply_200_handler(sip_msg_t *msg,
+@@ -1227,11 +1236,19 @@ static int sca_call_info_invite_reply_200_handler(sip_msg_t *msg,
  
  	if(SCA_CALL_INFO_IS_SHARED_CALLEE(call_info)
  			&& (!SCA_STR_EQ(from_aor, to_aor))) {
@@ -114,7 +114,7 @@ index b2aa8bb..ef481a5 100644
  		goto done;
  	}
  
-@@ -1258,6 +1275,8 @@ static int sca_call_info_invite_reply_200_handler(sip_msg_t *msg,
+@@ -1259,6 +1276,8 @@ static int sca_call_info_invite_reply_200_handler(sip_msg_t *msg,
  			&from->tag_value, NULL, slot_idx);
  	if(app == NULL) {
  		// no SCA line is involved with this call
@@ -123,7 +123,7 @@ index b2aa8bb..ef481a5 100644
  		rc = 1;
  		goto done;
  	}
-@@ -1432,6 +1451,8 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1433,6 +1452,8 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  			sca_appearance_update_state_unsafe(app, state);
  			// can't send NOTIFYs until we unlock the slot below
  		}
@@ -132,7 +132,7 @@ index b2aa8bb..ef481a5 100644
  	}
  
  done:
-@@ -1599,7 +1620,11 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1600,7 +1621,11 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  	str *tag = NULL;
  
  	if(msg->first_line.type == SIP_REQUEST) {
@@ -144,7 +144,7 @@ index b2aa8bb..ef481a5 100644
  			slot_idx = sca_uri_lock_shared_appearance(sca, from_aor);
  			if(slot_idx < 0) {
  				LM_ERR("sca_call_info_bye_handler: failed to acquire "
-@@ -1653,6 +1678,10 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1654,6 +1679,10 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  					goto done;
  				}
  			}
@@ -155,7 +155,7 @@ index b2aa8bb..ef481a5 100644
  		}
  
  		if(slot_idx >= 0) {
-@@ -1708,6 +1737,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1709,6 +1738,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  			}
  		}
  	} else {
@@ -163,7 +163,7 @@ index b2aa8bb..ef481a5 100644
  		// this is just a backup to catch anything missed on the BYE request
  		if(SCA_CALL_INFO_IS_SHARED_CALLEE(call_info)) {
  			slot_idx = sca_hash_table_index_for_key(sca->appearances, to_aor);
-@@ -2093,28 +2123,37 @@ int sca_call_info_update(
+@@ -2100,28 +2130,37 @@ int sca_call_info_update(
  	if(sca_uri_is_shared_appearance(sca, &from_aor)) {
  		if((update_mask & SCA_CALL_INFO_SHARED_CALLER)) {
  			call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;

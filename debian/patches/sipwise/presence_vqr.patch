@@ -25,18 +25,18 @@ Subject: presence_vqr
  create mode 100644 src/modules/presence_vqr/presence_vqr.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 698847f..f0fe234 100644
+index 6242bb7..ed8b1c6 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -118,7 +118,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
- 					   presence_xml \
+@@ -115,7 +115,7 @@ mod_list_lcrrate=lcr_rate
+ # - modules related to SIMPLE presence extensions
+ mod_list_presence=presence presence_conference presence_dialoginfo \
+ 					   presence_mwi presence_profile presence_reginfo \
+-					   presence_xml presence_dfks \
++					   presence_xml presence_dfks presence_vqr \
  					   pua pua_bla pua_dialoginfo pua_reginfo \
  					   pua_rpc pua_usrloc pua_xmpp \
--					   rls xcap_client xcap_server presence_dfks
-+					   rls xcap_client xcap_server presence_dfks presence_vqr
- 
- 
- # - modules depending on lua library
+ 					   rls xcap_client xcap_server
 diff --git a/src/modules/presence_vqr/Makefile b/src/modules/presence_vqr/Makefile
 new file mode 100644
 index 0000000..02957e5

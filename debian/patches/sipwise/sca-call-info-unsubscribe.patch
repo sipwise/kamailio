@@ -7,10 +7,10 @@ Subject: sca-call-info-unsubscribe
  1 file changed, 26 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/sca/sca_subscribe.c b/src/modules/sca/sca_subscribe.c
-index 7d68867..2a55039 100644
+index ca42fd1..8cddf7c 100644
 --- a/src/modules/sca/sca_subscribe.c
 +++ b/src/modules/sca/sca_subscribe.c
-@@ -1171,6 +1171,8 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
+@@ -1172,6 +1172,8 @@ int ki_sca_handle_subscribe_uris(sip_msg_t *msg, str *uri_to, str *uri_from)
  	int released = 0;
  	int_str val;
  	sca_to_body_t tmp_to;
@@ -19,7 +19,7 @@ index 7d68867..2a55039 100644
  
  	memset(&tmp_to, 0, sizeof(tmp_to));
  	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
-@@ -1263,12 +1265,17 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
+@@ -1267,12 +1269,17 @@ int ki_sca_handle_subscribe_uris(sip_msg_t *msg, str *uri_to, str *uri_from)
  		}
  	}
  
@@ -39,7 +39,7 @@ index 7d68867..2a55039 100644
  		// this will remove the subscription if expires == 0
  		if(sca_subscription_update_unsafe(sca, sub, &req_sub, idx) < 0) {
  			SCA_SUB_REPLY_ERROR(sca, 500,
-@@ -1324,10 +1331,25 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
+@@ -1328,10 +1335,25 @@ int ki_sca_handle_subscribe_uris(sip_msg_t *msg, str *uri_to, str *uri_from)
  				if(released) {
  					LM_INFO("released %d appearances for subscriber %.*s\n",
  							released, STR_FMT(&req_sub.subscriber));
@@ -65,7 +65,7 @@ index 7d68867..2a55039 100644
  		// in-dialog request, but we didn't find it.
  		if(!SCA_STR_EMPTY(to_tag)) {
  			SCA_SUB_REPLY_ERROR(
-@@ -1366,6 +1388,8 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
+@@ -1370,6 +1392,8 @@ int ki_sca_handle_subscribe_uris(sip_msg_t *msg, str *uri_to, str *uri_from)
  			// we got an in-dialog SUBSCRIBE with an "Expires: 0" header,
  			// but the dialog wasn't in our table. just reply with the
  			// subscription info we got, without saving or creating anything.

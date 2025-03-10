@@ -8,10 +8,10 @@ Subject: TT#41650 Development of Kamailio module/function for parsing iCal
 Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
 ---
  src/modules/tmrec/Makefile    |  2 +-
- src/modules/tmrec/ical.c      | 45 ++++++++++++++++++++++++++++++++
- src/modules/tmrec/ical.h      | 17 ++++++++++++
- src/modules/tmrec/tmrec_mod.c | 60 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 123 insertions(+), 1 deletion(-)
+ src/modules/tmrec/ical.c      | 45 ++++++++++++++++++++++++++++++++++++
+ src/modules/tmrec/ical.h      | 17 ++++++++++++++
+ src/modules/tmrec/tmrec_mod.c | 54 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 117 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/tmrec/ical.c
  create mode 100644 src/modules/tmrec/ical.h
 
@@ -102,7 +102,7 @@ index 0000000..5e44ba1
 +
 +#endif
 diff --git a/src/modules/tmrec/tmrec_mod.c b/src/modules/tmrec/tmrec_mod.c
-index 78949a9..519247c 100644
+index fb07d45..30ac767 100644
 --- a/src/modules/tmrec/tmrec_mod.c
 +++ b/src/modules/tmrec/tmrec_mod.c
 @@ -41,6 +41,7 @@
@@ -123,40 +123,35 @@ index 78949a9..519247c 100644
  static int w_is_leap_year(struct sip_msg *msg, char *t, char *p2);
  static int fixup_is_leap_year(void **param, int param_no);
  static int fixup_time_period_match(void **param, int param_no);
-@@ -64,6 +67,10 @@ static cmd_export_t cmds[] = {{"tmrec_match", (cmd_function)w_tmrec_match, 1,
- 									  fixup_tmrec_match, 0, ANY_ROUTE},
- 		{"tmrec_match", (cmd_function)w_tmrec_match, 2, fixup_tmrec_match, 0,
- 				ANY_ROUTE},
-+		{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 1, fixup_ical, 0,
-+				ANY_ROUTE},
-+		{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 2, fixup_ical, 0,
-+				ANY_ROUTE},
- 		{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year, 0,
- 				ANY_ROUTE},
- 		{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year, 0,
-@@ -242,6 +249,45 @@ static int w_tmrec_match(struct sip_msg *msg, char *rec, char *t)
+@@ -65,6 +68,8 @@ static cmd_export_t cmds[] = {
+ 	{"tmrec_match", (cmd_function)w_tmrec_match, 1,
+ 			fixup_tmrec_match, 0, ANY_ROUTE},
+ 	{"tmrec_match", (cmd_function)w_tmrec_match, 2, fixup_tmrec_match, 0, ANY_ROUTE},
++	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 1, fixup_ical, 0, ANY_ROUTE},
++	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 2, fixup_ical, 0, ANY_ROUTE},
+ 	{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year, 0, ANY_ROUTE},
+ 	{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year, 0, ANY_ROUTE},
+ 	{"time_period_match", (cmd_function)w_time_period_match, 1,
+@@ -246,6 +251,42 @@ static int w_tmrec_match(struct sip_msg *msg, char *rec, char *t)
  	return ki_tmrec_match_timestamp(msg, &rv, ti);
  }
  
-+static int w_tmrec_match_ical(struct sip_msg* msg, char* ical_rec, char* t)
++static int w_tmrec_match_ical(struct sip_msg *msg, char *ical_rec, char *t)
 +{
 +	str rv;
 +	time_t tv;
 +	int ti;
 +
-+	if(msg==NULL)
++	if(msg == NULL)
 +		return -2;
 +
-+	if(fixup_get_svalue(msg, (gparam_t*)ical_rec, &rv)!=0)
-+	{
++	if(fixup_get_svalue(msg, (gparam_t *)ical_rec, &rv) != 0) {
 +		LM_ERR("w_tmrec_match_ical: invalid input");
 +		return -1;
 +	}
 +
-+	if(t!=NULL)
-+	{
-+		if(fixup_get_ivalue(msg, (gparam_t*)t, &ti)!=0)
-+		{
++	if(t != NULL) {
++		if(fixup_get_ivalue(msg, (gparam_t *)t, &ti) != 0) {
 +			LM_ERR("invalid time stamp parameter value\n");
 +			return -4;
 +		}
@@ -180,19 +175,18 @@ index 78949a9..519247c 100644
  static int fixup_tmrec_match(void **param, int param_no)
  {
  	if(param_no == 1) {
-@@ -255,6 +301,20 @@ static int fixup_tmrec_match(void **param, int param_no)
+@@ -259,6 +300,19 @@ static int fixup_tmrec_match(void **param, int param_no)
  	return 0;
  }
  
-+static int fixup_ical(void** param, int param_no)
++static int fixup_ical(void **param, int param_no)
 +{
-+	if(param_no==1)
-+	{
-+		if(fixup_spve_null(param, 1)<0)
++	if(param_no == 1) {
++		if(fixup_spve_null(param, 1) < 0)
 +			return -1;
 +		return 0;
-+	} else if(param_no==2) {
-+		if(fixup_igp_null(param, 1)<0)
++	} else if(param_no == 2) {
++		if(fixup_igp_null(param, 1) < 0)
 +			return -1;
 +	}
 +	return 0;

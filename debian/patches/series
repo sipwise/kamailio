@@ -12,8 +12,6 @@ sipwise/parallel_build.patch
 sipwise/add_pcem_module.patch
 sipwise/add_lcr_rate_module.patch
 sipwise/add_tcap_module.patch
-sipwise/add_presence_dfks_module.patch
-sipwise/presence_dfks_null_ptr_fixes.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
@@ -21,8 +19,6 @@ sipwise/pv_trans_eval_uri.patch
 sipwise/tmrec-ical.patch
 sipwise/switch_from_python2_to_python3.patch
 ## SCA Patches
-sipwise/sca-line-seize.patch
-sipwise/sca-fallback-if-no-contact.patch
 sipwise/sca-call-info-unsubscribe.patch
 sipwise/sca-rr-is-direction.patch
 sipwise/sca-fix-pickup-when-upstream-flow.patch
@@ -30,26 +26,9 @@ sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
-## upstream 5.8
-upstream/db_sqlite-fix-incompatible-pointer-types-warning.patch
-upstream/db_unixodbc-fix-incompatible-pointer-types-warning.patch
-upstream/htable-do-not-print-item-name-before-is-computed.patch
+#
 ## upstream master
-upstream/rtpengine_rework_rtpp_flags.patch
-upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
-upstream/cfgutils-initialize-the-optional-key.patch
-upstream/permissions_add_register_allow_with_port_check.patch
-upstream/multipart-sdp.patch
-upstream/dialog-don-t-complain-if-dst_var-doesn-t-exist.patch
-upstream/rtpengine-use-to-tag-for-NG-message-when-rtpp-flags.patch
-upstream/dialog-remove-destroy-of-internal-structures-on-mod-.patch
-upstream/tm-remove-destroy-of-internal-structures-on-mod-dest.patch
-upstream/usrloc-remove-destroy-of-internal-structures-on-mod-.patch
-upstream/htable-remove-destroy-of-internal-structures-on-mod-.patch
-upstream/presence-remove-destroy-of-internal-structures-on-mo.patch
-upstream/pua-remove-destroy-of-internal-structures-on-mod-des.patch
-upstream/dialog-get-vars-via-value-instead-of-reference-for-k.patch
-upstream/dialog-fixed-DLG_FLAG_CHANGED_PROF-value-and-setting.patch
+#
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
@@ -59,13 +38,9 @@ sipwise/lcr_read_id.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
-sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
 sipwise/cfgutils-allow-lock_set_size-14.patch
-sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
-sipwise/pua_dialoginfo-use_uuid.patch
 sipwise/http_client-add-method-parameter-to-http_connect.patch
 sipwise/lost-add-method-parameter-to-http_connect-calls.patch
-sipwise/rtpengine_add_sip_code.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 ### active development
 #
