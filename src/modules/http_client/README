@@ -62,6 +62,7 @@ Hugh Waite
               3.19. httpcon (string)
               3.20. config_file (string)
               3.21. netinterface (string)
+              3.22. response_headers (int)
 
         4. Functions
 
@@ -74,10 +75,15 @@ Hugh Waite
               4.3. http_get_redirect(connection, result)
               4.4. http_client_query(url, [post-data], [hdrs], result)
               4.5. http_client_get(url, body, hdrs, respv)
+              4.6. http_client_request(met, url, body, hdrs, respv)
+              4.7. http_client_request_v2pk(met, url, body, hdrs, respv)
+              4.8. http_client_response_headers_set(mode)
+              4.9. http_client_response_headers_clear()
 
-        5. Pseudovariables
+        5. Pseudo-Variables
 
               5.1. $curlerror(error)
+              5.2. $httprhdr(name)
 
         6. RPC Commands
 
@@ -127,11 +133,16 @@ Hugh Waite
    1.20. Set config_file parameter
    1.21. Short http_client config file
    1.22. Set netinterface parameter
-   1.23. http_connect() usage
-   1.24. http_connect_raw() usage
-   1.25. http_get_redirect() usage
-   1.26. http_client_query() usage
-   1.27. http_client_get() usage
+   1.23. Set response_headers parameter
+   1.24. http_connect() usage
+   1.25. http_connect_raw() usage
+   1.26. http_get_redirect() usage
+   1.27. http_client_query() usage
+   1.28. http_client_get() usage
+   1.29. http_client_request() usage
+   1.30. http_client_request_v2pk() usage
+   1.31. http_client_response_headers_set() usage
+   1.32. http_client_response_headers_clear() usage
 
 Chapter 1. Admin Guide
 
@@ -166,6 +177,7 @@ Chapter 1. Admin Guide
         3.19. httpcon (string)
         3.20. config_file (string)
         3.21. netinterface (string)
+        3.22. response_headers (int)
 
    4. Functions
 
@@ -175,10 +187,15 @@ Chapter 1. Admin Guide
         4.3. http_get_redirect(connection, result)
         4.4. http_client_query(url, [post-data], [hdrs], result)
         4.5. http_client_get(url, body, hdrs, respv)
+        4.6. http_client_request(met, url, body, hdrs, respv)
+        4.7. http_client_request_v2pk(met, url, body, hdrs, respv)
+        4.8. http_client_response_headers_set(mode)
+        4.9. http_client_response_headers_clear()
 
-   5. Pseudovariables
+   5. Pseudo-Variables
 
         5.1. $curlerror(error)
+        5.2. $httprhdr(name)
 
    6. RPC Commands
 
@@ -265,6 +282,7 @@ Chapter 1. Admin Guide
    3.19. httpcon (string)
    3.20. config_file (string)
    3.21. netinterface (string)
+   3.22. response_headers (int)
 
    The parameters are loaded in order. That can lead to unexpected
    behavior: If httpcon is set at first, the default values for all other
@@ -695,6 +713,18 @@ http_follow_redirect = no
 modparam("http_client", "netinterface", "eth0")
 ...
 
+3.22. response_headers (int)
+
+   Set to 1 in order to store HTTP response headers. A header value can be
+   retrieved with $httprhdr(name).
+
+   Default value is 0.
+
+   Example 1.23. Set response_headers parameter
+...
+modparam("http_client", "response_headers", 1)
+...
+
 4. Functions
 
    4.1. http_connect(connection, url, [content_type, data,] result)
@@ -702,6 +732,10 @@ modparam("http_client", "netinterface", "eth0")
    4.3. http_get_redirect(connection, result)
    4.4. http_client_query(url, [post-data], [hdrs], result)
    4.5. http_client_get(url, body, hdrs, respv)
+   4.6. http_client_request(met, url, body, hdrs, respv)
+   4.7. http_client_request_v2pk(met, url, body, hdrs, respv)
+   4.8. http_client_response_headers_set(mode)
+   4.9. http_client_response_headers_clear()
 
 4.1.  http_connect(connection, url, [content_type, data,] result)
 
@@ -726,7 +760,7 @@ modparam("http_client", "netinterface", "eth0")
    This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
    FAILURE_ROUTE, and BRANCH_ROUTE.
 
-   Example 1.23. http_connect() usage
+   Example 1.24. http_connect() usage
 ...
 modparam("http_client", "httpcon", "apiserver=>https://kamailio.org/api/");
 ...
@@ -767,7 +801,7 @@ xlog("L_INFO", "API-server HTTP connection: $avp(route) Result code $var(res)\n"
    This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
    FAILURE_ROUTE, and BRANCH_ROUTE.
 
-   Example 1.24. http_connect_raw() usage
+   Example 1.25. http_connect_raw() usage
 ...
 modparam("http_client", "httpcon", "apiserver=>https://kamailio.org/api/");
 ...
@@ -794,7 +828,7 @@ xlog("L_INFO", "API-server HTTP connection: $avp(route) Result code $var(res)\n"
        result - The name of a pseudo variable that will contain the last
        used URL.
 
-   Example 1.25. http_get_redirect() usage
+   Example 1.26. http_get_redirect() usage
 ...
 modparam("http_client", "httpredirect", 1);
 ...
@@ -829,7 +863,7 @@ http_get_redirect("apiserver", "$var(targeturl)");
    utils module. It is changed to use the same base library and settings
    as the rest of the functions in this module.
 
-   Example 1.26. http_client_query() usage
+   Example 1.27. http_client_query() usage
 ...
 # GET-Request
 http_client_query("http://api.com/index.php?r_uri=$(ru{s.escape.param})&f_uri=$(
@@ -862,7 +896,7 @@ http_client_query("http://api.com/index.php", "src=$si",
    the body in HTTP GET does not affect the response, but is not
    explicitely forbidden.
 
-   Example 1.27. http_client_get() usage
+   Example 1.28. http_client_get() usage
 ...
 http_client_get("http://api.com/index.php?r_uri=$(ru{s.escape.param})&f_uri=$(fu
 {s.escape.param})",
@@ -872,9 +906,73 @@ switch ($rc) {
 }
 ...
 
-5. Pseudovariables
+4.6.  http_client_request(met, url, body, hdrs, respv)
+
+   Perform a HTTP request to "url", storing the response body in the
+   "respv" variable. The method of the request is set by "met". The "body"
+   and "hdrs" can be empty strings to skip setting them. The first four
+   parameters can contain variables that are evaluated at runtime. The
+   "respv" has to be the name of a writable variable.
+
+   Example 1.29. http_client_request() usage
+...
+http_client_request("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.param})
+&f_uri=$(fu{s.escape.param})",
+           "", "X-Token: abc", "$var(result)");
+switch ($rc) {
+    ...
+}
+...
+
+4.7.  http_client_request_v2pk(met, url, body, hdrs, respv)
+
+   Similar to http_client_request(), but using HTTP/2 prior-knowledge that
+   the server does not need HTTP/1.1-Upgrade (direct HTTP/2 by seting
+   libcurl option CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE).
+
+   Example 1.30. http_client_request_v2pk() usage
+...
+http_client_request_v2pk("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.pa
+ram})&f_uri=$(fu{s.escape.param})",
+           "", "X-Token: abc", "$var(result)");
+switch ($rc) {
+    ...
+}
+...
+
+4.8.  http_client_response_headers_set(mode)
+
+   Set if the HTTP response header should be stored (when mode is 1) or
+   not (when mode is 0). If mode is 0, then it also clears previously
+   stored response headers.
+
+   Example 1.31. http_client_response_headers_set() usage
+...
+http_client_response_headers_set("1");
+http_client_request_v2pk("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.pa
+ram})&f_uri=$(fu{s.escape.param})",
+           "", "X-Token: abc", "$var(result)");
+xinfo("response header: $httprhdr(X-Header)\n");
+...
+
+4.9.  http_client_response_headers_clear()
+
+   Clear stored response headers, if not explicitely done, it happens when
+   the next HTTP request is performed.
+
+   Example 1.32. http_client_response_headers_clear() usage
+...
+http_client_request_v2pk("GET", "http://api.com/index.php?r_uri=$(ru{s.escape.pa
+ram})&f_uri=$(fu{s.escape.param})",
+           "", "X-Token: abc", "$var(result)");
+xinfo("response header: $httprhdr(X-Header)\n");
+http_client_response_headers_clear();
+...
+
+5. Pseudo-Variables
 
    5.1. $curlerror(error)
+   5.2. $httprhdr(name)
 
 5.1.  $curlerror(error)
 
@@ -883,6 +981,11 @@ switch ($rc) {
    $curlerror pv returns a text string representing the error. For more
    information on cURL error codes, please visit
    http://curl.haxx.se/libcurl/c/libcurl-errors.html
+
+5.2.  $httprhdr(name)
+
+   Return response header value. It requires response_headers parameter to
+   be set to 1.
 
 6. RPC Commands
 

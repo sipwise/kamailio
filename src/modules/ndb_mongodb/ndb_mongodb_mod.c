@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -48,6 +50,7 @@ static int w_mongodb_cmd_simple(sip_msg_t *msg, char *ssrv, char *sdname,
 static int w_mongodb_cmd(sip_msg_t *msg, char *ssrv, char *sdname, char *scname,
 		char *scmd, char *sres);
 static int fixup_mongodb_cmd(void **param, int param_no);
+static int fixup_free_mongodb_cmd(void **param, int param_no);
 static int w_mongodb_free_reply(struct sip_msg *msg, char *res);
 static int w_mongodb_next_reply(struct sip_msg *msg, char *res);
 
@@ -58,44 +61,48 @@ static int pv_get_mongodb(
 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 static int pv_parse_mongodb_name(pv_spec_p sp, str *in);
 
+/* clang-format off */
 static pv_export_t mod_pvs[] = {
-		{{"mongodb", sizeof("mongodb") - 1}, PVT_OTHER, pv_get_mongodb, 0,
-				pv_parse_mongodb_name, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
-
-
-static cmd_export_t cmds[] = {{"mongodb_find", (cmd_function)w_mongodb_find, 5,
-									  fixup_mongodb_cmd, 0, ANY_ROUTE},
-		{"mongodb_find_one", (cmd_function)w_mongodb_find_one, 5,
-				fixup_mongodb_cmd, 0, ANY_ROUTE},
-		{"mongodb_cmd_simple", (cmd_function)w_mongodb_cmd_simple, 5,
-				fixup_mongodb_cmd, 0, ANY_ROUTE},
-		{"mongodb_cmd", (cmd_function)w_mongodb_cmd, 5, fixup_mongodb_cmd, 0,
-				ANY_ROUTE},
-		{"mongodb_free", (cmd_function)w_mongodb_free_reply, 1, fixup_spve_null,
-				0, ANY_ROUTE},
-		{"mongodb_next", (cmd_function)w_mongodb_next_reply, 1, fixup_spve_null,
-				0, ANY_ROUTE},
-		{"bind_ndb_mongodb", (cmd_function)bind_ndb_mongodb, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {
-		{"server", PARAM_STRING | USE_FUNC_PARAM, (void *)mongodb_srv_param},
-		{0, 0, 0}};
-
-struct module_exports exports = {
-		"ndb_mongodb",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /*·exported·functions·*/
-		params,			 /*·exported·params·*/
-		0,				 /*·exported·RPC·methods·*/
-		mod_pvs,		 /* exported pseudo-variables */
-		0,				 /* response function */
-		0,				 /* module·initialization·function */
-		child_init,		 /* per child init function */
-		mod_destroy		 /* destroy function */
+	{{"mongodb", sizeof("mongodb") - 1}, PVT_OTHER, pv_get_mongodb, 0,
+			pv_parse_mongodb_name, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
 };
 
+static cmd_export_t cmds[] = {
+	{"mongodb_find", (cmd_function)w_mongodb_find, 5,
+		fixup_mongodb_cmd, fixup_free_mongodb_cmd, ANY_ROUTE},
+	{"mongodb_find_one", (cmd_function)w_mongodb_find_one, 5,
+		fixup_mongodb_cmd, fixup_free_mongodb_cmd, ANY_ROUTE},
+	{"mongodb_cmd_simple", (cmd_function)w_mongodb_cmd_simple, 5,
+		fixup_mongodb_cmd, fixup_free_mongodb_cmd, ANY_ROUTE},
+	{"mongodb_cmd", (cmd_function)w_mongodb_cmd, 5,
+		fixup_mongodb_cmd, fixup_free_mongodb_cmd, ANY_ROUTE},
+	{"mongodb_free", (cmd_function)w_mongodb_free_reply, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"mongodb_next", (cmd_function)w_mongodb_next_reply, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"bind_ndb_mongodb", (cmd_function)bind_ndb_mongodb, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
+
+static param_export_t params[] = {
+	{"server", PARAM_STRING | PARAM_USE_FUNC, (void *)mongodb_srv_param},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"ndb_mongodb",   /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /*·exported·functions·*/
+	params,          /*·exported·params·*/
+	0,               /*·exported·RPC·methods·*/
+	mod_pvs,         /* exported pseudo-variables */
+	0,               /* response function */
+	0,               /* module·initialization·function */
+	child_init,      /* per child init function */
+	mod_destroy      /* destroy function */
+};
+/* clang-format on */
 
 /* each child get a new connection to the database */
 static int child_init(int rank)
@@ -242,6 +249,11 @@ static int w_mongodb_find_one(sip_msg_t *msg, char *ssrv, char *sdname,
 static int fixup_mongodb_cmd(void **param, int param_no)
 {
 	return fixup_spve_null(param, 1);
+}
+
+static int fixup_free_mongodb_cmd(void **param, int param_no)
+{
+	return fixup_free_spve_null(param, 1);
 }
 
 /**

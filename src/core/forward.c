@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -40,6 +42,7 @@
 #include "hash_func.h"
 #include "config.h"
 #include "parser/msg_parser.h"
+#include "parser/parse_uri.h"
 #include "char_msg_val.h"
 #include "route.h"
 #include "events.h"
@@ -482,14 +485,15 @@ int check_self_port(unsigned short port, unsigned short proto)
  *                 - send_info->send_flags is filled from the message
  *                 - if the send_socket member is null, a send_socket will be
  *                   chosen automatically
+ *   mbmode    - message build mode (for build_req_buf_from_sip_req())
  * WARNING: don't forget to zero-fill all the  unused members (a non-zero
  * random id along with proto==PROTO_TCP can have bad consequences, same for
  *   a bogus send_socket value)
  *
  * return: 0 (E_OK) on success; negative (E_*) on failure
  */
-int forward_request(struct sip_msg *msg, str *dst, unsigned short port,
-		struct dest_info *send_info)
+int forward_request_mode(struct sip_msg *msg, str *dst, unsigned short port,
+		struct dest_info *send_info, unsigned int mbmode)
 {
 	unsigned int len;
 	char *buf;
@@ -582,7 +586,7 @@ int forward_request(struct sip_msg *msg, str *dst, unsigned short port,
 			if(buf)
 				pkg_free(buf);
 			send_info->proto = proto;
-			buf = build_req_buf_from_sip_req(msg, &len, send_info, 0);
+			buf = build_req_buf_from_sip_req(msg, &len, send_info, mbmode);
 			if(!buf) {
 				LM_ERR("building failed\n");
 				ret = E_OUT_OF_MEM; /* most probable */
@@ -685,6 +689,112 @@ end:
 	return ret;
 }
 
+
+/**
+ * forward request in stateless mode
+ */
+int forward_request(struct sip_msg *msg, str *dst, unsigned short port,
+		struct dest_info *send_info)
+{
+	return forward_request_mode(msg, dst, port, send_info, 0);
+}
+
+
+/**
+ * forward request like initial uac sender, with only one via
+ */
+int forward_request_uac(struct sip_msg *msg, str *dst, unsigned short port,
+		struct dest_info *send_info)
+{
+	int ret;
+	sr_lump_t *anchor;
+	hdr_field_t *hf;
+	msg_flags_t msg_flags_bk;
+
+	if(parse_headers(msg, HDR_EOH_F, 0) == -1) {
+		LM_ERR("error while parsing message\n");
+		return -1;
+	}
+	/* remove incoming Via headers */
+	for(hf = msg->headers; hf; hf = hf->next) {
+		if(hf->type != HDR_VIA_T) {
+			continue;
+		}
+		anchor = del_lump(msg, hf->name.s - msg->buf, hf->len, 0);
+		if(anchor == 0) {
+			LM_ERR("cannot remove Via header\n");
+			return -1;
+		}
+	}
+
+	msg_flags_bk = msg->msg_flags;
+	msg->msg_flags |= FL_VIA_NORECEIVED;
+	ret = forward_request_mode(msg, dst, port, send_info, BUILD_NO_VIA1_UPDATE);
+	msg->msg_flags = msg_flags_bk;
+
+	return ret;
+}
+
+/**
+ * forward request like initial uac sender, with only one via
+ */
+int forward_uac_uri(sip_msg_t *msg, str *vuri)
+{
+	int ret;
+	dest_info_t dst;
+	sip_uri_t *u;
+	sip_uri_t next_hop;
+	sr_lump_t *anchor;
+	hdr_field_t *hf;
+	msg_flags_t msg_flags_bk;
+
+	if(msg == NULL) {
+		LM_WARN("invalid msg parameter\n");
+		return -1;
+	}
+
+	if(parse_headers(msg, HDR_EOH_F, 0) == -1) {
+		LM_ERR("error while parsing message\n");
+		return -1;
+	}
+	/* remove incoming Via headers */
+	for(hf = msg->headers; hf; hf = hf->next) {
+		if(hf->type != HDR_VIA_T) {
+			continue;
+		}
+		anchor = del_lump(msg, hf->name.s - msg->buf, hf->len, 0);
+		if(anchor == 0) {
+			LM_ERR("cannot remove Via header\n");
+			return -1;
+		}
+	}
+
+	init_dest_info(&dst);
+	if(vuri == NULL || vuri->s == NULL || vuri->len <= 0) {
+		if(msg->dst_uri.len) {
+			ret = parse_uri(msg->dst_uri.s, msg->dst_uri.len, &next_hop);
+			u = &next_hop;
+		} else {
+			ret = parse_sip_msg_uri(msg);
+			u = &msg->parsed_uri;
+		}
+	} else {
+		ret = parse_uri(vuri->s, vuri->len, &next_hop);
+		u = &next_hop;
+	}
+	if(ret < 0) {
+		LM_ERR("forward - bad uri dropping packet\n");
+		return -1;
+	}
+	dst.proto = u->proto;
+	msg_flags_bk = msg->msg_flags;
+	msg->msg_flags |= FL_VIA_NORECEIVED;
+	ret = forward_request_mode(
+			msg, &u->host, u->port_no, &dst, BUILD_NO_VIA1_UPDATE);
+	msg->msg_flags = msg_flags_bk;
+
+	return ret;
+}
 
 int update_sock_struct_from_via(
 		union sockaddr_union *to, struct sip_msg *msg, struct via_body *via)

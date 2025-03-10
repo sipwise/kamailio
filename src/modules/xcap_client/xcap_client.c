@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -41,9 +43,6 @@
 #include "../../core/mem/shm_mem.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
-#define KSR_RTHREAD_NEED_4L
-#define KSR_RTHREAD_SKIP_P
-#include "../../core/rthreads.h"
 #include "../presence/utils_func.h"
 #include "xcap_functions.h"
 #include "xcap_client.h"
@@ -81,28 +80,34 @@ db_func_t xcap_dbf;
 
 void query_xcap_update(unsigned int ticks, void *param);
 
-static param_export_t params[] = {{"db_url", PARAM_STR, &xcap_db_url},
-		{"xcap_table", PARAM_STR, &xcap_db_table},
-		{"periodical_query", INT_PARAM, &periodical_query},
-		{"query_period", INT_PARAM, &query_period}, {0, 0, 0}};
-
+/* clang-format off */
+static param_export_t params[] = {
+	{"db_url", PARAM_STR, &xcap_db_url},
+	{"xcap_table", PARAM_STR, &xcap_db_table},
+	{"periodical_query", PARAM_INT, &periodical_query},
+	{"query_period", PARAM_INT, &query_period},
+	{0, 0, 0}
+};
 
 static cmd_export_t cmds[] = {
-		{"bind_xcap", (cmd_function)bind_xcap, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0}};
+	{"bind_xcap", (cmd_function)bind_xcap, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"xcap_client",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* exported rpc functions */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* child init function */
-		destroy			 /* module destroy function */
+	"xcap_client",   /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* exported rpc functions */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* child init function */
+	destroy          /* module destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function
@@ -143,7 +148,7 @@ static int mod_init(void)
 	xcap_dbf.close(xcap_db);
 	xcap_db = NULL;
 
-	run_thread4L((_thread_proto4L)curl_global_init, CURL_GLOBAL_ALL);
+	curl_global_init(CURL_GLOBAL_ALL);
 
 	if(periodical_query) {
 		register_timer(query_xcap_update, 0, query_period);

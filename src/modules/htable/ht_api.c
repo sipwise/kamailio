@@ -359,6 +359,11 @@ int ht_init_tables(void)
 	ht = _ht_root;
 
 	while(ht) {
+		if(ht->entries != NULL) {
+			ht = ht->next;
+			continue;
+		}
+
 		LM_DBG("initializing htable [%.*s] with nr. of slots: %d\n",
 				ht->name.len, ht->name.s, ht->htsize);
 		if(ht->name.len + sizeof("htable:expired:") < HT_EVEX_NAME_SIZE) {
@@ -491,9 +496,7 @@ int ht_set_cell_ex(
 						it->value.s.s[it->value.s.len] = '\0';
 
 						if(exv <= 0) {
-							if(ht->updateexpire) {
-								it->expire = now + ht->htexpire;
-							}
+							HT_UPDATE_EXPIRE(ht, it, now);
 						} else {
 							it->expire = now + exv;
 						}
@@ -509,11 +512,7 @@ int ht_set_cell_ex(
 						cell->next = it->next;
 						cell->prev = it->prev;
 						if(exv <= 0) {
-							if(ht->updateexpire) {
-								cell->expire = now + ht->htexpire;
-							} else {
-								cell->expire = it->expire;
-							}
+							HT_COPY_EXPIRE(ht, cell, now, it);
 						} else {
 							it->expire = now + exv;
 						}
@@ -530,9 +529,7 @@ int ht_set_cell_ex(
 					it->value.n = val->n;
 
 					if(exv <= 0) {
-						if(ht->updateexpire) {
-							it->expire = now + ht->htexpire;
-						}
+						HT_UPDATE_EXPIRE(ht, it, now);
 					} else {
 						it->expire = now + exv;
 					}
@@ -551,11 +548,7 @@ int ht_set_cell_ex(
 						return -1;
 					}
 					if(exv <= 0) {
-						if(ht->updateexpire) {
-							cell->expire = now + ht->htexpire;
-						} else {
-							cell->expire = it->expire;
-						}
+						HT_COPY_EXPIRE(ht, cell, now, it);
 					} else {
 						it->expire = now + exv;
 					}
@@ -573,9 +566,7 @@ int ht_set_cell_ex(
 					it->value.n = val->n;
 
 					if(exv <= 0) {
-						if(ht->updateexpire) {
-							it->expire = now + ht->htexpire;
-						}
+						HT_UPDATE_EXPIRE(ht, it, now);
 					} else {
 						it->expire = now + exv;
 					}
@@ -864,8 +855,14 @@ ht_cell_t *ht_cell_pkg_copy(ht_t *ht, str *name, ht_cell_t *old)
 				}
 			}
 			cell = (ht_cell_t *)pkg_malloc(it->msize);
-			if(cell != NULL)
+			if(cell != NULL) {
 				memcpy(cell, it, it->msize);
+
+				cell->name.s = (char *)cell + sizeof(ht_cell_t);
+				if(cell->flags & AVP_VAL_STR) {
+					cell->value.s.s = (char *)cell->name.s + cell->name.len + 1;
+				}
+			}
 			ht_slot_unlock(ht, idx);
 			return cell;
 		}
@@ -1037,7 +1034,7 @@ int ht_table_spec(char *spec)
 
 			coldelim = tok.s[0];
 			LM_DBG("htable [%.*s] - coldelim [%c]\n", name.len, name.s,
-				   coldelim);
+					coldelim);
 		} else if(pit->name.len == 7
 				  && strncmp(pit->name.s, "colnull", 7) == 0) {
 			if(tok.len > 1)
@@ -1049,8 +1046,7 @@ int ht_table_spec(char *spec)
 				colnull = tok.s[0];
 			}
 
-			LM_DBG("htable [%.*s] - colnull [%c]\n", name.len, name.s,
-			   		colnull);
+			LM_DBG("htable [%.*s] - colnull [%c]\n", name.len, name.s, colnull);
 		} else {
 			goto error;
 		}
@@ -1387,6 +1383,18 @@ int ht_rm_cell_op(str *sre, ht_t *ht, int mode, int op)
 							&& strncmp(it->name.s, sre->s, sre->len) == 0) {
 						match = 1;
 					}
+				} else if(op == HT_RM_OP_EW) {
+					if(sre->len <= it->name.len
+							&& strncmp(it->name.s + it->name.len - sre->len,
+									   sre->s, sre->len)
+									   == 0) {
+						match = 1;
+					}
+				} else if(op == HT_RM_OP_IN) {
+					if(sre->len <= it->name.len
+							&& str_search(&it->name, sre) != NULL) {
+						match = 1;
+					}
 				}
 			} else {
 				if(op == HT_RM_OP_SW) {
@@ -1394,6 +1402,23 @@ int ht_rm_cell_op(str *sre, ht_t *ht, int mode, int op)
 						if(sre->len <= it->value.s.len
 								&& strncmp(it->value.s.s, sre->s, sre->len)
 										   == 0) {
+							match = 1;
+						}
+					}
+				} else if(op == HT_RM_OP_EW) {
+					if(it->flags & AVP_VAL_STR) {
+						if(sre->len <= it->value.s.len
+								&& strncmp(it->value.s.s + it->value.s.len
+												   - sre->len,
+										   sre->s, sre->len)
+										   == 0) {
+							match = 1;
+						}
+					}
+				} else if(op == HT_RM_OP_IN) {
+					if(it->flags & AVP_VAL_STR) {
+						if(sre->len <= it->value.s.len
+								&& str_search(&it->value.s, sre) != NULL) {
 							match = 1;
 						}
 					}

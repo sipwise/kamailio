@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,6 +54,7 @@
 #include "rfc2617.h"
 #include "sip_messages.h"
 #include "cxdx_mar.h"
+#include "../tm/h_table.h"
 
 
 #define NONCE_LEN 16
@@ -95,7 +98,9 @@ typedef struct _auth_vector
 	str ck;				/**< Cypher Key						*/
 	str ik;				/**< Integrity Key					*/
 	time_t expires;		/**< expires in (after it is sent)	*/
-	uint32_t use_nb;	/**< number of use (nonce count)*/
+	uint32_t use_nb;	/**< number of use (nonce count) */
+
+	int is_locally_generated; /**< flag to indicate if the vector was generated locally, not on the HSS */
 
 	enum auth_vector_status status; /**< current status		*/
 	struct _auth_vector *next;		/**< next av in the list		*/
@@ -109,6 +114,8 @@ typedef struct _auth_userdata
 	str private_identity; /**< authorization username		*/
 	str public_identity;  /**< public identity linked to	*/
 	time_t expires;		  /**< expires in					*/
+	uint8_t sqn[6];		  /**< sqn							*/
+	uint8_t _pad[2];	  /**< padding						*/
 
 	auth_vector *head; /**< first auth vector in list	*/
 	auth_vector *tail; /**< last auth vector in list	*/
@@ -140,9 +147,9 @@ int proxy_challenge(struct sip_msg *msg, char *route, char *_realm, char *str2);
  * Authorize using WWW-Authorization header field
  */
 int www_authenticate(struct sip_msg *_msg, char *_realm, char *_table);
-int www_challenge2(struct sip_msg *msg, char *route, char *_realm, char *str2);
-int www_challenge3(struct sip_msg *msg, char *route, char *_realm, char *str2);
-int www_resync_auth(struct sip_msg *msg, char *_route, char *str1, char *str2);
+int www_challenge2(struct sip_msg *msg, char *route, char *_realm);
+int www_challenge3(struct sip_msg *msg, char *route, char *_realm, char *_alg);
+int www_resync_auth(struct sip_msg *msg, char *_route, char *_realm);
 
 
 /*
@@ -150,8 +157,6 @@ int www_resync_auth(struct sip_msg *msg, char *_route, char *str1, char *str2);
  */
 int bind_ims_auth(ims_auth_api_t *api);
 
-auth_vector *get_auth_vector(str private_identity, str public_identity,
-		int status, str *nonce, unsigned int *hash);
 /*
  * Storage of authentication vectors
  */
@@ -174,9 +179,11 @@ unsigned int get_hash_auth(str private_identity, str public_identity);
 
 int add_auth_vector(str private_identity, str public_identity, auth_vector *av);
 auth_vector *get_auth_vector(str private_identity, str public_identity,
-		int status, str *nonce, unsigned int *hash);
+		int status, str *nonce, unsigned int *hash, auth_userdata **out_aud);
 
-int drop_auth_userdata(str private_identity, str public_identity);
+int drop_auth_vectors(str private_identity, str public_identity);
+void drop_auth_vectors_for_userdata(auth_userdata *aud);
+
 auth_userdata *get_auth_userdata(str private_identity, str public_identity);
 
 int stateful_request_reply(struct sip_msg *msg, int code, char *text);
@@ -195,5 +202,8 @@ void start_reg_await_timer(auth_vector *av);
 void reg_await_timer(unsigned int ticks, void *param);
 
 unsigned char get_algorithm_type(str algorithm);
+
+int ims_auth_data_set(str *pk, str *pop, str *pop_c, str *pamf);
+void ims_auth_data_reset(void);
 
 #endif /* AUTHORIZE_H */

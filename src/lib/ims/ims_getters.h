@@ -5,7 +5,7 @@
  * Copyright (C) 2012 Smile Communications, richard.good@smilecoms.com
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -15,7 +15,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -25,6 +25,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +80,7 @@ enum cscf_dialog_direction
  * @param src - source src
  * @param mem - type of mem to duplicate into (shm/pkg)
  */
-#define str_dup(dst, src, mem)                                                 \
+#define ims_str_dup(dst, src, mem)                                             \
 	do {                                                                       \
 		if((src).len) {                                                        \
 			(dst).s = mem##_malloc((src).len);                                 \
@@ -100,7 +102,7 @@ enum cscf_dialog_direction
  * @param x - the str to free
  * @param mem - type of memory that the content is using (shm/pkg)
  */
-#define str_free(x, mem)       \
+#define ims_str_free(x, mem)   \
 	do {                       \
 		if((x).s)              \
 			mem##_free((x).s); \
@@ -205,6 +207,12 @@ str cscf_get_public_identity_from_requri(struct sip_msg *msg);
  * NOTE: should only be called when REQ URI has been converted sip:user@IP_ADDRESS:PORT or tel:IP_ADDRESS:PORT
  */
 str cscf_get_contact_from_requri(struct sip_msg *msg);
+
+/**
+ * Get the host from the Request URI of the message.
+ * Useful for example on MT, to get the destination from the Request URI, if P-Called-Party-ID is not present.
+ */
+str cscf_get_host_from_requri(struct sip_msg *msg);
 
 /**
  * Looks for the Call-ID header

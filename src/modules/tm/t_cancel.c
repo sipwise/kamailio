@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -123,7 +125,7 @@ int cancel_uacs(struct cell *t, struct cancel_info *cancel_data, int flags)
 	/* cancel pending client transactions, if any */
 	for(i = 0; i < t->nr_of_outgoings; i++)
 		if(cancel_data->cancel_bitmap & (1 << i)) {
-			r = cancel_branch(t, i, &cancel_data->reason,
+			r = cancel_branch(t, i, NULL, &cancel_data->reason,
 					flags
 							| ((t->uac[i].request.buffer == NULL)
 											? F_CANCEL_B_FAKE_REPLY
@@ -172,6 +174,7 @@ int cancel_all_uacs(struct cell *trans, int how)
  *
  * params:  t - transaction
  *          branch - branch number to be canceled
+ *          cancel_msg - incoming cancel message
  *          reason - cancel reason structure
  *          flags - howto cancel:
  *                   F_CANCEL_B_KILL - will completely stop the
@@ -203,8 +206,8 @@ int cancel_all_uacs(struct cell *trans, int how)
  *          - checking for buffer==0 under REPLY_LOCK is no enough, an
  *           atomic_cmpxhcg or atomic_get_and_set _must_ be used.
  */
-int cancel_branch(
-		struct cell *t, int branch, struct cancel_reason *reason, int flags)
+int cancel_branch(struct cell *t, int branch, sip_msg_t *cancel_msg,
+		struct cancel_reason *reason, int flags)
 {
 	char *cancel;
 	unsigned int len;
@@ -293,11 +296,11 @@ int cancel_branch(
 				(t->uas.request && t->uas.request->msg_flags & FL_USE_UAC_TO)
 						? 0
 						: &t->to_hdr,
-				reason);
+				cancel_msg, reason);
 	} else {
 		/* build the CANCEL from the received INVITE */
-		cancel = build_local(
-				t, branch, &len, CANCEL, CANCEL_LEN, &t->to_hdr, reason);
+		cancel = build_local(t, branch, &len, CANCEL, CANCEL_LEN, &t->to_hdr,
+				cancel_msg, reason);
 	}
 	if(!cancel || len <= 0) {
 		LM_ERR("attempt to build a CANCEL failed\n");

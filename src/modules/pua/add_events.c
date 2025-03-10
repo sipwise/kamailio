@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -104,6 +106,13 @@ int pua_add_events(void)
 			   XCAPDIFF_EVENT, "xcap-diff", "application/xcap-diff+xml", 0)
 			< 0) {
 		LM_ERR("while adding event xcap-diff\n");
+		return -1;
+	}
+
+	if(add_pua_event(DFKS_EVENT, "as-feature-event",
+			   "application/x-as-feature-event+xml", dfks_process_body)
+			< 0) {
+		LM_ERR("while adding event as-feature-event\n");
 		return -1;
 	}
 
@@ -376,6 +385,12 @@ int mwi_process_body(publ_info_t *publ, str **fin_body, int ver, str **tuple)
 }
 
 int dlg_process_body(publ_info_t *publ, str **fin_body, int ver, str **tuple)
+{
+	*fin_body = publ->body;
+	return 0;
+}
+
+int dfks_process_body(publ_info_t *publ, str **fin_body, int ver, str **tuple)
 {
 	*fin_body = publ->body;
 	return 0;

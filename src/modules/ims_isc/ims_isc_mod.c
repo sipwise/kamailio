@@ -6,7 +6,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -16,7 +16,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -26,6 +26,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,45 +80,45 @@ static int domain_fixup(void **param, int param_no);
 static int w_isc_match_filter_reg(struct sip_msg *_m, char *str1, char *str2);
 static int w_isc_match_filter(struct sip_msg *_m, char *str1, char *str2);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"isc_match_filter_reg", (cmd_function)w_isc_match_filter_reg, 2,
-				domain_fixup, 0, REQUEST_ROUTE},
-		{"isc_from_as", (cmd_function)isc_from_as, 1, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"isc_match_filter", (cmd_function)w_isc_match_filter, 2, domain_fixup,
-				0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"isc_match_filter_reg", (cmd_function)w_isc_match_filter_reg, 2,
+			domain_fixup, 0, REQUEST_ROUTE},
+	{"isc_from_as", (cmd_function)isc_from_as, 1, 0, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"isc_match_filter", (cmd_function)w_isc_match_filter, 2, domain_fixup,
+			0, REQUEST_ROUTE | FAILURE_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"my_uri", PARAM_STR,
-				&isc_my_uri}, /**< SIP Uri of myself for getting the messages back */
-		{"expires_grace", INT_PARAM,
-				&isc_expires_grace}, /**< expires value to add to the expires in the 3rd party register to prevent expiration in AS */
-		{"isc_fr_timeout", INT_PARAM,
-				&isc_fr_timeout}, /**< Time in ms that we are waiting for a AS response until we
- 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 consider it dead. Has to be lower than SIP transaction timeout
- 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 to prevent downstream timeouts. Not too small though because
- 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 AS are usually slow as hell... */
-		{"isc_fr_inv_timeout", INT_PARAM,
-				&isc_fr_inv_timeout}, /**< Time in ms that we are waiting for a AS INVITE response until we
- 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 consider it dead. Has to be lower than SIP transaction timeout
- 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 to prevent downstream timeouts. Not too small though because
- 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 AS are usually slow as hell... */
-		{"add_p_served_user", INT_PARAM,
-				&add_p_served_user}, /**< boolean indicating if the P-Served-User (RFC5502) should be added on the ISC interface or not */
-		{0, 0, 0}};
+	{"my_uri", PARAM_STR, &isc_my_uri}, /**< SIP Uri of myself for getting the messages back */
+	{"expires_grace", PARAM_INT, &isc_expires_grace}, /**< expires value to add to the expires in the 3rd party register to prevent expiration in AS */
+	{"isc_fr_timeout", PARAM_INT, &isc_fr_timeout}, /**< Time in ms that we are waiting for a AS response until we
+	 	 	 	 	 	 	 	 	 	 	 	 	 	 consider it dead. Has to be lower than SIP transaction timeout
+	 	 	 	 	 	 	 	 	 	 	 	 	 	 to prevent downstream timeouts. Not too small though because
+	 	 	 	 	 	 	 	 	 	 	 	 	 	 AS are usually slow as hell... */
+	{"isc_fr_inv_timeout", PARAM_INT, &isc_fr_inv_timeout}, /**< Time in ms that we are waiting for a AS INVITE response until we
+	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 consider it dead. Has to be lower than SIP transaction timeout
+	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 to prevent downstream timeouts. Not too small though because
+	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 AS are usually slow as hell... */
+	{"add_p_served_user", PARAM_INT, &add_p_served_user}, /**< boolean indicating if the P-Served-User (RFC5502) should be added on the ISC interface or not */
+	{0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"ims_isc", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,						/* Exported functions */
-		params, 0,					/* exported RPC methods */
-		0,							/* exported pseudo-variables */
-		0,							/* response handling function */
-		mod_init,					/* module initialization function */
-		0,							/* per-child init function */
-		0							/* module destroy function */
+	"ims_isc", DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,						/* Exported functions */
+	params, 0,					/* exported RPC methods */
+	0,							/* exported pseudo-variables */
+	0,							/* response handling function */
+	mod_init,					/* module initialization function */
+	0,							/* per-child init function */
+	0							/* module destroy function */
 };
+
+/* clang-format on */
 
 /*! \brief
  * Convert char* parameter to udomain_t* pointer

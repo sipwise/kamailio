@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -29,17 +31,13 @@
 #include "../../core/cfg/cfg_struct.h"
 
 #include "python_exec.h"
-#include "python_iface.h"
 #include "python_msgobj.h"
 #include "python_support.h"
 #include "app_python3_mod.h"
 
-#include "mod_Router.h"
-#include "mod_Core.h"
-#include "mod_Ranks.h"
-#include "mod_Logger.h"
-
 #include "apy_kemi.h"
+static int apy_load_script(void);
+static int apy_init_script(int rank);
 
 MODULE_VERSION
 
@@ -58,8 +56,10 @@ PyObject *format_exc_obj = NULL;
 char *dname = NULL, *bname = NULL;
 
 int _apy_process_rank = 0;
+int _ksr_apy3_threads_mode = 0;
 
-PyThreadState *myThreadState;
+PyThreadState *myThreadState = NULL;
+__thread PyThreadState *_save = NULL;
 
 /* clang-format off */
 /** module parameters */
@@ -68,6 +68,7 @@ static param_export_t params[] = {
 	{"load", PARAM_STR, &_sr_python_load_file},
 	{"mod_init_function", PARAM_STR, &mod_init_fname},
 	{"child_init_method", PARAM_STR, &child_init_mname},
+	{"threads_mode", PARAM_INT, &_ksr_apy3_threads_mode},
 	{0, 0, 0}
 };
 
@@ -183,6 +184,7 @@ static int mod_init(void)
  */
 static int child_init(int rank)
 {
+	int ret = -1;
 	if(rank == PROC_INIT) {
 		/*
 		 * this is called before any process is forked
@@ -190,7 +192,13 @@ static int child_init(int rank)
 		 * should be called now.
 		 */
 #if PY_VERSION_HEX >= 0x03070000
+		if(_ksr_apy3_threads_mode == 1) {
+			Py_BLOCK_THREADS;
+		}
 		PyOS_BeforeFork();
+		if(_ksr_apy3_threads_mode == 1) {
+			Py_UNBLOCK_THREADS;
+		}
 #endif
 		return 0;
 	}
@@ -200,13 +208,23 @@ static int child_init(int rank)
 		 * processes
 		 */
 #if PY_VERSION_HEX >= 0x03070000
+		if(_ksr_apy3_threads_mode == 1) {
+			Py_BLOCK_THREADS;
+		}
 		PyOS_AfterFork_Parent();
+		if(_ksr_apy3_threads_mode == 1) {
+			Py_UNBLOCK_THREADS;
+		}
 #endif
 		return 0;
 	}
 	_apy_process_rank = rank;
-
-	if(!_ksr_is_main) {
+	/* clang-format off */
+	if(_ksr_apy3_threads_mode == 1) {
+		Py_BLOCK_THREADS;
+	}
+	if(!_ksr_is_main)
+	{
 #if PY_VERSION_HEX >= 0x03070000
 		PyOS_AfterFork_Child();
 #else
@@ -214,9 +232,16 @@ static int child_init(int rank)
 #endif
 	}
 	if(cfg_child_init()) {
-		return -1;
+		ret = -1;
+		goto finish;
 	}
-	return apy_init_script(rank);
+	ret = apy_init_script(rank);
+
+finish:
+	if(_ksr_apy3_threads_mode == 1) {
+		Py_UNBLOCK_THREADS;
+	}
+	return ret;
 }
 
 /**
@@ -228,17 +253,12 @@ static void mod_destroy(void)
 		free(dname); // dname was strdup'ed
 	if(bname)
 		free(bname); // bname was strdup'ed
-
-	destroy_mod_Core();
-	destroy_mod_Ranks();
-	destroy_mod_Logger();
-	destroy_mod_Router();
 }
 
-
-#define PY_GIL_ENSURE gstate = PyGILState_Ensure()
-#define PY_GIL_RELEASE PyGILState_Release(gstate)
-int apy_mod_init(PyObject *pModule)
+/* Python module utility function
+ * - must be called with GIL held
+ */
+static int apy_mod_init(PyObject *pModule)
 {
 
 	/*
@@ -248,7 +268,9 @@ int apy_mod_init(PyObject *pModule)
 	PyGILState_STATE gstate;
 	int rval = -1;
 
-	PY_GIL_ENSURE;
+	if(_ksr_apy3_threads_mode != 1) {
+		gstate = PyGILState_Ensure();
+	}
 	pFunc = PyObject_GetAttrString(pModule, mod_init_fname.s);
 
 	/* pFunc is a new reference */
@@ -322,7 +344,9 @@ int apy_mod_init(PyObject *pModule)
 	_sr_apy_handler_obj = pHandler;
 	rval = 0;
 err:
-	PY_GIL_RELEASE;
+	if(_ksr_apy3_threads_mode != 1) {
+		PyGILState_Release(gstate);
+	}
 	return rval;
 }
 
@@ -334,10 +358,14 @@ static PyObject *_sr_apy_module;
 
 int apy_reload_script(void)
 {
-	PyGILState_STATE gstate;
 	int rval = -1;
+	PyGILState_STATE gstate;
 
-	PY_GIL_ENSURE;
+	if(_ksr_apy3_threads_mode != 1) {
+		gstate = PyGILState_Ensure();
+	} else {
+		Py_BLOCK_THREADS;
+	}
 	PyObject *pModule = PyImport_ReloadModule(_sr_apy_module);
 	if(!pModule) {
 		if(!PyErr_Occurred())
@@ -360,43 +388,46 @@ int apy_reload_script(void)
 	}
 	rval = 0;
 err:
-	PY_GIL_RELEASE;
+	if(_ksr_apy3_threads_mode != 1) {
+		PyGILState_Release(gstate);
+	} else {
+		Py_UNBLOCK_THREADS;
+	}
 	return rval;
 }
 
-#define INTERNAL_VERSION "1002\n"
+#define INTERNAL_VERSION "1003\n"
 
-int apy_load_script(void)
+/* Entry point for the embedded interpreter
+ * - releases the GIL so Python threading
+ *   will run
+ */
+
+static int apy_load_script(void)
 {
 	PyObject *sys_path, *pDir, *pModule;
 	PyGILState_STATE gstate;
 	int rc, rval = -1;
 
-	if(ap_init_modules() != 0) {
+	if(sr_apy_init_ksr() != 0) {
 		return -1;
 	}
 
 	Py_Initialize();
+
 #if PY_VERSION_HEX < 0x03070000
 	PyEval_InitThreads();
 #endif
-	myThreadState = PyThreadState_Get();
 
-	PY_GIL_ENSURE;
+	if(_ksr_apy3_threads_mode != 1) {
+		myThreadState = PyThreadState_Get();
+		gstate = PyGILState_Ensure();
+	}
 
 	// Py3 does not create a package-like hierarchy of modules
 	// make legacy modules importable using Py2 syntax
-	// import Router.Logger
 
-	rc = PyRun_SimpleString("import sys\n"
-							"import Router\n"
-							"import KSR\n"
-							"KSR.__version__ = " INTERNAL_VERSION
-							"sys.modules['Router.Core'] = Router.Core\n"
-							"sys.modules['Router.Logger'] = Router.Logger\n"
-							"sys.modules['Router.Ranks'] = Router.Ranks\n"
-							"sys.modules['KSR.pv'] = KSR.pv\n"
-							"sys.modules['KSR.x'] = KSR.x\n");
+	rc = PyRun_SimpleString("import KSR\nKSR.__version__ = " INTERNAL_VERSION);
 	if(rc) {
 		LM_ERR("Early imports of modules failed\n");
 		goto err;
@@ -459,11 +490,19 @@ int apy_load_script(void)
 
 	rval = 0;
 err:
-	PY_GIL_RELEASE;
+	if(_ksr_apy3_threads_mode != 1) {
+		PyGILState_Release(gstate);
+	} else {
+		Py_UNBLOCK_THREADS;
+	}
 	return rval;
 }
 
-int apy_init_script(int rank)
+/*
+ * Python script utility function
+ * - must be called with GIL held
+ */
+static int apy_init_script(int rank)
 {
 	PyObject *pFunc, *pArgs, *pValue, *pResult;
 	int rval = -1;
@@ -474,8 +513,9 @@ int apy_init_script(int rank)
 #endif
 	PyGILState_STATE gstate;
 
-
-	PY_GIL_ENSURE;
+	if(_ksr_apy3_threads_mode != 1) {
+		gstate = PyGILState_Ensure();
+	}
 
 	// get instance class name
 	classname = get_instance_class_name(_sr_apy_handler_obj);
@@ -557,7 +597,9 @@ int apy_init_script(int rank)
 	rval = PyLong_AsLong(pResult);
 	Py_DECREF(pResult);
 err:
-	PY_GIL_RELEASE;
+	if(_ksr_apy3_threads_mode != 1) {
+		PyGILState_Release(gstate);
+	}
 	return rval;
 }
 /**

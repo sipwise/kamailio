@@ -728,15 +728,55 @@ int fixup_free_spve_spve_igp(void **param, int param_no)
 }
 
 /**
+ * - first params are dynamic strings (spve)
+ * - n - how many params are spve; n+1 is name of pv
+ * - if pvmode==1, the last param pv has to be r/w
+ */
+int fixup_spve_n_pvar(void **param, int n, int param_no, int pvmode)
+{
+	int ret = 0;
+	if(param_no >= 1 && param_no <= n)
+		return fixup_spve_null(param, 1);
+	if(param_no == n + 1) {
+		ret = fixup_pvar_null(param, 1);
+		if((ret == 0) && (pvmode == 1)) {
+			if(((pv_spec_t *)(*param))->setf == NULL) {
+				LM_ERR("pvar is not writeble\n");
+				return E_UNSPEC;
+			}
+		}
+		return ret;
+	}
+	return E_UNSPEC;
+}
+
+/**
+ *
+ */
+int fixup_free_spve_n_pvar(void **param, int n, int param_no)
+{
+	if(param_no >= 1 && param_no <= n)
+		return fixup_free_spve_null(param, 1);
+	if(param_no == n + 1)
+		return fixup_free_pvar_null(param, 1);
+	return E_UNSPEC;
+}
+
+/**
  *
  */
 int fixup_spve_pvar(void **param, int param_no)
 {
-	if(param_no == 1)
-		return fixup_spve_null(param, 1);
-	if(param_no == 2)
-		return fixup_pvar_null(param, 1);
-	return E_UNSPEC;
+	return fixup_spve_n_pvar(param, 1, param_no, 0);
+}
+
+/**
+ * - first params are dynamic strings
+ * - last param pv has to be r/w
+ */
+int fixup_spve1_pvar(void **param, int param_no)
+{
+	return fixup_spve_n_pvar(param, 1, param_no, 1);
 }
 
 /**
@@ -744,11 +784,58 @@ int fixup_spve_pvar(void **param, int param_no)
  */
 int fixup_free_spve_pvar(void **param, int param_no)
 {
-	if(param_no == 1)
-		return fixup_free_spve_null(param, 1);
-	if(param_no == 2)
-		return fixup_free_pvar_null(param, 1);
-	return E_UNSPEC;
+	return fixup_free_spve_n_pvar(param, 1, param_no);
+}
+
+/**
+ * - first params are dynamic strings
+ * - last param pv has to be r/w
+ */
+int fixup_spve2_pvar(void **param, int param_no)
+{
+	return fixup_spve_n_pvar(param, 2, param_no, 1);
+}
+
+/**
+ *
+ */
+int fixup_free_spve2_pvar(void **param, int param_no)
+{
+	return fixup_free_spve_n_pvar(param, 2, param_no);
+}
+
+/**
+ * - first params are dynamic strings
+ * - last param pv has to be r/w
+ */
+int fixup_spve3_pvar(void **param, int param_no)
+{
+	return fixup_spve_n_pvar(param, 3, param_no, 1);
+}
+
+/**
+ *
+ */
+int fixup_free_spve3_pvar(void **param, int param_no)
+{
+	return fixup_free_spve_n_pvar(param, 3, param_no);
+}
+
+/**
+ * - first params are dynamic strings
+ * - last param pv has to be r/w
+ */
+int fixup_spve4_pvar(void **param, int param_no)
+{
+	return fixup_spve_n_pvar(param, 4, param_no, 1);
+}
+
+/**
+ *
+ */
+int fixup_free_spve4_pvar(void **param, int param_no)
+{
+	return fixup_free_spve_n_pvar(param, 4, param_no);
 }
 
 /**
@@ -938,6 +1025,140 @@ int fixup_free_ssii(void **param, int param_no)
 		case 3:
 		case 4:
 			return fixup_free_igp_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_isi(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+		case 3:
+			return fixup_igp_null(param, 1);
+		case 2:
+			return fixup_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_free_isi(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+		case 3:
+			return fixup_free_igp_null(param, 1);
+		case 2:
+			return fixup_free_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_iss(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+			return fixup_igp_null(param, 1);
+		case 2:
+		case 3:
+			return fixup_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_free_iss(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+			return fixup_free_igp_null(param, 1);
+		case 2:
+		case 3:
+			return fixup_free_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_isii(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+		case 3:
+		case 4:
+			return fixup_igp_null(param, 1);
+		case 2:
+			return fixup_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_free_isii(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+		case 3:
+		case 4:
+			return fixup_free_igp_null(param, 1);
+		case 2:
+			return fixup_free_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_isiii(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+		case 3:
+		case 4:
+		case 5:
+			return fixup_igp_null(param, 1);
+		case 2:
+			return fixup_spve_null(param, 1);
+		default:
+			return E_UNSPEC;
+	}
+}
+
+/**
+ *
+ */
+int fixup_free_isiii(void **param, int param_no)
+{
+	switch(param_no) {
+		case 1:
+		case 3:
+		case 4:
+		case 5:
+			return fixup_free_igp_null(param, 1);
+		case 2:
+			return fixup_free_spve_null(param, 1);
 		default:
 			return E_UNSPEC;
 	}

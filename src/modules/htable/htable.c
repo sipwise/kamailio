@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -67,6 +69,7 @@ static int child_init(int rank);
 static void destroy(void);
 
 static int fixup_ht_key(void **param, int param_no);
+static int fixup_free_ht_key(void **param, int param_no);
 static int w_ht_rm(sip_msg_t *msg, char *htname, char *itname);
 static int ht_rm_name_re(struct sip_msg *msg, char *key, char *foo);
 static int ht_rm_value_re(struct sip_msg *msg, char *key, char *foo);
@@ -119,36 +122,36 @@ static pv_export_t mod_pvs[] = {
 
 static cmd_export_t cmds[] = {
 	{"sht_print", (cmd_function)ht_print, 0, 0, 0, ANY_ROUTE},
-	{"sht_rm", (cmd_function)w_ht_rm, 2, fixup_spve_spve, 0, ANY_ROUTE},
-	{"sht_rm_name_re", (cmd_function)ht_rm_name_re, 1, fixup_ht_key, 0,
+	{"sht_rm", (cmd_function)w_ht_rm, 2, fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{"sht_rm_name_re", (cmd_function)ht_rm_name_re, 1, fixup_ht_key, fixup_free_ht_key,
 			ANY_ROUTE},
-	{"sht_rm_value_re", (cmd_function)ht_rm_value_re, 1, fixup_ht_key, 0,
+	{"sht_rm_value_re", (cmd_function)ht_rm_value_re, 1, fixup_ht_key, fixup_free_ht_key,
 			ANY_ROUTE},
-	{"sht_rm_name", (cmd_function)w_ht_rm_name, 3, fixup_spve_all, 0,
+	{"sht_rm_name", (cmd_function)w_ht_rm_name, 3, fixup_spve_all, fixup_free_spve_all,
 			ANY_ROUTE},
-	{"sht_rm_value", (cmd_function)w_ht_rm_value, 3, fixup_spve_all, 0,
+	{"sht_rm_value", (cmd_function)w_ht_rm_value, 3, fixup_spve_all, fixup_free_spve_all,
 			ANY_ROUTE},
-	{"sht_match_name", (cmd_function)w_ht_match_name, 3, fixup_spve_all, 0,
+	{"sht_match_name", (cmd_function)w_ht_match_name, 3, fixup_spve_all, fixup_free_spve_all,
 			ANY_ROUTE},
-	{"sht_has_name", (cmd_function)w_ht_match_name, 3, fixup_spve_all, 0,
+	{"sht_has_name", (cmd_function)w_ht_match_name, 3, fixup_spve_all, fixup_free_spve_all,
 			ANY_ROUTE},
 	{"sht_match_str_value", (cmd_function)w_ht_match_str_value, 3,
-			fixup_spve_all, 0, ANY_ROUTE},
+			fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
 	{"sht_has_str_value", (cmd_function)w_ht_match_str_value, 3,
-			fixup_spve_all, 0, ANY_ROUTE},
-	{"sht_lock", (cmd_function)w_ht_slot_lock, 1, fixup_ht_key, 0,
+			fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
+	{"sht_lock", (cmd_function)w_ht_slot_lock, 1, fixup_ht_key, fixup_free_ht_key,
 			ANY_ROUTE},
-	{"sht_unlock", (cmd_function)w_ht_slot_unlock, 1, fixup_ht_key, 0,
+	{"sht_unlock", (cmd_function)w_ht_slot_unlock, 1, fixup_ht_key, fixup_free_ht_key,
 			ANY_ROUTE},
-	{"sht_reset", (cmd_function)ht_reset, 1, fixup_spve_null, 0, ANY_ROUTE},
+	{"sht_reset", (cmd_function)ht_reset, 1, fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sht_iterator_start", (cmd_function)w_ht_iterator_start, 2,
-			fixup_spve_spve, 0, ANY_ROUTE},
+			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sht_iterator_next", (cmd_function)w_ht_iterator_next, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sht_iterator_end", (cmd_function)w_ht_iterator_end, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sht_iterator_rm", (cmd_function)w_ht_iterator_rm, 1, fixup_spve_null,
-			0, ANY_ROUTE},
+			fixup_free_spve_null, ANY_ROUTE},
 	{"sht_iterator_sets", (cmd_function)w_ht_iterator_sets, 2,
 			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sht_iterator_seti", (cmd_function)w_ht_iterator_seti, 2,
@@ -165,7 +168,7 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-	{"htable", PARAM_STRING | USE_FUNC_PARAM, (void *)ht_param},
+	{"htable", PARAM_STRING | PARAM_USE_FUNC, (void *)ht_param},
 	{"db_url", PARAM_STR, &ht_db_url},
 	{"key_name_column", PARAM_STR, &ht_db_name_column},
 	{"key_type_column", PARAM_STR, &ht_db_ktype_column},
@@ -173,11 +176,11 @@ static param_export_t params[] = {
 	{"key_value_column", PARAM_STR, &ht_db_value_column},
 	{"expires_column", PARAM_STR, &ht_db_expires_column},
 	{"array_size_suffix", PARAM_STR, &ht_array_size_suffix},
-	{"fetch_rows", INT_PARAM, &ht_fetch_rows},
-	{"timer_interval", INT_PARAM, &ht_timer_interval},
-	{"db_expires", INT_PARAM, &ht_db_expires_flag},
-	{"enable_dmq", INT_PARAM, &ht_enable_dmq},
-	{"dmq_init_sync", INT_PARAM, &ht_dmq_init_sync},
+	{"fetch_rows", PARAM_INT, &ht_fetch_rows},
+	{"timer_interval", PARAM_INT, &ht_timer_interval},
+	{"db_expires", PARAM_INT, &ht_db_expires_flag},
+	{"enable_dmq", PARAM_INT, &ht_enable_dmq},
+	{"dmq_init_sync", PARAM_INT, &ht_dmq_init_sync},
 	{"timer_procs", PARAM_INT, &ht_timer_procs},
 	{"event_callback", PARAM_STR, &ht_event_callback},
 	{"event_callback_mode", PARAM_INT, &ht_event_callback_mode},
@@ -341,7 +344,6 @@ static void destroy(void)
 			}
 		}
 	}
-	ht_destroy();
 }
 
 /**
@@ -376,6 +378,12 @@ static int fixup_ht_key(void **param, int param_no)
 		return -1;
 	}
 	*param = (void *)sp;
+	return 0;
+}
+
+static int fixup_free_ht_key(void **param, int param_no)
+{
+	pkg_free(*param);
 	return 0;
 }
 
@@ -512,6 +520,30 @@ static int ht_rm_items(sip_msg_t *msg, str *hname, str *op, str *val, int mkey)
 					LM_ERR("dmq replication failed (op %d)\n", mkey);
 				}
 				if(ht_rm_cell_op(val, ht, mkey, HT_RM_OP_SW) < 0) {
+					return -1;
+				}
+				return 1;
+			} else if(strncmp(op->s, "ew", 2) == 0) {
+				isval.s = *val;
+				if((ht->dmqreplicate > 0)
+						&& ht_dmq_replicate_action(HT_DMQ_RM_CELL_EW, &ht->name,
+								   NULL, AVP_VAL_STR, &isval, mkey)
+								   != 0) {
+					LM_ERR("dmq replication failed (op %d)\n", mkey);
+				}
+				if(ht_rm_cell_op(val, ht, mkey, HT_RM_OP_EW) < 0) {
+					return -1;
+				}
+				return 1;
+			} else if(strncmp(op->s, "ew", 2) == 0) {
+				isval.s = *val;
+				if((ht->dmqreplicate > 0)
+						&& ht_dmq_replicate_action(HT_DMQ_RM_CELL_IN, &ht->name,
+								   NULL, AVP_VAL_STR, &isval, mkey)
+								   != 0) {
+					LM_ERR("dmq replication failed (op %d)\n", mkey);
+				}
+				if(ht_rm_cell_op(val, ht, mkey, HT_RM_OP_IN) < 0) {
 					return -1;
 				}
 				return 1;
@@ -1529,7 +1561,7 @@ static void htable_rpc_delete(rpc_t *rpc, void *c)
 	int res;
 
 	if(rpc->scan(c, "SS", &htname, &keyname) < 2) {
-		rpc->fault(c, 500, "Not enough parameters (htable name & key name");
+		rpc->fault(c, 500, "Not enough parameters (htable name & key name)");
 		return;
 	}
 	ht = ht_get_table(&htname);

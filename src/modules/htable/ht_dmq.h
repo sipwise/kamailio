@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -39,7 +41,9 @@ typedef enum
 	HT_DMQ_SET_CELL_EXPIRE,
 	HT_DMQ_DEL_CELL,
 	HT_DMQ_RM_CELL_RE,
-	HT_DMQ_RM_CELL_SW
+	HT_DMQ_RM_CELL_SW,
+	HT_DMQ_RM_CELL_EW,
+	HT_DMQ_RM_CELL_IN
 } ht_dmq_action_t;
 
 int ht_dmq_initialize();

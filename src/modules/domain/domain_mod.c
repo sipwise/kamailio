@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -123,7 +125,7 @@ static param_export_t params[] = {
 	{"name_col",       PARAM_STR, &name_col  },
 	{"type_col",       PARAM_STR, &type_col  },
 	{"value_col",      PARAM_STR, &value_col  },
-	{"register_myself",INT_PARAM, &domain_reg_myself},
+	{"register_myself",PARAM_INT, &domain_reg_myself},
 	{0, 0, 0}
 };
 /* clang-format on */

@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -1258,6 +1260,9 @@ int add_listen_socket(socket_attrs_t *sa)
 {
 	socket_info_t *newsi;
 	name_lst_t addr_l;
+	char sname[128];
+	char *psname = NULL;
+	int i;
 
 	if(sa->bindaddr.s == NULL) {
 		LM_ERR("no bind address provided\n");
@@ -1266,11 +1271,52 @@ int add_listen_socket(socket_attrs_t *sa)
 	memset(&addr_l, 0, sizeof(name_lst_t));
 	addr_l.name = sa->bindaddr.s;
 
-	newsi = add_listen_socket_info(sa->bindaddr.s, &addr_l, sa->bindport,
-			sa->bindproto, sa->useproto, sa->useaddr.s, sa->useport,
-			sa->sockname.s, sa->sflags);
+	/* binding on single port */
+	if(sa->bindportend <= sa->bindport) {
+		newsi = add_listen_socket_info(sa->bindaddr.s, &addr_l, sa->bindport,
+				sa->bindproto, sa->useproto, sa->useaddr.s, sa->useport,
+				sa->sockname.s, sa->sflags);
+		if(newsi == NULL) {
+			return -1;
+		}
+		if(sa->agname.len > 0) {
+			if(sa->agname.len >= KSR_AGROUP_NAME_SIZE - 1) {
+				LM_ERR("action group too long (%.*s / %d)\n", sa->agname.len,
+						sa->agname.s, sa->agname.len);
+				return -1;
+			}
+			memcpy(newsi->agroup.agname, sa->agname.s, sa->agname.len);
+			newsi->agroup.agname[sa->agname.len] = '\0';
+		}
+		return 0;
+	}
 
-	return (newsi != NULL) ? 0 : -1;
+	/* binding on a range of ports */
+	for(i = 0; sa->bindport + i <= sa->bindportend; i++) {
+		if(sa->sockname.s != NULL) {
+			/* socketname gets port appended */
+			snprintf(sname, 128, "%s%d", sa->sockname.s, sa->bindport + i);
+			psname = sname;
+		} else {
+			psname = NULL;
+		}
+		newsi = add_listen_socket_info(sa->bindaddr.s, &addr_l,
+				sa->bindport + i, sa->bindproto, sa->useproto, sa->useaddr.s,
+				sa->useport + i, psname, sa->sflags);
+		if(newsi == NULL) {
+			return -1;
+		}
+		if(sa->agname.len > 0) {
+			if(sa->agname.len >= KSR_AGROUP_NAME_SIZE - 1) {
+				LM_ERR("action group too long (%.*s / %d)\n", sa->agname.len,
+						sa->agname.s, sa->agname.len);
+				return -1;
+			}
+			memcpy(newsi->agroup.agname, sa->agname.s, sa->agname.len);
+			newsi->agroup.agname[sa->agname.len] = '\0';
+		}
+	}
+	return 0;
 }
 
 #ifdef __OS_linux
@@ -1393,7 +1439,7 @@ static int get_flags(int family)
 	struct ifinfomsg *ifi;
 	char buf[NETLINK_BUFFER_SIZE];
 	char *p = buf;
-	int nll = 0;
+	unsigned int nll = 0;
 	int nl_sock = -1;
 
 	fill_nl_req(req, RTM_GETLINK, family);
@@ -1407,13 +1453,13 @@ static int get_flags(int family)
 	}
 
 	while(1) {
-		if((sizeof(buf) - nll) == 0) {
-			LM_ERR("netlink buffer overflow in get_flags");
-			goto error;
-		}
 		rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
 		if(rtn <= 0) {
 			LM_ERR("failed to receive data (%d/%d)\n", rtn, errno);
+			goto error;
+		}
+		if(nll >= sizeof(buf) - rtn) {
+			LM_ERR("netlink buffer overflow [%u/%d]\n", nll, rtn);
 			goto error;
 		}
 		nlp = (struct nlmsghdr *)p;
@@ -1422,7 +1468,7 @@ static int get_flags(int family)
 			break;
 		}
 		if(nlp->nlmsg_type == NLMSG_ERROR) {
-			LM_DBG("Error on message to netlink");
+			LM_DBG("error on message to netlink");
 			break;
 		}
 		p += rtn;

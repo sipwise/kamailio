@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -174,7 +176,7 @@ db1_con_t *db_oracle_init(const str *_url)
  */
 void db_oracle_close(db1_con_t *_h)
 {
-	db_do_close(_h, db_oracle_free_connection);
+	db_do_close(_h, (void *)db_oracle_free_connection);
 }
 
 

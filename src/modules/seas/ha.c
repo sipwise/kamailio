@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -154,7 +156,7 @@ static inline int parse_ping(
 		}
 		string++;
 	}
-	if(!(ping_period_s && pings_lost_s && ping_timeout_s)) {
+	if(!(pings_lost_s && ping_timeout_s)) {
 		LM_ERR("malformed ping config string. Unparseable :[%s]\n", string);
 		return -1;
 	}

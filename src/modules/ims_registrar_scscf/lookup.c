@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -115,8 +117,9 @@ int lookup(struct sip_msg *_m, udomain_t *_d, char *ue_type_c)
 	// add user part
 	memcpy(aor.s + aor.len, _m->parsed_uri.user.s, _m->parsed_uri.user.len);
 	aor.len += _m->parsed_uri.user.len;
-	// add '@'
-	aor.s[aor.len++] = '@';
+	// add '@' - but only if there is a host part, else we make bad URIs like tel:+123@
+	if(_m->parsed_uri.host.len > 0)
+		aor.s[aor.len++] = '@';
 	// add host part
 	memcpy(aor.s + aor.len, _m->parsed_uri.host.s, _m->parsed_uri.host.len);
 	aor.len += _m->parsed_uri.host.len;

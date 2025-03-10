@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -90,8 +92,8 @@ int sm_process(
 
 	if(!peer_locked)
 		lock_get(p->lock);
-	LM_DBG("sm_process(): Peer %.*s State %s Event %s\n", p->fqdn.len,
-			p->fqdn.s, dp_states[p->state], dp_events[event - 101]);
+	LM_DBG("Peer %.*s State %s Event %s\n", p->fqdn.len, p->fqdn.s,
+			dp_states[p->state], dp_events[event - 101]);
 
 	switch(p->state) {
 		case Closed:
@@ -124,7 +126,7 @@ int sm_process(
 					p->state = Closed;
 					break;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -163,7 +165,7 @@ int sm_process(
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -190,11 +192,11 @@ int sm_process(
 						p->state = Wait_Returns;
 						if(Elect(p, msg)) {
 							// won the election = > I_Disc(), R_Send_CEA()
-							LM_INFO("sm_process():Wait_I_CEA Win Elect \n");
+							LM_INFO("Wait_I_CEA Win Elect \n");
 							sm_process(p, Win_Election, msg, 1, sock);
 						} else {
 							// lost the election => wait for I_Recv_CEA, then R_Disc()
-							LM_INFO("sm_process():Wait_I_CEA Lose Elect \n");
+							LM_INFO("Wait_I_CEA Lose Elect \n");
 							p->r_cer = msg;
 							sm_process(p, I_Peer_Disc, 0, 1, p->I_sock);
 						}
@@ -219,7 +221,7 @@ int sm_process(
 					p->state = Closed;
 					break;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -233,18 +235,18 @@ int sm_process(
 						p->state = Wait_Returns;
 						if(Elect(p, p->r_cer)) {
 							// won the election = > I_Disc(), R_Send_CEA()
-							LM_INFO("sm_process():Wait_Conn_Ack_Elect Win "
+							LM_INFO("Wait_Conn_Ack_Elect Win "
 									"Elect \n");
 							sm_process(p, Win_Election, p->r_cer, 1, sock);
 							p->r_cer = 0;
 						} else {
 							// lost the election => wait for I_Recv_CEA, then R_Disc()
-							LM_INFO("sm_process():Wait_Conn_Ack_Elect Lose "
+							LM_INFO("Wait_Conn_Ack_Elect Lose "
 									"Elect \n");
 							AAAFreeMessage(&p->r_cer);
 						}
 					} else {
-						LM_ERR("sm_process():Wait_Conn_Ack_Elect, "
+						LM_ERR("Wait_Conn_Ack_Elect, "
 							   "I_Rcv_Conn_Ack, No R-CER ! \n");
 						p->state = Wait_I_CEA;
 					}
@@ -263,7 +265,7 @@ int sm_process(
 							//	p->state = R_Open; /* Or maybe I should disconnect it?*/
 						}
 					} else {
-						LM_ERR("sm_process():Wait_Conn_Ack_Elect, "
+						LM_ERR("Wait_Conn_Ack_Elect, "
 							   "I_Rcv_Conn_NAck No R-CER ! \n");
 					}
 					break;
@@ -284,7 +286,7 @@ int sm_process(
 					p->state = Closed;
 					break;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -294,7 +296,7 @@ int sm_process(
 			switch(event) {
 				case Win_Election:
 					/* this is the Win Election -> I is dropped, R is kept */
-					LM_INFO("sm_process():Wait_Returns Win Elect \n");
+					LM_INFO("Wait_Returns Win Elect \n");
 					I_Disc(p);
 					result_code = Process_CER(p, msg);
 					Snd_CEA(p, msg, result_code, p->R_sock);
@@ -318,13 +320,13 @@ int sm_process(
 							p->state = Closed;
 						}
 					} else {
-						LM_ERR("sm_process():Wait_Returns, I_Peer_Disc No "
+						LM_ERR("Wait_Returns, I_Peer_Disc No "
 							   "R-CER ! \n");
 					}
 					break;
 				case I_Rcv_CEA:
 					/* this is the Lost Election -> I is kept, R dropped */
-					LM_INFO("sm_process():Wait_Returns Lost Elect \n");
+					LM_INFO("Wait_Returns Lost Elect \n");
 					R_Disc(p);
 					result_code = Process_CEA(p, msg);
 					if(result_code >= 2000 && result_code < 3000)
@@ -353,7 +355,7 @@ int sm_process(
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -420,7 +422,7 @@ int sm_process(
 					log_peer_list();
 					break;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -486,7 +488,7 @@ int sm_process(
 					}
 					break;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -517,7 +519,7 @@ int sm_process(
 					p->state = Closed;
 					break;
 				default:
-					LM_ERR("sm_process(): In state %s invalid event %s\n",
+					LM_ERR("In state %s invalid event %s\n",
 							dp_states[p->state], dp_events[event - 101]);
 					goto error;
 			}
@@ -546,7 +548,7 @@ error:
  */
 peer_event_t I_Snd_Conn_Req(peer *p)
 {
-	LM_INFO("I_Snd_Conn_Req(): Peer %.*s \n", p->fqdn.len, p->fqdn.s);
+	LM_INFO("Peer %.*s \n", p->fqdn.len, p->fqdn.s);
 
 	if(p->I_sock > 0)
 		close(p->I_sock);
@@ -667,8 +669,7 @@ void I_Snd_CER(peer *p)
 	cer->endtoendId = next_endtoend();
 	addrlen = sizeof(addr_u);
 	if((ret = getsockname(p->I_sock, &(addr_u.addr), &addrlen)) == -1) {
-		LM_ERR("I_Snd_CER(): Error on finding local host address > %s\n",
-				strerror(errno));
+		LM_ERR("Error on finding local host address > %s\n", strerror(errno));
 		Cleanup(p, p->I_sock);
 		p->state = Closed;
 		AAAFreeMessage(&cer);
@@ -691,7 +692,7 @@ void I_Snd_CER(peer *p)
 						AAA_AVP_FLAG_MANDATORY, 0, x, 18);
 				break;
 			default:
-				LM_ERR("I_Snd_CER(): unknown address type with family %d\n",
+				LM_ERR("unknown address type with family %d\n",
 						addr_u.addr.sa_family);
 		}
 	}
@@ -794,7 +795,7 @@ void save_peer_applications(peer *p, AAAMessage *msg)
 	p->applications = shm_malloc(sizeof(app_config) * total_cnt);
 	p->applications_max = total_cnt;
 	if(!p->applications) {
-		LM_ERR("save_peer_applications(): Error allocating %ld bytes! No "
+		LM_ERR("Error allocating %ld bytes! No "
 			   "applications saved...\n",
 				(long int)(sizeof(app_config) * total_cnt));
 		return;
@@ -1143,8 +1144,7 @@ void Snd_CEA(peer *p, AAAMessage *cer, int result_code, int sock)
 
 	addrlen = sizeof(addr_u);
 	if(getsockname(sock, &(addr_u.addr), &addrlen) == -1) {
-		LM_ERR("Snd_CEA(): Error on finding local host address > %s\n",
-				strerror(errno));
+		LM_ERR("Error on finding local host address > %s\n", strerror(errno));
 	} else {
 		switch(addr_u.addr.sa_family) {
 			case AF_INET:
@@ -1161,7 +1161,7 @@ void Snd_CEA(peer *p, AAAMessage *cer, int result_code, int sock)
 						AAA_AVP_FLAG_MANDATORY, 0, x, 18);
 				break;
 			default:
-				LM_ERR("Snd_CEA(): unknown address type with family %d\n",
+				LM_ERR("unknown address type with family %d\n",
 						addr_u.addr.sa_family);
 		}
 	}
@@ -1239,9 +1239,8 @@ void Snd_Message(peer *p, AAAMessage *msg)
 	AAASession *session = 0;
 	int rcode;
 	int send_message_before_session_sm = 0;
-	LM_DBG("Snd_Message called to peer [%.*s] for %s with code %d \n",
-			p->fqdn.len, p->fqdn.s, is_req(msg) ? "request" : "response",
-			msg->commandCode);
+	LM_DBG("called to peer [%.*s] for %s with code %d \n", p->fqdn.len,
+			p->fqdn.s, is_req(msg) ? "request" : "response", msg->commandCode);
 	if(msg->sessionId)
 		session = cdp_get_session(msg->sessionId->data);
 
@@ -1419,10 +1418,10 @@ void Rcv_Process(peer *p, AAAMessage *msg)
 		}
 	}
 	if(!nput && !put_task(p, msg)) {
-		LM_ERR("Rcv_Process(): Queue refused task\n");
+		LM_ERR("Queue refused task\n");
 		AAAFreeMessage(&msg);
 	}
-	//if (msg) LM_ERR("Rcv_Process(): task added to queue command %d, flags %#1x endtoend %u hopbyhop %u\n",msg->commandCode,msg->flags,msg->endtoendId,msg->hopbyhopId);
+	//if (msg) LM_ERR("task added to queue command %d, flags %#1x endtoend %u hopbyhop %u\n",msg->commandCode,msg->flags,msg->endtoendId,msg->hopbyhopId);
 
 	//	AAAPrintMessage(msg);
 }

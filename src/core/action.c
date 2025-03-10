@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -511,8 +513,8 @@ int do_action(struct run_act_ctx *h, struct action *a, struct sip_msg *msg)
 			}
 			break;
 		case LOG_T:
-			if((a->val[0].type != NUMBER_ST) | (a->val[1].type != STRING_ST)) {
-				LM_CRIT("bad log() types %d, %d\n", a->val[0].type,
+			if((a->val[0].type != NUMBER_ST) || (a->val[1].type != STRING_ST)) {
+				LM_CRIT("bad log() parameter types %d, %d\n", a->val[0].type,
 						a->val[1].type);
 				ret = E_BUG;
 				goto error;

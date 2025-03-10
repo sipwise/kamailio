@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -190,12 +192,12 @@ sip_uri_t *trace_dup_uri = 0;
 static str _siptrace_evcb_msg = STR_NULL;
 static int _siptrace_evrt_msg_idx = -1;
 
-static unsigned short traced_user_avp_type = 0;
-static int_str traced_user_avp;
+static avp_flags_t traced_user_avp_type = 0;
+static avp_name_t traced_user_avp;
 static str traced_user_avp_str = {NULL, 0};
 
-static unsigned short trace_table_avp_type = 0;
-static int_str trace_table_avp;
+static avp_flags_t trace_table_avp_type = 0;
+static avp_name_t trace_table_avp;
 static str trace_table_avp_str = {NULL, 0};
 
 static str trace_local_ip = {NULL, 0};
@@ -225,9 +227,9 @@ static cmd_export_t cmds[] = {
 		ANY_ROUTE},
 	{"sip_trace_msg", (cmd_function)w_sip_trace_msg, 5, fixup_spve_all, fixup_free_spve_all,
 		ANY_ROUTE},
-	{"hlog", (cmd_function)w_hlog1, 1, fixup_spve_null, 0,
+	{"hlog", (cmd_function)w_hlog1, 1, fixup_spve_null, fixup_free_spve_null,
 		ANY_ROUTE},
-	{"hlog", (cmd_function)w_hlog2, 2, fixup_spve_spve, 0,
+	{"hlog", (cmd_function)w_hlog2, 2, fixup_spve_spve, fixup_free_spve_null,
 		ANY_ROUTE},
 	{"sip_trace_mode", (cmd_function)w_sip_trace_mode, 1, fixup_spve_null,
 		fixup_free_spve_null, ANY_ROUTE},
@@ -255,24 +257,24 @@ static param_export_t params[] = {
 	{"fromtag_column", PARAM_STR, &fromtag_column},
 	{"totag_column", PARAM_STR, &totag_column},
 	{"direction_column", PARAM_STR, &direction_column},
-	{"trace_flag", INT_PARAM, &trace_flag_param},
-	{"trace_on", INT_PARAM, &trace_on},
+	{"trace_flag", PARAM_INT, &trace_flag_param},
+	{"trace_on", PARAM_INT, &trace_on},
 	{"traced_user_avp", PARAM_STR, &traced_user_avp_str},
 	{"trace_table_avp", PARAM_STR, &trace_table_avp_str},
 	{"duplicate_uri", PARAM_STR, &trace_dup_uri_str},
-	{"trace_to_database", INT_PARAM, &trace_to_database},
+	{"trace_to_database", PARAM_INT, &trace_to_database},
 	{"trace_local_ip", PARAM_STR, &trace_local_ip},
-	{"trace_sl_acks", INT_PARAM, &trace_sl_acks},
-	{"xheaders_write", INT_PARAM, &trace_xheaders_write},
-	{"xheaders_read", INT_PARAM, &trace_xheaders_read},
-	{"hep_mode_on", INT_PARAM, &hep_mode_on},
+	{"trace_sl_acks", PARAM_INT, &trace_sl_acks},
+	{"xheaders_write", PARAM_INT, &trace_xheaders_write},
+	{"xheaders_read", PARAM_INT, &trace_xheaders_read},
+	{"hep_mode_on", PARAM_INT, &hep_mode_on},
 	{"force_send_sock", PARAM_STR, &trace_send_sock_str},
 	{"send_sock_addr", PARAM_STR, &trace_send_sock_str},
 	{"send_sock_name", PARAM_STR, &trace_send_sock_name_str},
-	{"hep_version", INT_PARAM, &hep_version},
-	{"hep_capture_id", INT_PARAM, &hep_capture_id},
-	{"trace_delayed", INT_PARAM, &trace_db_delayed},
-	{"trace_db_mode", INT_PARAM, &trace_db_mode},
+	{"hep_version", PARAM_INT, &hep_version},
+	{"hep_capture_id", PARAM_INT, &hep_capture_id},
+	{"trace_delayed", PARAM_INT, &trace_db_delayed},
+	{"trace_db_mode", PARAM_INT, &trace_db_mode},
 	{"trace_init_mode", PARAM_INT, &_siptrace_init_mode},
 	{"trace_mode", PARAM_INT, &_siptrace_mode},
 	{"data_mode", PARAM_INT, &_siptrace_data_mode},

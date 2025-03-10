@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -50,9 +52,9 @@ static pv_export_t nats_mod_pvs[] = {
 };
 
 static param_export_t params[] = {
-	{"nats_url", PARAM_STRING|USE_FUNC_PARAM, (void*)_init_nats_server_url_add},
-	{"num_publish_workers", INT_PARAM, &nats_pub_workers_num},
-	{"subject_queue_group", PARAM_STRING|USE_FUNC_PARAM, (void*)_init_nats_sub_add},
+	{"nats_url", PARAM_STRING|PARAM_USE_FUNC, (void*)_init_nats_server_url_add},
+	{"num_publish_workers", PARAM_INT, &nats_pub_workers_num},
+	{"subject_queue_group", PARAM_STRING|PARAM_USE_FUNC, (void*)_init_nats_sub_add},
 	{"event_callback", PARAM_STR,   &nats_event_callback},
 	{0, 0, 0}
 };

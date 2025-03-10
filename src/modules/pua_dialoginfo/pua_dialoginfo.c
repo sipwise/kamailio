@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -51,6 +53,7 @@
 MODULE_VERSION
 
 /* Default module parameter values */
+#define DEF_USE_UUID 0
 #define DEF_INCLUDE_CALLID 1
 #define DEF_INCLUDE_LOCALREMOTE 1
 #define DEF_INCLUDE_TAGS 1
@@ -77,10 +80,10 @@ pua_api_t _pua_api;
 
 struct dlg_binds dlg_api;
 
-unsigned short pubruri_caller_avp_type;
-int_str pubruri_caller_avp_name;
-unsigned short pubruri_callee_avp_type;
-int_str pubruri_callee_avp_name;
+avp_flags_t pubruri_caller_avp_type;
+avp_name_t pubruri_caller_avp_name;
+avp_flags_t pubruri_callee_avp_type;
+avp_name_t pubruri_callee_avp_name;
 sruid_t _puadi_sruid;
 
 static char *DLG_VAR_SEP = ",";
@@ -91,6 +94,7 @@ static str callee_entity_when_publish_disabled = {0, 0}; /* pubruri_callee */
 static str local_identity_dlg_var = STR_NULL;
 
 /* Module parameter variables */
+int use_uuid = DEF_USE_UUID;
 int include_callid = DEF_INCLUDE_CALLID;
 int include_localremote = DEF_INCLUDE_LOCALREMOTE;
 int include_tags = DEF_INCLUDE_TAGS;
@@ -123,26 +127,27 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-	{"include_callid", INT_PARAM, &include_callid},
-	{"include_localremote", INT_PARAM, &include_localremote},
-	{"include_tags", INT_PARAM, &include_tags},
-	{"override_lifetime", INT_PARAM, &override_lifetime},
-	{"caller_confirmed", INT_PARAM, &caller_confirmed},
-	{"include_req_uri", INT_PARAM, &include_req_uri},
-	{"send_publish_flag", INT_PARAM, &send_publish_flag},
-	{"use_pubruri_avps", INT_PARAM, &use_pubruri_avps},
-	{"refresh_pubruri_avps_flag", INT_PARAM, &refresh_pubruri_avps_flag},
+	{"use_uuid", PARAM_INT, &use_uuid},
+	{"include_callid", PARAM_INT, &include_callid},
+	{"include_localremote", PARAM_INT, &include_localremote},
+	{"include_tags", PARAM_INT, &include_tags},
+	{"override_lifetime", PARAM_INT, &override_lifetime},
+	{"caller_confirmed", PARAM_INT, &caller_confirmed},
+	{"include_req_uri", PARAM_INT, &include_req_uri},
+	{"send_publish_flag", PARAM_INT, &send_publish_flag},
+	{"use_pubruri_avps", PARAM_INT, &use_pubruri_avps},
+	{"refresh_pubruri_avps_flag", PARAM_INT, &refresh_pubruri_avps_flag},
 	{"pubruri_caller_avp", PARAM_STRING, &pubruri_caller_avp},
 	{"pubruri_callee_avp", PARAM_STRING, &pubruri_callee_avp},
 	{"pubruri_caller_dlg_var", PARAM_STR, &caller_dlg_var},
 	{"pubruri_callee_dlg_var", PARAM_STR, &callee_dlg_var},
 	{"local_identity_dlg_var", PARAM_STR, &local_identity_dlg_var},
-	{"callee_trying", INT_PARAM, &callee_trying},
-	{"disable_caller_publish_flag", INT_PARAM, &disable_caller_publish_flag},
-	{"disable_callee_publish_flag", INT_PARAM, &disable_callee_publish_flag},
+	{"callee_trying", PARAM_INT, &callee_trying},
+	{"disable_caller_publish_flag", PARAM_INT, &disable_caller_publish_flag},
+	{"disable_callee_publish_flag", PARAM_INT, &disable_callee_publish_flag},
 	{"caller_entity_when_publish_disabled", PARAM_STR, &caller_entity_when_publish_disabled},
 	{"callee_entity_when_publish_disabled", PARAM_STR, &callee_entity_when_publish_disabled},
-	{"publish_dialog_req_within", INT_PARAM, &publish_dialog_req_within},
+	{"publish_dialog_req_within", PARAM_INT, &publish_dialog_req_within},
 	{"attribute_display", PARAM_INT, &puadinfo_attribute_display},
 	{0, 0, 0}
 };
@@ -733,8 +738,16 @@ struct dlginfo_cell *get_dialog_data(struct dlg_cell *dlg, int type,
 	int len;
 
 	// generate new random uuid
-	if(sruid_next_safe(&_puadi_sruid) < 0) {
-		return NULL;
+	if(use_uuid) {
+		_puadi_sruid.uid.len = SRUID_SIZE;
+		if(sruid_uuid_generate(_puadi_sruid.uid.s, &_puadi_sruid.uid.len) < 0) {
+			LM_ERR("uuid not generated\n");
+			return NULL;
+		}
+	} else {
+		if(sruid_next_safe(&_puadi_sruid) < 0) {
+			return NULL;
+		}
 	}
 	LM_DBG("uuid generated: '%.*s'\n", _puadi_sruid.uid.len,
 			_puadi_sruid.uid.s);

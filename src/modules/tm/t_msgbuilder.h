@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -28,12 +30,16 @@
 #include "h_table.h"
 #include "t_reply.h"
 
+#define TM_CANCEL_HEADERS_COPY (1)
+#define TM_CANCEL_FORWARD_UAC (1 << 1)
+
 char *build_local(struct cell *Trans, unsigned int branch, unsigned int *len,
-		char *method, int method_len, str *to, struct cancel_reason *reason);
+		char *method, int method_len, str *to, sip_msg_t *imsg,
+		struct cancel_reason *reason);
 
 char *build_local_reparse(struct cell *Trans, unsigned int branch,
 		unsigned int *len, char *method, int method_len, str *to,
-		struct cancel_reason *reason);
+		sip_msg_t *imsg, struct cancel_reason *reason);
 
 char *build_uac_request(str msg_type, str dst, str from, str fromtag, int cseq,
 		str callid, str headers, str body, int branch, struct cell *t,

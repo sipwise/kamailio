@@ -13,6 +13,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -77,39 +79,40 @@ static avp_list_t *avps_1;
 static avp_list_t *avps_2;
 static rpc_export_t rpc_methods[];
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"set_ugflag", set_gflag, 1, fixup_int_1, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"reset_ugflag", reset_gflag, 1, fixup_int_1, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"is_ugflag", is_gflag, 1, fixup_int_1, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{"flush_ugflags", flush_gflags, 0, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {{"initial", PARAM_INT, &initial},
-		{"db_url", PARAM_STRING, &db_url},
-		{"load_global_attrs", PARAM_INT, &load_global_attrs},
-		{"global_attrs_table", PARAM_STRING, &attr_table},
-		{"global_attrs_name", PARAM_STRING, &attr_name},
-		{"global_attrs_type", PARAM_STRING, &attr_type},
-		{"global_attrs_value", PARAM_STRING, &attr_value},
-		{"global_attrs_flags", PARAM_STRING, &attr_flags}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"uid_gflags",	 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		rpc_methods,	 /* exported RPC methods */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function*/
-		mod_init,		 /* module init function */
-		child_init,		 /* per-child init function */
-		mod_destroy		 /* module destroy function */
+	{"set_ugflag", set_gflag, 1, fixup_int_1, 0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"reset_ugflag", reset_gflag, 1, fixup_int_1, 0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"is_ugflag", is_gflag, 1, fixup_int_1, 0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{"flush_ugflags", flush_gflags, 0, 0, 0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
 };
 
+static param_export_t params[] = {
+	{"initial", PARAM_INT, &initial},
+	{"db_url", PARAM_STRING, &db_url},
+	{"load_global_attrs", PARAM_INT, &load_global_attrs},
+	{"global_attrs_table", PARAM_STRING, &attr_table},
+	{"global_attrs_name", PARAM_STRING, &attr_name},
+	{"global_attrs_type", PARAM_STRING, &attr_type},
+	{"global_attrs_value", PARAM_STRING, &attr_value},
+	{"global_attrs_flags", PARAM_STRING, &attr_flags},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"uid_gflags",    /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	rpc_methods,     /* exported RPC methods */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function*/
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	mod_destroy      /* module destroy function */
+};
+/* clang-format on */
 
 static int init_db(void)
 {

@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -530,7 +532,6 @@ static PyObject *init_KSR(void)
 
 	KSR_moduledef.m_methods = _sr_crt_KSRMethods;
 	_sr_apy_ksr_module = PyModule_Create(&KSR_moduledef);
-
 	Py_INCREF(_sr_apy_ksr_module);
 
 	m = 0;
@@ -538,6 +539,13 @@ static PyObject *init_KSR(void)
 	/* special sub-modules - x.modf() can have variable number of params */
 	_sr_apy_ksr_modules_list[m] = PyModule_Create(&KSR_x_moduledef);
 	PyModule_AddObject(_sr_apy_ksr_module, "x", _sr_apy_ksr_modules_list[m]);
+
+#if defined(Py_GIL_DISABLED) && !defined(KSR_PYTHON_DISABLE_FREETHREADING)
+#warning Python Free Threading build
+	PyUnstable_Module_SetGIL(_sr_apy_ksr_module, Py_MOD_GIL_NOT_USED);
+	PyUnstable_Module_SetGIL(_sr_apy_ksr_modules_list[m], Py_MOD_GIL_NOT_USED);
+#endif
+
 	Py_INCREF(_sr_apy_ksr_modules_list[m]);
 	m++;
 
@@ -579,6 +587,12 @@ static PyObject *init_KSR(void)
 			mmodule->m_size = -1;
 
 			_sr_apy_ksr_modules_list[m] = PyModule_Create(mmodule);
+
+#if defined(Py_GIL_DISABLED) && !defined(KSR_PYTHON_DISABLE_FREETHREADING)
+#warning Python Free Threading build
+			PyUnstable_Module_SetGIL(
+					_sr_apy_ksr_modules_list[m], Py_MOD_GIL_NOT_USED);
+#endif
 			PyModule_AddObject(_sr_apy_ksr_module, emods[k].kexp[0].mname.s,
 					_sr_apy_ksr_modules_list[m]);
 			Py_INCREF(_sr_apy_ksr_modules_list[m]);

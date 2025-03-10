@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -261,6 +263,7 @@ extern char *default_routename;
 %token FORCE_TCP_ALIAS
 %token UDP_MTU
 %token UDP_MTU_TRY_PROTO
+%token UDP_RECEIVER_MODE
 %token UDP4_RAW
 %token UDP4_RAW_MTU
 %token UDP4_RAW_TTL
@@ -333,6 +336,7 @@ extern char *default_routename;
 %token ADVERTISE
 %token VIRTUAL
 %token STRNAME
+%token AGNAME
 %token ALIAS
 %token SR_AUTO_ALIASES
 %token DOMAIN
@@ -395,6 +399,8 @@ extern char *default_routename;
 %token ASYNC_USLEEP
 %token ASYNC_NONBLOCK
 %token ASYNC_WORKERS_GROUP
+%token ASYNC_TKV_GNAME
+%token ASYNC_TKV_EVCB
 %token CHECK_VIA
 %token PHONE2TEL
 %token MEMLOG
@@ -839,6 +845,19 @@ socket_lattr:
 			tmp_sa.bindaddr.len = strlen(tmp_sa.bindaddr.s);
 			tmp_sa.bindport = $5;
 		}
+	| BIND EQUAL proto COLON listen_id COLON port MINUS port	{
+			tmp_sa.bindproto = $3;
+			tmp_sa.bindaddr.s = $5;
+			tmp_sa.bindaddr.len = strlen(tmp_sa.bindaddr.s);
+			tmp_sa.bindport = $7;
+			tmp_sa.bindportend = $9;
+		}
+	| BIND EQUAL listen_id COLON port MINUS port	{
+			tmp_sa.bindaddr.s = $3;
+			tmp_sa.bindaddr.len = strlen(tmp_sa.bindaddr.s);
+			tmp_sa.bindport = $5;
+			tmp_sa.bindportend = $7;
+		}
 	| BIND EQUAL proto COLON listen_id	{
 			tmp_sa.bindproto = $3;
 			tmp_sa.bindaddr.s = $5;
@@ -865,6 +884,11 @@ socket_lattr:
 			tmp_sa.useaddr.len = strlen(tmp_sa.useaddr.s);
 			tmp_sa.useport = $7;
 		}
+	| AGNAME EQUAL STRING {
+			tmp_sa.agname.s = $3;
+			tmp_sa.agname.len = strlen(tmp_sa.agname.s);
+		}
+	| AGNAME EQUAL error { yyerror("string value expected"); }
 	| WORKERS EQUAL NUMBER { tmp_sa.workers=$3; }
 	| WORKERS EQUAL error { yyerror("number expected"); }
 	| VIRTUAL EQUAL NUMBER { if($3!=0) { tmp_sa.sflags |= SI_IS_VIRTUAL; } }
@@ -1068,6 +1092,10 @@ assign_stm:
 	| ASYNC_NONBLOCK EQUAL error { yyerror("number expected"); }
 	| ASYNC_WORKERS_GROUP EQUAL STRING { async_task_set_workers_group($3); }
 	| ASYNC_WORKERS_GROUP EQUAL error { yyerror("string expected"); }
+	| ASYNC_TKV_GNAME EQUAL STRING { async_tkv_gname_set($3); }
+	| ASYNC_TKV_GNAME EQUAL error { yyerror("string expected"); }
+	| ASYNC_TKV_EVCB EQUAL STRING { async_tkv_evcb_set($3); }
+	| ASYNC_TKV_EVCB EQUAL error { yyerror("string expected"); }
 	| CHECK_VIA EQUAL NUMBER { check_via=$3; }
 	| CHECK_VIA EQUAL error { yyerror("boolean value expected"); }
 	| PHONE2TEL EQUAL NUMBER { phone2tel=$3; }
@@ -2088,6 +2116,8 @@ assign_stm:
 	| ONSEND_RT_REPLY EQUAL error { yyerror("int value expected"); }
 	| UDP_MTU EQUAL NUMBER { default_core_cfg.udp_mtu=$3; }
 	| UDP_MTU EQUAL error { yyerror("number expected"); }
+	| UDP_RECEIVER_MODE EQUAL NUMBER { ksr_udp_receiver_mode=$3; }
+	| UDP_RECEIVER_MODE EQUAL error { yyerror("number expected"); }
 	| FORCE_RPORT EQUAL NUMBER
 		{ default_core_cfg.force_rport=$3; fix_global_req_flags(0, 0); }
 	| FORCE_RPORT EQUAL error { yyerror("boolean value expected"); }
@@ -3183,7 +3213,8 @@ attr_id_any_str:
 	| STRING {
 		avp_spec_t *avp_spec;
 		str s;
-		int type, idx;
+		avp_flags_t type;
+		int  idx;
 		avp_spec = pkg_malloc(sizeof(*avp_spec));
 		if (!avp_spec) {
 			yyerror("Not enough memory");

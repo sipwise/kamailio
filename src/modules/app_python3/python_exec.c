@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -15,9 +17,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
+
 
 #include <Python.h>
 
@@ -47,8 +49,9 @@ sr_apy_env_t *sr_apy_env_get()
 	return &_sr_apy_env;
 }
 
-#define PY_GIL_ENSURE gstate = PyGILState_Ensure()
-#define PY_GIL_RELEASE PyGILState_Release(gstate)
+extern __thread PyThreadState *_save;
+extern int _ksr_apy3_threads_mode;
+
 #define LOCK_RELEASE \
 	if(locked)       \
 	lock_release(_sr_python_reload_lock)
@@ -71,6 +74,9 @@ int apy_exec(sip_msg_t *_msg, char *fname, char *fparam, int emode)
 	PyGILState_STATE gstate;
 	int locked = 0;
 
+	if(_ksr_apy3_threads_mode == 1) {
+		Py_BLOCK_THREADS;
+	}
 	/* clear error state */
 	PyErr_Clear();
 
@@ -90,7 +96,10 @@ int apy_exec(sip_msg_t *_msg, char *fname, char *fparam, int emode)
 
 	bmsg = _sr_apy_env.msg;
 	_sr_apy_env.msg = _msg;
-	PY_GIL_ENSURE;
+
+	if(_ksr_apy3_threads_mode != 1) {
+		gstate = PyGILState_Ensure();
+	}
 
 	pFunc = PyObject_GetAttrString(_sr_apy_handler_obj, fname);
 	if(pFunc == NULL || !PyCallable_Check(pFunc)) {
@@ -168,8 +177,14 @@ int apy_exec(sip_msg_t *_msg, char *fname, char *fparam, int emode)
 err:
 	/* clear error state */
 	PyErr_Clear();
-	PY_GIL_RELEASE;
+	if(_ksr_apy3_threads_mode != 1) {
+		PyGILState_Release(gstate);
+	}
 	LOCK_RELEASE;
+	if(_ksr_apy3_threads_mode == 1) {
+		Py_UNBLOCK_THREADS;
+	}
+
 	return rval;
 }
 

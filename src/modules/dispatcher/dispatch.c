@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -79,6 +81,7 @@
 #define DS_ALG_RELWEIGHT 11
 #define DS_ALG_PARALLEL 12
 #define DS_ALG_LATENCY 13
+#define DS_ALG_OVERLOAD 64 /* 2^6 - can be also used as a flag */
 
 #define DS_HN_SIZE 256
 
@@ -142,6 +145,7 @@ static void ds_run_route(
 		struct sip_msg *msg, str *uri, char *route, ds_rctx_t *rctx);
 
 void shuffle_uint100array(unsigned int *arr);
+void shuffle_char100array(char *arr);
 int ds_reinit_rweight_on_state_change(
 		int old_state, int new_state, ds_set_t *dset);
 
@@ -204,6 +208,26 @@ int ds_hash_load_destroy(void)
 		return -1;
 	ds_ht_destroy(_dsht_load);
 	_dsht_load = NULL;
+	return 0;
+}
+
+/**
+ *
+ */
+static inline int ds_get_index(int group, int ds_list_idx, ds_set_t **index)
+{
+	ds_set_t *si = NULL;
+
+	if(index == NULL || group < 0 || ds_lists[ds_list_idx] == NULL)
+		return -1;
+
+	/* get the index of the set */
+	si = ds_avl_find(ds_lists[ds_list_idx], group);
+
+	if(si == NULL)
+		return -1;
+
+	*index = si;
 	return 0;
 }
 
@@ -376,11 +400,145 @@ int ds_set_attrs(ds_dest_t *dest, str *vattrs)
 		} else if(pit->name.len == 7
 				  && strncasecmp(pit->name.s, "obproxy", 7) == 0) {
 			dest->attrs.obproxy = pit->body;
+		} else if(pit->name.len == 5
+				  && strncasecmp(pit->name.s, "ocmin", 5) == 0) {
+			str2int(&pit->body, &dest->ocdata.ocmin);
+		} else if(pit->name.len == 5
+				  && strncasecmp(pit->name.s, "ocmax", 5) == 0) {
+			str2int(&pit->body, &dest->ocdata.ocmax);
+		} else if(pit->name.len == 6
+				  && strncasecmp(pit->name.s, "ocrate", 6) == 0) {
+			str2int(&pit->body, &dest->ocdata.ocrate);
 		}
 	}
+	if(dest->ocdata.ocmax > 100) {
+		dest->ocdata.ocmax = 100;
+	}
+	if(dest->ocdata.ocmax == 0) {
+		dest->ocdata.ocmax = 100;
+	}
+	if(dest->ocdata.ocmin > 100) {
+		dest->ocdata.ocmin = 0;
+	}
+	if(dest->ocdata.ocmin > dest->ocdata.ocmax) {
+		dest->ocdata.ocmin = 0;
+	}
+	if(dest->ocdata.ocrate > 100) {
+		dest->ocdata.ocrate = 0;
+	}
+	if(dest->ocdata.ocrate < dest->ocdata.ocmin) {
+		dest->ocdata.ocrate = dest->ocdata.ocmin;
+	}
+	if(dest->ocdata.ocrate > dest->ocdata.ocmax) {
+		dest->ocdata.ocrate = dest->ocdata.ocmax;
+	}
+
 	if(params_list)
 		free_params(params_list);
 	return 0;
+}
+
+/**
+ *
+ */
+void ds_oc_prepare(ds_dest_t *dp)
+{
+	int i;
+	for(i = 0; i < dp->ocdata.ocrate; i++) {
+		dp->ocdata.ocdist[i] = '0';
+	}
+	for(i = dp->ocdata.ocrate; i < 100; i++) {
+		dp->ocdata.ocdist[i] = '1';
+	}
+	shuffle_char100array(dp->ocdata.ocdist);
+}
+
+/**
+ *
+ */
+int ds_oc_set_attrs(
+		sip_msg_t *msg, int setid, str *duri, int irval, int itval, int isval)
+{
+	int i = 0;
+	int ret = -1;
+	ds_set_t *idx = NULL;
+	struct timeval tnow;
+	struct timeval tdiff;
+
+	if(_ds_list == NULL || _ds_list_nr <= 0) {
+		LM_ERR("the list is null\n");
+		return -1;
+	}
+
+	/* get the index of the set */
+	if(ds_get_index(setid, *ds_crt_idx, &idx) != 0) {
+		LM_ERR("destination set [%d] not found\n", setid);
+		return -1;
+	}
+	LM_DBG("updating oc attrs for %d %.*s to rate %d validity %d seq %d\n",
+			setid, duri->len, duri->s, irval, itval, isval);
+
+	gettimeofday(&tnow, NULL);
+	timerclear(&tdiff);
+
+	/* interval set to itval or to default 500 milliseconds */
+	tdiff.tv_sec = (((itval > 0) ? itval : 500) * 1000) / 1000000;
+	tdiff.tv_usec = (((itval > 0) ? itval : 500) * 1000) % 1000000;
+
+	ret = -2;
+	for(i = 0; i < idx->nr; i++) {
+		if(idx->dlist[i].uri.len == duri->len
+				&& strncasecmp(idx->dlist[i].uri.s, duri->s, duri->len) == 0) {
+			if(idx->dlist[i].ocdata.ocseq >= isval) {
+				LM_DBG("skipping entry %d due to seq condition\n", i);
+				continue;
+			}
+			idx->dlist[i].ocdata.ocrate = irval;
+			if(idx->dlist[i].ocdata.ocrate < idx->dlist[i].ocdata.ocmin) {
+				idx->dlist[i].ocdata.ocrate = idx->dlist[i].ocdata.ocmin;
+			}
+			if(idx->dlist[i].ocdata.ocrate > idx->dlist[i].ocdata.ocmax) {
+				idx->dlist[i].ocdata.ocrate = idx->dlist[i].ocdata.ocmax;
+			}
+			ds_oc_prepare(&idx->dlist[i]);
+			timeradd(&tnow, &tdiff, &idx->dlist[i].ocdata.octime);
+			idx->dlist[i].ocdata.ocseq = isval;
+			ret = 1;
+			LM_DBG("updated entry %d\n", i);
+		}
+	}
+	return ret;
+}
+
+/**
+ *
+ */
+static inline int ds_oc_skip(ds_set_t *dsg, int alg, int n)
+{
+	int ret;
+	struct timeval tnow;
+
+	if(alg != DS_ALG_OVERLOAD) {
+		return 0;
+	}
+
+	gettimeofday(&tnow, NULL);
+
+	if(timercmp(&dsg->dlist[n].ocdata.octime, &tnow, <)) {
+		/* over the time interval validity - use it */
+		LM_DBG("time validity not matching\n");
+		return 0;
+	}
+	if(dsg->dlist[n].ocdata.ocdist[dsg->dlist[n].ocdata.ocidx] == '1') {
+		/* use it */
+		ret = 0;
+	} else {
+		/* skip it */
+		ret = 1;
+	}
+	dsg->dlist[n].ocdata.ocidx = (dsg->dlist[n].ocdata.ocidx + 1) % 100;
+
+	return ret;
 }
 
 /**
@@ -455,6 +613,7 @@ ds_dest_t *pack_dest(str iuri, int flags, int priority, str *attrs, int dload)
 	dp->flags = flags;
 	dp->priority = priority;
 	dp->dload = dload;
+	dp->ocdata.ocmax = 100;
 
 	if(ds_set_attrs(dp, attrs) < 0) {
 		LM_ERR("cannot set attributes!\n");
@@ -536,6 +695,8 @@ ds_dest_t *pack_dest(str iuri, int flags, int priority, str *attrs, int dload)
 		}
 	}
 
+	ds_oc_prepare(dp);
+
 	return dp;
 err:
 	if(dp != NULL) {
@@ -552,7 +713,7 @@ err:
 /**
  *
  */
-int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
+ds_dest_t *add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 		int list_idx, int *setn, int dload, ds_latency_stats_t *latency_stats)
 {
 	ds_dest_t *dp = NULL;
@@ -561,8 +722,9 @@ int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 	ds_dest_t *dp1 = NULL;
 
 	dp = pack_dest(uri, flags, priority, attrs, dload);
-	if(!dp)
-		goto err;
+	if(!dp) {
+		goto error;
+	}
 
 	if(latency_stats != NULL) {
 		dp->latency_stats.stdev = latency_stats->stdev;
@@ -578,7 +740,7 @@ int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 	sp = ds_avl_insert(&ds_lists[list_idx], id, setn);
 	if(!sp) {
 		LM_ERR("no more memory.\n");
-		goto err;
+		goto error;
 	}
 	sp->nr++;
 
@@ -605,8 +767,8 @@ int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 
 	LM_DBG("dest [%d/%d] <%.*s>\n", sp->id, sp->nr, dp->uri.len, dp->uri.s);
 
-	return 0;
-err:
+	return dp;
+error:
 	if(dp != NULL) {
 		if(dp->uri.s != NULL)
 			shm_free(dp->uri.s);
@@ -615,7 +777,7 @@ err:
 		shm_free(dp);
 	}
 
-	return -1;
+	return NULL;
 }
 
 
@@ -625,6 +787,23 @@ void shuffle_uint100array(unsigned int *arr)
 	int k;
 	int j;
 	unsigned int t;
+	if(arr == NULL)
+		return;
+	for(j = 0; j < 100; j++) {
+		k = j + (kam_rand() % (100 - j));
+		t = arr[j];
+		arr[j] = arr[k];
+		arr[k] = t;
+	}
+}
+
+
+/* for internal usage; arr must be arr[100] */
+void shuffle_char100array(char *arr)
+{
+	int k;
+	int j;
+	char t;
 	if(arr == NULL)
 		return;
 	for(j = 0; j < 100; j++) {
@@ -934,7 +1113,7 @@ int ds_load_list(char *lfile)
 		}
 		if(add_dest2list(id, uri, flags, priority, &attrs, *ds_next_idx, &setn,
 				   0, latency_stats)
-				!= 0) {
+				== NULL) {
 			LM_WARN("unable to add destination %.*s to set %d -- skipping\n",
 					uri.len, uri.s, id);
 			if(ds_load_mode == 1) {
@@ -1194,7 +1373,7 @@ int ds_load_db(void)
 		}
 		if(add_dest2list(id, uri, flags, priority, &attrs, *ds_next_idx, &setn,
 				   0, latency_stats)
-				!= 0) {
+				== NULL) {
 			dest_errs++;
 			LM_WARN("unable to add destination %.*s to set %d -- skipping\n",
 					uri.len, uri.s, id);
@@ -1565,26 +1744,6 @@ int ds_hash_pvar(struct sip_msg *msg, unsigned int *hash)
 	LM_DBG("Hashing of '%.*s' resulted in %u !\n", hash_str.len, hash_str.s,
 			*hash);
 
-	return 0;
-}
-
-/**
- *
- */
-static inline int ds_get_index(int group, int ds_list_idx, ds_set_t **index)
-{
-	ds_set_t *si = NULL;
-
-	if(index == NULL || group < 0 || ds_lists[ds_list_idx] == NULL)
-		return -1;
-
-	/* get the index of the set */
-	si = ds_avl_find(ds_lists[ds_list_idx], group);
-
-	if(si == NULL)
-		return -1;
-
-	*index = si;
 	return 0;
 }
 
@@ -2516,6 +2675,14 @@ int ds_manage_routes(sip_msg_t *msg, ds_select_state_t *rstate)
 				return -1;
 			xavp_filled = 1;
 			break;
+		case DS_ALG_OVERLOAD: /* 64 - round robin with overload control */
+			lock_get(&idx->lock);
+			hash = idx->last;
+			idx->last = (idx->last + 1) % idx->nr;
+			vlast = idx->last;
+			lock_release(&idx->lock);
+			ulast = 1;
+			break;
 		default:
 			LM_WARN("algo %d not implemented - using first entry...\n",
 					rstate->alg);
@@ -2531,7 +2698,9 @@ int ds_manage_routes(sip_msg_t *msg, ds_select_state_t *rstate)
 	i = hash;
 
 	/* if selected address is inactive, find next active */
-	while(!xavp_filled && ds_skip_dst(idx->dlist[i].flags)) {
+	while(!xavp_filled
+			&& (ds_skip_dst(idx->dlist[i].flags)
+					|| ds_oc_skip(idx, rstate->alg, i))) {
 		if(ds_use_default != 0 && idx->nr != 1)
 			i = (i + 1) % (idx->nr - 1);
 		else
@@ -2540,7 +2709,8 @@ int ds_manage_routes(sip_msg_t *msg, ds_select_state_t *rstate)
 			/* back to start -- looks like no active dst */
 			if(ds_use_default != 0) {
 				i = idx->nr - 1;
-				if(ds_skip_dst(idx->dlist[i].flags))
+				if(ds_skip_dst(idx->dlist[i].flags)
+						|| ds_oc_skip(idx, rstate->alg, i))
 					return -1;
 				break;
 			} else {
@@ -2696,14 +2866,16 @@ next_dst:
 void ds_add_dest_cb(ds_set_t *node, int i, void *arg)
 {
 	int setn;
+	ds_dest_t *ndst = NULL;
 
-	if(add_dest2list(node->id, node->dlist[i].uri, node->dlist[i].flags,
-			   node->dlist[i].priority, &node->dlist[i].attrs.body,
-			   *ds_next_idx, &setn, node->dlist[i].dload,
-			   &node->dlist[i].latency_stats)
-			!= 0) {
+	ndst = add_dest2list(node->id, node->dlist[i].uri, node->dlist[i].flags,
+			node->dlist[i].priority, &node->dlist[i].attrs.body, *ds_next_idx,
+			&setn, node->dlist[i].dload, &node->dlist[i].latency_stats);
+	if(ndst == NULL) {
 		LM_WARN("failed to add destination in group %d - %.*s\n", node->id,
 				node->dlist[i].uri.len, node->dlist[i].uri.s);
+	} else {
+		memcpy(&ndst->ocdata, &node->dlist[i].ocdata, sizeof(ds_ocdata_t));
 	}
 	return;
 }
@@ -2724,7 +2896,7 @@ int ds_add_dst(int group, str *address, int flags, int priority, str *attrs)
 	// add new destination
 	if(add_dest2list(group, *address, flags, priority, attrs, *ds_next_idx,
 			   &setn, 0, NULL)
-			!= 0) {
+			== NULL) {
 		LM_WARN("unable to add destination %.*s to set %d", address->len,
 				address->s, group);
 		if(ds_load_mode == 1) {
@@ -2752,7 +2924,10 @@ error:
 /* callback for removing nodes based on setid & address */
 void ds_filter_dest_cb(ds_set_t *node, int i, void *arg)
 {
-	struct ds_filter_dest_cb_arg *filter_arg = (typeof(filter_arg))arg;
+	ds_dest_t *ndst = NULL;
+	struct ds_filter_dest_cb_arg *filter_arg;
+
+	filter_arg = (typeof(filter_arg))arg;
 
 	if(node->id == filter_arg->setid
 			&& node->dlist[i].uri.len == filter_arg->dest->uri.len
@@ -2761,13 +2936,16 @@ void ds_filter_dest_cb(ds_set_t *node, int i, void *arg)
 					   == 0)
 		return;
 
-	if(add_dest2list(node->id, node->dlist[i].uri, node->dlist[i].flags,
-			   node->dlist[i].priority, &node->dlist[i].attrs.body,
-			   *ds_next_idx, filter_arg->setn, node->dlist[i].dload,
-			   &node->dlist[i].latency_stats)
-			!= 0) {
+	ndst = add_dest2list(node->id, node->dlist[i].uri, node->dlist[i].flags,
+			node->dlist[i].priority, &node->dlist[i].attrs.body, *ds_next_idx,
+			filter_arg->setn, node->dlist[i].dload,
+			&node->dlist[i].latency_stats);
+
+	if(ndst == NULL) {
 		LM_WARN("failed to add destination in group %d - %.*s\n", node->id,
 				node->dlist[i].uri.len, node->dlist[i].uri.s);
+	} else {
+		memcpy(&ndst->ocdata, &node->dlist[i].ocdata, sizeof(ds_ocdata_t));
 	}
 	return;
 }
@@ -3931,6 +4109,12 @@ void ds_ping_set(ds_set_t *node)
 	for(j = 0; j < node->nr; j++) {
 		/* skip addresses set in disabled state by admin */
 		if((node->dlist[j].flags & DS_DISABLED_DST) != 0)
+			continue;
+		/* skip addresses with no-ping flag */
+		if((node->dlist[j].flags & DS_NOPING_DST) != 0)
+			continue;
+		/* skip addresses with no-DNS-A flag */
+		if((node->dlist[j].flags & DS_NODNSARES_DST) != 0)
 			continue;
 		/* If the Flag of the entry has "Probing set, send a probe:	*/
 		if(ds_ping_result_helper(node, j)) {

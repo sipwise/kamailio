@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -134,6 +136,7 @@ static int rtpproxy_manage2(struct sip_msg *msg, char *flags, char *ip);
 
 static int add_rtpproxy_socks(struct rtpp_set *rtpp_list, char *rtpproxy);
 static int fixup_set_id(void **param, int param_no);
+static int fixup_free_set_id(void **param, int param_no);
 static int set_rtp_proxy_set_f(struct sip_msg *msg, char *str1, char *str2);
 static struct rtpp_set *select_rtpp_set(int id_set);
 
@@ -164,8 +167,8 @@ struct rtpp_set_head *rtpp_set_list = 0;
 struct rtpp_set *selected_rtpp_set = 0;
 struct rtpp_set *default_rtpp_set = 0;
 static char *ice_candidate_priority_avp_param = NULL;
-static int ice_candidate_priority_avp_type;
-static int_str ice_candidate_priority_avp;
+static avp_flags_t ice_candidate_priority_avp_type;
+static avp_name_t ice_candidate_priority_avp;
 static str rtp_inst_pv_param = {NULL, 0};
 static pv_spec_t *rtp_inst_pvar = NULL;
 
@@ -191,81 +194,78 @@ static str timeout_tag_pv_str = {0, 0};
 static pv_elem_t *timeout_tag_pv = NULL;
 static pv_elem_t *extra_id_pv = NULL;
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"set_rtp_proxy_set", (cmd_function)set_rtp_proxy_set_f, 1,
-				fixup_set_id, 0, ANY_ROUTE},
-		{"unforce_rtp_proxy", (cmd_function)unforce_rtp_proxy1_f, 0, 0, 0,
-				ANY_ROUTE},
-		{"rtpproxy_destroy", (cmd_function)unforce_rtp_proxy1_f, 0, 0, 0,
-				ANY_ROUTE},
-		{"unforce_rtp_proxy", (cmd_function)unforce_rtp_proxy1_f, 1,
-				fixup_spve_null, 0, ANY_ROUTE},
-		{"rtpproxy_destroy", (cmd_function)unforce_rtp_proxy1_f, 1,
-				fixup_spve_null, 0, ANY_ROUTE},
-		{"start_recording", (cmd_function)start_recording_f, 0, 0, 0,
-				ANY_ROUTE},
-		{"rtpproxy_offer", (cmd_function)rtpproxy_offer1_f, 0, 0, 0, ANY_ROUTE},
-		{"rtpproxy_offer", (cmd_function)rtpproxy_offer1_f, 1, fixup_spve_null,
-				0, ANY_ROUTE},
-		{"rtpproxy_offer", (cmd_function)rtpproxy_offer2_f, 2, fixup_spve_spve,
-				0, ANY_ROUTE},
-		{"rtpproxy_answer", (cmd_function)rtpproxy_answer1_f, 0, 0, 0,
-				ANY_ROUTE},
-		{"rtpproxy_answer", (cmd_function)rtpproxy_answer1_f, 1,
-				fixup_spve_null, 0, ANY_ROUTE},
-		{"rtpproxy_answer", (cmd_function)rtpproxy_answer2_f, 2,
-				fixup_spve_spve, 0, ANY_ROUTE},
-		{"rtpproxy_stream2uac", (cmd_function)rtpproxy_stream2uac2_f, 2,
-				fixup_var_str_int, 0, ANY_ROUTE},
-		{"rtpproxy_stream2uas", (cmd_function)rtpproxy_stream2uas2_f, 2,
-				fixup_var_str_int, 0, ANY_ROUTE},
-		{"rtpproxy_stop_stream2uac", (cmd_function)rtpproxy_stop_stream2uac2_f,
-				0, NULL, 0, ANY_ROUTE},
-		{"rtpproxy_stop_stream2uas", (cmd_function)rtpproxy_stop_stream2uas2_f,
-				0, NULL, 0, ANY_ROUTE},
-		{"rtpproxy_manage", (cmd_function)rtpproxy_manage0, 0, 0, 0, ANY_ROUTE},
-		{"rtpproxy_manage", (cmd_function)rtpproxy_manage1, 1, fixup_spve_null,
-				fixup_free_spve_null, ANY_ROUTE},
-		{"rtpproxy_manage", (cmd_function)rtpproxy_manage2, 2, fixup_spve_spve,
-				fixup_free_spve_spve, ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
-static pv_export_t mod_pvs[] = {
-		{{"rtpstat", (sizeof("rtpstat") - 1)}, /* RTP-Statistics */
-				PVT_OTHER, pv_get_rtppstat_f, 0, 0, 0, 0, 0},
-		{{"rtppstat", (sizeof("rtppstat") - 1)}, /* RTP-Statistics */
-				PVT_OTHER, pv_get_rtppstat_f, 0, 0, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {
-		{"nortpproxy_str", PARAM_STR, &nortpproxy_str},
-		{"rtpproxy_sock", PARAM_STRING | USE_FUNC_PARAM,
-				(void *)rtpproxy_set_store},
-		{"rtpproxy_disable_tout", INT_PARAM, &rtpproxy_disable_tout},
-		{"rtpproxy_retr", INT_PARAM, &rtpproxy_retr},
-		{"rtpproxy_tout", INT_PARAM, &rtpproxy_tout},
-		{"timeout_socket", PARAM_STR, &timeout_socket_str},
-		{"timeout_tag_pv", PARAM_STR, &timeout_tag_pv_str},
-		{"ice_candidate_priority_avp", PARAM_STRING,
-				&ice_candidate_priority_avp_param},
-		{"extra_id_pv", PARAM_STR, &extra_id_pv_param},
-		{"db_url", PARAM_STR, &rtpp_db_url},
-		{"table_name", PARAM_STR, &rtpp_table_name},
-		{"rtp_inst_pvar", PARAM_STR, &rtp_inst_pv_param}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"rtpproxy",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* cmd exports */
-		params,			 /* param exports */
-		0,				 /* RPC method exports */
-		mod_pvs,		 /* exported pseudo-variables */
-		0,				 /* reply processing */
-		mod_init,		 /* module init function */
-		child_init,		 /* per-child init function */
-		mod_destroy,	 /* destroy function */
+	{"set_rtp_proxy_set", (cmd_function)set_rtp_proxy_set_f, 1,
+		fixup_set_id, fixup_free_set_id, ANY_ROUTE},
+	{"unforce_rtp_proxy", (cmd_function)unforce_rtp_proxy1_f, 0, 0, 0,	ANY_ROUTE},
+	{"rtpproxy_destroy", (cmd_function)unforce_rtp_proxy1_f, 0,	0, 0, ANY_ROUTE},
+	{"unforce_rtp_proxy", (cmd_function)unforce_rtp_proxy1_f, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"rtpproxy_destroy", (cmd_function)unforce_rtp_proxy1_f, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"start_recording", (cmd_function)start_recording_f, 0, 0, 0, ANY_ROUTE},
+	{"rtpproxy_offer", (cmd_function)rtpproxy_offer1_f, 0, 0, 0, ANY_ROUTE},
+	{"rtpproxy_offer", (cmd_function)rtpproxy_offer1_f, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"rtpproxy_offer", (cmd_function)rtpproxy_offer2_f, 2,
+		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{"rtpproxy_answer", (cmd_function)rtpproxy_answer1_f, 0, 0, 0, ANY_ROUTE},
+	{"rtpproxy_answer", (cmd_function)rtpproxy_answer1_f, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"rtpproxy_answer", (cmd_function)rtpproxy_answer2_f, 2,
+		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{"rtpproxy_stream2uac", (cmd_function)rtpproxy_stream2uac2_f, 2,
+		fixup_var_str_int, fixup_free_var_str_int, ANY_ROUTE},
+	{"rtpproxy_stream2uas", (cmd_function)rtpproxy_stream2uas2_f, 2,
+		fixup_var_str_int, fixup_free_var_str_int, ANY_ROUTE},
+	{"rtpproxy_stop_stream2uac", (cmd_function)rtpproxy_stop_stream2uac2_f, 0, 0, 0, ANY_ROUTE},
+	{"rtpproxy_stop_stream2uas", (cmd_function)rtpproxy_stop_stream2uas2_f, 0, 0, 0, ANY_ROUTE},
+	{"rtpproxy_manage", (cmd_function)rtpproxy_manage0, 0, 0, 0, ANY_ROUTE},
+	{"rtpproxy_manage", (cmd_function)rtpproxy_manage1, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"rtpproxy_manage", (cmd_function)rtpproxy_manage2, 2,
+		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
 };
 
+static pv_export_t mod_pvs[] = {
+	{{"rtpstat", (sizeof("rtpstat") - 1)}, /* RTP-Statistics */
+			PVT_OTHER, pv_get_rtppstat_f, 0, 0, 0, 0, 0},
+	{{"rtppstat", (sizeof("rtppstat") - 1)}, /* RTP-Statistics */
+			PVT_OTHER, pv_get_rtppstat_f, 0, 0, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
+
+static param_export_t params[] = {
+	{"nortpproxy_str", PARAM_STR, &nortpproxy_str},
+	{"rtpproxy_sock", PARAM_STRING | PARAM_USE_FUNC, (void *)rtpproxy_set_store},
+	{"rtpproxy_disable_tout", PARAM_INT, &rtpproxy_disable_tout},
+	{"rtpproxy_retr", PARAM_INT, &rtpproxy_retr},
+	{"rtpproxy_tout", PARAM_INT, &rtpproxy_tout},
+	{"timeout_socket", PARAM_STR, &timeout_socket_str},
+	{"timeout_tag_pv", PARAM_STR, &timeout_tag_pv_str},
+	{"ice_candidate_priority_avp", PARAM_STRING, &ice_candidate_priority_avp_param},
+	{"extra_id_pv", PARAM_STR, &extra_id_pv_param},
+	{"db_url", PARAM_STR, &rtpp_db_url},
+	{"table_name", PARAM_STR, &rtpp_table_name},
+	{"rtp_inst_pvar", PARAM_STR, &rtp_inst_pv_param},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"rtpproxy",      /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	mod_pvs,         /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per-child init function */
+	mod_destroy      /* module destroy function */
+};
+/* clang-format on */
 
 static int rtpproxy_set_store(modparam_t type, void *val)
 {
@@ -556,6 +556,12 @@ static int fixup_set_id(void **param, int param_no)
 	return 0;
 }
 
+static int fixup_free_set_id(void **param, int param_no)
+{
+	pkg_free(*param);
+	return 0;
+}
+
 static void rtpproxy_rpc_enable(rpc_t *rpc, void *ctx)
 {
 	str rtpp_url;
@@ -653,7 +659,7 @@ static int mod_init(void)
 	int i;
 	pv_spec_t avp_spec;
 	str s;
-	unsigned short avp_flags;
+	avp_flags_t avp_flags;
 
 	if(rtpproxy_rpc_init() < 0) {
 		LM_ERR("failed to register RPC commands\n");

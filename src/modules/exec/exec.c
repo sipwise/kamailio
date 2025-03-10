@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -218,9 +220,9 @@ error00:
 
 int exec_avp(struct sip_msg *msg, char *cmd, pvname_list_p avpl)
 {
-	int_str avp_val;
-	int_str avp_name;
-	unsigned short avp_type;
+	avp_value_t avp_val;
+	avp_name_t avp_name;
+	avp_flags_t avp_type;
 	FILE *pipe;
 	int ret;
 	char res_line[MAX_URI_SIZE + 1];

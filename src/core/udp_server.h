@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -40,5 +42,6 @@ int udp_init(struct socket_info *si);
 int udp_send(struct dest_info *dst, char *buf, unsigned len);
 int udp_rcv_loop(void);
 
+int ksr_udp_start_mtreceiver(int child_rank, char *agname, int *woneinit);
 
 #endif

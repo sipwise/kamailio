@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -115,6 +117,18 @@ int is_request(struct sip_msg *msg);
  */
 int w_is_reply(struct sip_msg *msg, char *foo, char *bar);
 int is_reply(struct sip_msg *msg);
+
+/*
+ * Return true (1) if it is a SIP message, otherwise false (-1)
+ */
+int w_is_sip(struct sip_msg *msg, char *foo, char *bar);
+int ki_is_sip(struct sip_msg *msg);
+
+/*
+ * Return true (1) if it is a HTTP message, otherwise false (-1)
+ */
+int w_is_http(sip_msg_t *msg, char *foo, char *bar);
+int ki_is_http(sip_msg_t *msg);
 
 /*
  * Find if Request URI has a given parameter with matching value

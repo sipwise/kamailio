@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -81,9 +83,9 @@ static cmd_export_t cmds[] = {{"db_ctx", (cmd_function)NULL, 0, 0, 0, 0},
 /*
  * Exported parameters
  */
-static param_export_t params[] = {{"auto_reload", INT_PARAM, &auto_reload},
-		{"log_enable", INT_PARAM, &log_enable},
-		{"journal_roll_interval", INT_PARAM, &journal_roll_interval},
+static param_export_t params[] = {{"auto_reload", PARAM_INT, &auto_reload},
+		{"log_enable", PARAM_INT, &log_enable},
+		{"journal_roll_interval", PARAM_INT, &journal_roll_interval},
 		{0, 0, 0}};
 
 struct module_exports exports = {

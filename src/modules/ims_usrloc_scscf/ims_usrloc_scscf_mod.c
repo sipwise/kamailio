@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -157,31 +159,31 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"timer_interval", INT_PARAM, &timer_interval},
-	{"desc_time_order", INT_PARAM, &desc_time_order},
-	{"matching_mode", INT_PARAM, &matching_mode},
-	{"cseq_delay", INT_PARAM, &cseq_delay},
-	{"fetch_rows", INT_PARAM, &ul_fetch_rows},
-	{"hash_size", INT_PARAM, &ul_hash_size},
-	{"subs_hash_size", INT_PARAM, &subs_hash_size},
-	{"contacts_hash_size", INT_PARAM, &contacts_hash_size},
-	{"nat_bflag", INT_PARAM, &nat_bflag},
-	{"contact_delete_delay", INT_PARAM, &contact_delete_delay},
+	{"timer_interval", PARAM_INT, &timer_interval},
+	{"desc_time_order", PARAM_INT, &desc_time_order},
+	{"matching_mode", PARAM_INT, &matching_mode},
+	{"cseq_delay", PARAM_INT, &cseq_delay},
+	{"fetch_rows", PARAM_INT, &ul_fetch_rows},
+	{"hash_size", PARAM_INT, &ul_hash_size},
+	{"subs_hash_size", PARAM_INT, &subs_hash_size},
+	{"contacts_hash_size", PARAM_INT, &contacts_hash_size},
+	{"nat_bflag", PARAM_INT, &nat_bflag},
+	{"contact_delete_delay", PARAM_INT, &contact_delete_delay},
 	{"usrloc_debug_file", PARAM_STR, &usrloc_debug_file},
-	{"enable_debug_file", INT_PARAM, &usrloc_debug},
+	{"enable_debug_file", PARAM_INT, &usrloc_debug},
 	{"user_data_dtd", PARAM_STRING, &scscf_user_data_dtd},
 	{"user_data_xsd", PARAM_STRING, &scscf_user_data_xsd},
-	{"support_wildcardPSI", INT_PARAM, &scscf_support_wildcardPSI},
-	{"unreg_validity", INT_PARAM, &unreg_validity},
-	{"maxcontact_behaviour", INT_PARAM, &maxcontact_behaviour},
-	{"maxcontact", INT_PARAM, &maxcontact},
-	{"maxcontact_3gpp", INT_PARAM, &maxcontact_3gpp},
-	{"max_subscribes", INT_PARAM, &max_subscribes},
-	{"sub_dialog_hash_size", INT_PARAM, &sub_dialog_hash_size},
-	{"db_mode", INT_PARAM, &db_mode}, {"db_url", PARAM_STR, &db_url},
-	{"timer_procs", INT_PARAM, &ul_timer_procs},
+	{"support_wildcardPSI", PARAM_INT, &scscf_support_wildcardPSI},
+	{"unreg_validity", PARAM_INT, &unreg_validity},
+	{"maxcontact_behaviour", PARAM_INT, &maxcontact_behaviour},
+	{"maxcontact", PARAM_INT, &maxcontact},
+	{"maxcontact_3gpp", PARAM_INT, &maxcontact_3gpp},
+	{"max_subscribes", PARAM_INT, &max_subscribes},
+	{"sub_dialog_hash_size", PARAM_INT, &sub_dialog_hash_size},
+	{"db_mode", PARAM_INT, &db_mode}, {"db_url", PARAM_STR, &db_url},
+	{"timer_procs", PARAM_INT, &ul_timer_procs},
 	{"realm", PARAM_STRING, &cscf_realm},
-	{"skip_realm", INT_PARAM, &skip_cscf_realm},
+	{"skip_realm", PARAM_INT, &skip_cscf_realm},
 	{0, 0, 0}
 };
 

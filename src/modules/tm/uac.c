@@ -9,6 +9,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -718,7 +720,7 @@ static inline int send_prepared_request_impl(
 	if(run_onsend(p_msg, &uac->request.dst, uac->request.buffer,
 			   uac->request.buffer_len)
 			== 0) {
-		uac->last_received = 408;
+		uac->last_received = _tm_reply_408_code;
 		su2ip_addr(&ip, &uac->request.dst.to);
 		LM_DBG("onsend_route dropped msg. to %s:%d (%d)\n", ip_addr2a(&ip),
 				su_getport(&uac->request.dst.to), uac->request.dst.proto);
@@ -1086,6 +1088,7 @@ int request(uac_req_t *uac_r, str *ruri, str *to, str *from, str *next_hop)
 	str callid, fromtag;
 	dlg_t *dialog;
 	int res;
+	unsigned int cseqno;
 
 	if(check_params(uac_r, to, from) < 0)
 		goto err;
@@ -1094,9 +1097,10 @@ int request(uac_req_t *uac_r, str *ruri, str *to, str *from, str *next_hop)
 		generate_callid(&callid);
 	else
 		callid = *uac_r->callid;
+	cseqno = (uac_r->cseqno > 0) ? uac_r->cseqno : DEFAULT_CSEQ;
 	generate_fromtag(&fromtag, &callid, ruri);
 
-	if(new_dlg_uac(&callid, &fromtag, DEFAULT_CSEQ, from, to, &dialog) < 0) {
+	if(new_dlg_uac(&callid, &fromtag, cseqno, from, to, &dialog) < 0) {
 		LM_ERR("Error while creating temporary dialog\n");
 		goto err;
 	}

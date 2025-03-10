@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -122,7 +124,9 @@ static int child_init(int);
 static void destroy(void);
 int stored_pres_info(struct sip_msg *msg, char *pres_uri, char *s);
 static int fixup_presence(void **param, int param_no);
+static int fixup_free_presence(void **param, int param_no);
 static int fixup_subscribe(void **param, int param_no);
+static int fixup_free_subscribe(void **param, int param_no);
 static int update_pw_dialogs(
 		subs_t *subs, unsigned int hash_code, subs_t **subs_array);
 static int w_pres_auth_status(struct sip_msg *_msg, char *_sp1, char *_sp2);
@@ -133,7 +137,9 @@ static int w_pres_refresh_watchers5(struct sip_msg *msg, char *puri,
 static int w_pres_update_watchers(
 		struct sip_msg *msg, char *puri, char *pevent);
 static int fixup_refresh_watchers(void **param, int param_no);
+static int fixup_free_refresh_watchers(void **param, int param_no);
 static int fixup_update_watchers(void **param, int param_no);
+static int fixup_free_update_watchers(void **param, int param_no);
 static int presence_init_rpc(void);
 
 static int w_pres_has_subscribers(struct sip_msg *_msg, char *_sp1, char *_sp2);
@@ -182,23 +188,23 @@ sruid_t pres_sruid;
 static cmd_export_t cmds[]=
 {
 	{"handle_publish",        (cmd_function)w_handle_publish,        0,
-		fixup_presence, 0, REQUEST_ROUTE},
+		fixup_presence, fixup_free_presence, REQUEST_ROUTE},
 	{"handle_publish",        (cmd_function)w_handle_publish,        1,
-		fixup_presence, 0, REQUEST_ROUTE},
+		fixup_presence, fixup_free_presence, REQUEST_ROUTE},
 	{"handle_subscribe",      (cmd_function)handle_subscribe0,       0,
-		fixup_subscribe, 0, REQUEST_ROUTE},
+		fixup_subscribe, fixup_free_subscribe, REQUEST_ROUTE},
 	{"handle_subscribe",      (cmd_function)w_handle_subscribe,      1,
-		fixup_subscribe, 0, REQUEST_ROUTE},
+		fixup_subscribe, fixup_free_subscribe, REQUEST_ROUTE},
 	{"pres_auth_status",      (cmd_function)w_pres_auth_status,      2,
 		fixup_spve_spve, fixup_free_spve_spve, REQUEST_ROUTE},
 	{"pres_refresh_watchers", (cmd_function)w_pres_refresh_watchers, 3,
-		fixup_refresh_watchers, 0, ANY_ROUTE},
+		fixup_refresh_watchers, fixup_free_refresh_watchers, ANY_ROUTE},
 	{"pres_refresh_watchers", (cmd_function)w_pres_refresh_watchers5,5,
-		fixup_refresh_watchers, 0, ANY_ROUTE},
+		fixup_refresh_watchers, fixup_free_refresh_watchers, ANY_ROUTE},
 	{"pres_update_watchers",  (cmd_function)w_pres_update_watchers,  2,
-		fixup_update_watchers, 0, ANY_ROUTE},
+		fixup_update_watchers, fixup_free_update_watchers, ANY_ROUTE},
 	{"pres_has_subscribers",  (cmd_function)w_pres_has_subscribers,  2,
-                fixup_has_subscribers, 0, ANY_ROUTE},
+		fixup_has_subscribers, fixup_free_update_watchers, ANY_ROUTE},
  	{"bind_presence",         (cmd_function)bind_presence,           1,
 		0, 0, 0},
 	{ 0, 0, 0, 0, 0, 0}
@@ -211,27 +217,27 @@ static param_export_t params[]={
 	{ "presentity_table",       PARAM_STR, &presentity_table},
 	{ "active_watchers_table",  PARAM_STR, &active_watchers_table},
 	{ "watchers_table",         PARAM_STR, &watchers_table},
-	{ "clean_period",           INT_PARAM, &pres_clean_period },
-	{ "db_update_period",       INT_PARAM, &pres_db_update_period },
-	{ "waitn_time",             INT_PARAM, &pres_waitn_time },
-	{ "notifier_poll_rate",     INT_PARAM, &pres_notifier_poll_rate },
-	{ "notifier_processes",     INT_PARAM, &pres_notifier_processes },
-	{ "force_delete",           INT_PARAM, &pres_force_delete },
-	{ "startup_mode",           INT_PARAM, &pres_startup_mode },
-	{ "expires_offset",         INT_PARAM, &pres_expires_offset },
-	{ "max_expires",            INT_PARAM, &pres_max_expires },
-	{ "min_expires",            INT_PARAM, &pres_min_expires },
-	{ "min_expires_action",     INT_PARAM, &pres_min_expires_action },
+	{ "clean_period",           PARAM_INT, &pres_clean_period },
+	{ "db_update_period",       PARAM_INT, &pres_db_update_period },
+	{ "waitn_time",             PARAM_INT, &pres_waitn_time },
+	{ "notifier_poll_rate",     PARAM_INT, &pres_notifier_poll_rate },
+	{ "notifier_processes",     PARAM_INT, &pres_notifier_processes },
+	{ "force_delete",           PARAM_INT, &pres_force_delete },
+	{ "startup_mode",           PARAM_INT, &pres_startup_mode },
+	{ "expires_offset",         PARAM_INT, &pres_expires_offset },
+	{ "max_expires",            PARAM_INT, &pres_max_expires },
+	{ "min_expires",            PARAM_INT, &pres_min_expires },
+	{ "min_expires_action",     PARAM_INT, &pres_min_expires_action },
 	{ "server_address",         PARAM_STR, &pres_server_address},
-	{ "subs_htable_size",       INT_PARAM, &shtable_size},
-	{ "pres_htable_size",       INT_PARAM, &phtable_size},
-	{ "subs_db_mode",           INT_PARAM, &pres_subs_dbmode},
-	{ "publ_cache",             INT_PARAM, &publ_cache_mode},
-	{ "enable_sphere_check",    INT_PARAM, &pres_sphere_enable},
-	{ "timeout_rm_subs",        INT_PARAM, &pres_timeout_rm_subs},
-	{ "send_fast_notify",       INT_PARAM, &pres_send_fast_notify},
-	{ "fetch_rows",             INT_PARAM, &pres_fetch_rows},
-	{ "db_table_lock_type",     INT_PARAM, &pres_db_table_lock_type},
+	{ "subs_htable_size",       PARAM_INT, &shtable_size},
+	{ "pres_htable_size",       PARAM_INT, &phtable_size},
+	{ "subs_db_mode",           PARAM_INT, &pres_subs_dbmode},
+	{ "publ_cache",             PARAM_INT, &publ_cache_mode},
+	{ "enable_sphere_check",    PARAM_INT, &pres_sphere_enable},
+	{ "timeout_rm_subs",        PARAM_INT, &pres_timeout_rm_subs},
+	{ "send_fast_notify",       PARAM_INT, &pres_send_fast_notify},
+	{ "fetch_rows",             PARAM_INT, &pres_fetch_rows},
+	{ "db_table_lock_type",     PARAM_INT, &pres_db_table_lock_type},
 	{ "local_log_level",        PARAM_INT, &pres_local_log_level},
 	{ "local_log_facility",     PARAM_STRING, &pres_log_facility_str},
 	{ "subs_remove_match",      PARAM_INT, &pres_subs_remove_match},
@@ -635,26 +641,6 @@ static void destroy(void)
 		} else
 			timer_db_update(0, 0);
 	}
-
-	if(subs_htable) {
-		destroy_shtable(subs_htable, shtable_size);
-	}
-
-	if(pres_htable) {
-		destroy_phtable();
-	}
-
-	if(pa_db && pa_dbf.close) {
-		pa_dbf.close(pa_db);
-	}
-
-	if(pres_notifier_id != NULL) {
-		shm_free(pres_notifier_id);
-	}
-
-	destroy_evlist();
-
-	ps_ptable_destroy();
 }
 
 static int fixup_presence(void **param, int param_no)
@@ -670,6 +656,14 @@ static int fixup_presence(void **param, int param_no)
 	return fixup_spve_null(param, 1);
 }
 
+static int fixup_free_presence(void **param, int param_no)
+{
+	if(param_no == 0)
+		return 0;
+
+	return fixup_free_spve_null(param, 1);
+}
+
 static int fixup_subscribe(void **param, int param_no)
 {
 
@@ -680,6 +674,14 @@ static int fixup_subscribe(void **param, int param_no)
 	}
 	if(param_no == 1) {
 		return fixup_spve_null(param, 1);
+	}
+	return 0;
+}
+
+static int fixup_free_subscribe(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return fixup_free_spve_null(param, 1);
 	}
 	return 0;
 }
@@ -1650,6 +1652,22 @@ static int fixup_refresh_watchers(void **param, int param_no)
 	return 0;
 }
 
+static int fixup_free_refresh_watchers(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 2) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 3) {
+		return fixup_free_igp_null(param, 1);
+	} else if(param_no == 4) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 5) {
+		return fixup_free_spve_null(param, 1);
+	}
+
+	return 0;
+}
 
 /**
  * wrapper for update_watchers_status to use via kemi
@@ -1725,6 +1743,16 @@ static int fixup_update_watchers(void **param, int param_no)
 		return fixup_spve_null(param, 1);
 	} else if(param_no == 2) {
 		return fixup_spve_null(param, 1);
+	}
+	return 0;
+}
+
+static int fixup_free_update_watchers(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return fixup_free_spve_null(param, 1);
+	} else if(param_no == 2) {
+		return fixup_free_spve_null(param, 1);
 	}
 	return 0;
 }

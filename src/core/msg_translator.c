@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -212,6 +214,24 @@ static int check_via_address(
 	return -1;
 }
 
+/* check if rport has to be added or updated in Via
+ * - return 1 on true; 0 on false */
+int rport_test(struct sip_msg *msg)
+{
+	if(msg->msg_flags & FL_VIA_NORECEIVED) {
+		return 0;
+	}
+	/* check if rport needs to be updated:
+	 *  - if FL_FORCE_RPORT is set add it (and del. any previous version)
+	 *  - if via already contains an rport add it and overwrite the previous
+	 *  rport value if present (if you don't want to overwrite the previous
+	 *  version remove the comments) */
+	if(((msg->msg_flags | global_req_flags) & FL_FORCE_RPORT)
+			|| (msg->via1->rport /*&& msg->via1->rport->value.s==0*/)) {
+		return 1;
+	}
+	return 0;
+}
 
 /* check if IP address in Via != source IP address of signaling,
  * or the sender requires adding rport or received values */
@@ -219,6 +239,9 @@ int received_test(struct sip_msg *msg)
 {
 	int rcvd;
 
+	if(msg->msg_flags & FL_VIA_NORECEIVED) {
+		return 0;
+	}
 	rcvd = msg->via1->received || msg->via1->rport
 		   || check_via_address(&msg->rcv.src_ip, &msg->via1->host,
 				   msg->via1->port, received_dns);
@@ -230,6 +253,9 @@ int received_via_test(struct sip_msg *msg)
 {
 	int rcvd;
 
+	if(msg->msg_flags & FL_VIA_NORECEIVED) {
+		return 0;
+	}
 	rcvd = (check_via_address(&msg->rcv.src_ip, &msg->via1->host,
 					msg->via1->port, received_dns)
 			!= 0);
@@ -2122,13 +2148,8 @@ after_local_via:
 		}
 	}
 
-	/* check if rport needs to be updated:
-	 *  - if FL_FORCE_RPORT is set add it (and del. any previous version)
-	 *  - if via already contains an rport add it and overwrite the previous
-	 *  rport value if present (if you don't want to overwrite the previous
-	 *  version remove the comments) */
-	if((flags & FL_FORCE_RPORT)
-			|| (msg->via1->rport /*&& msg->via1->rport->value.s==0*/)) {
+	/* check if rport needs to be updated */
+	if(rport_test(msg)) {
 		if((rport_buf = rport_builder(msg, &rport_len)) == 0) {
 			LM_ERR("rport_builder failed\n");
 			goto error00; /* free everything */
@@ -2532,8 +2553,7 @@ char *build_res_buf_from_sip_req(unsigned int code, str *text, str *new_tag,
 		}
 	}
 	/* check if rport needs to be updated */
-	if(((msg->msg_flags | global_req_flags) & FL_FORCE_RPORT)
-			|| (msg->via1->rport /*&& msg->via1->rport->value.s==0*/)) {
+	if(rport_test(msg)) {
 		if((rport_buf = rport_builder(msg, &rport_len)) == 0) {
 			LM_ERR("rport_builder failed\n");
 			goto error01; /* free everything */
@@ -2917,12 +2937,20 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 		}
 	}
 	if(address_str == NULL) {
-		if(hp && hp->host->len)
+		if(hp && hp->host->len) {
 			address_str = hp->host;
-		else if(send_sock->useinfo.name.len > 0)
-			address_str = &(send_sock->useinfo.name);
-		else
-			address_str = &(send_sock->address_str);
+		} else if(send_sock != NULL) {
+			if(send_sock->useinfo.name.len > 0) {
+				address_str = &(send_sock->useinfo.name);
+			} else {
+				address_str = &(send_sock->address_str);
+			}
+		}
+	}
+	if(address_str == NULL || address_str->len <= 0) {
+		LM_ERR("unable to get address value\n");
+		ser_error = E_BAD_ADDRESS;
+		return 0;
 	}
 	if(msg && (msg->msg_flags & FL_USE_XAVP_VIA_FIELDS)
 			&& _ksr_xavp_via_fields.len > 0) {
@@ -2936,13 +2964,15 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 	if(port_str == NULL) {
 		if(hp && hp->port->len) {
 			port_str = hp->port;
-		} else if(send_sock->useinfo.name.len > 0) {
-			if(send_sock->useinfo.port_no > 0) {
-				port_str = &(send_sock->useinfo.port_no_str);
-			}
-		} else {
-			if(send_sock->port_no != SIP_PORT) {
-				port_str = &(send_sock->port_no_str);
+		} else if(send_sock != NULL) {
+			if(send_sock->useinfo.name.len > 0) {
+				if(send_sock->useinfo.port_no > 0) {
+					port_str = &(send_sock->useinfo.port_no_str);
+				}
+			} else {
+				if(send_sock->port_no != SIP_PORT) {
+					port_str = &(send_sock->port_no_str);
+				}
 			}
 		}
 	}
@@ -2957,7 +2987,7 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 		}
 	}
 	if(proto == PROTO_NONE) {
-		if(send_sock->useinfo.proto != PROTO_NONE) {
+		if(send_sock != NULL && send_sock->useinfo.proto != PROTO_NONE) {
 			proto = send_sock->useinfo.proto;
 		} else {
 			proto = send_info->proto;
@@ -3060,7 +3090,7 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 	}
 	/* add [] only if ipv6 address is used;
 	 * if using pre-set no check is made */
-	if(send_sock->address.af == AF_INET6) {
+	if(send_sock != NULL && send_sock->address.af == AF_INET6) {
 		/* lightweight safety checks if brackets set
 		 * or non-ipv6 (e.g., advertised hostname) */
 		if(address_str->s[0] != '['
@@ -3510,6 +3540,33 @@ int sip_msg_update_buffer(sip_msg_t *msg, str *obuf)
 		 * valid/safe for config */
 		return 0;
 	}
+	return 1;
+}
+
+/**
+ * evaluate changes and set the output buffer
+ * - obuf->s has to be pkg freed
+ * - return: 1 on success, -1 on failure
+ */
+int sip_msg_eval_changes(sip_msg_t *msg, str *obuf)
+{
+	dest_info_t dst;
+
+	init_dest_info(&dst);
+	dst.proto = PROTO_UDP;
+	if(msg->first_line.type == SIP_REPLY) {
+		obuf->s = generate_res_buf_from_sip_res(
+				msg, (unsigned int *)&obuf->len, BUILD_NO_VIA1_UPDATE);
+	} else {
+		obuf->s = build_req_buf_from_sip_req(msg, (unsigned int *)&obuf->len,
+				&dst,
+				BUILD_NO_PATH | BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE);
+	}
+	if(obuf->s == NULL) {
+		LM_ERR("couldn't update msg buffer content\n");
+		return -1;
+	}
+
 	return 1;
 }
 

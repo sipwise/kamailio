@@ -32,10 +32,13 @@
 #include "../../core/fmsg.h"
 #include "../../core/kemi.h"
 #include "../../core/str_list.h"
+#include "../../core/trim.h"
 #include "../../core/events.h"
 #include "../../core/onsend.h"
 #include "../../core/forward.h"
 #include "../../core/dns_cache.h"
+#include "../../core/data_lump.h"
+#include "../../core/async_task.h"
 #include "../../core/parser/parse_uri.h"
 #include "../../core/parser/parse_param.h"
 
@@ -48,6 +51,8 @@
 MODULE_VERSION
 
 static int nio_intercept = 0;
+static int w_forward_uac(sip_msg_t *msg, char *p1, char *p2);
+static int w_forward_uac_uri(sip_msg_t *msg, char *puri, char *p2);
 static int w_forward_reply(sip_msg_t *msg, char *p1, char *p2);
 static int w_append_branch(sip_msg_t *msg, char *su, char *sq);
 static int w_send_udp(sip_msg_t *msg, char *su, char *sq);
@@ -75,6 +80,7 @@ static int w_is_faked_msg(sip_msg_t *msg, char *p1, char *p2);
 static int w_is_socket_name(sip_msg_t *msg, char *psockname, char *p2);
 
 static int fixup_file_op(void **param, int param_no);
+static int fixup_free_file_op(void **param, int param_no);
 
 static sr_kemi_xval_t _sr_kemi_corex_xval = {0};
 static str corex_evcb_reply_out = STR_NULL;
@@ -82,16 +88,22 @@ static int corex_evrt_reply_out_no = -1;
 
 int corex_alias_subdomains_param(modparam_t type, void *val);
 int corex_dns_cache_param(modparam_t type, void *val);
+int corex_dns_file_param(modparam_t type, void *val);
+int corex_dns_file_load(void);
 
 static int mod_init(void);
 static int child_init(int);
 static void mod_destroy(void);
 
 static str_list_t *corex_dns_cache_list = NULL;
+static str_list_t *corex_dns_file_list = NULL;
 
 static int corex_dns_cache_param_add(str *pval);
 
 static int corex_sip_reply_out(sr_event_param_t *evp);
+
+static int pv_get_atkv(sip_msg_t *msg, pv_param_t *param, pv_value_t *res);
+static int pv_parse_atkv_name(pv_spec_t *sp, str *in);
 
 /* clang-format off */
 static pv_export_t mod_pvs[] = {
@@ -99,6 +111,8 @@ static pv_export_t mod_pvs[] = {
 		pv_parse_cfg_name, 0, 0, 0},
 	{{"lsock", (sizeof("lsock") - 1)}, PVT_OTHER, pv_get_lsock, 0,
 		pv_parse_lsock_name, 0, 0, 0},
+	{{"atkv", (sizeof("atkv") - 1)}, PVT_OTHER, pv_get_atkv, 0,
+		pv_parse_atkv_name, 0, 0, 0},
 	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
 };
 
@@ -109,6 +123,10 @@ static tr_export_t mod_trans[] = {
 };
 
 static cmd_export_t cmds[] = {
+	{"forward_uac", (cmd_function)w_forward_uac, 0,
+		0, 0, REQUEST_ROUTE},
+	{"forward_uac_uri", (cmd_function)w_forward_uac_uri, 1,
+		fixup_spve_null, fixup_free_spve_null, REQUEST_ROUTE},
 	{"forward_reply", (cmd_function)w_forward_reply, 0,
 		0, 0, CORE_ONREPLY_ROUTE},
 	{"append_branch", (cmd_function)w_append_branch, 0,
@@ -137,7 +155,7 @@ static cmd_export_t cmds[] = {
 	{"msg_iflag_is_set", (cmd_function)w_msg_iflag_is_set, 1,
 		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"file_read", (cmd_function)w_file_read, 2,
-		fixup_file_op, 0, ANY_ROUTE},
+		fixup_file_op, fixup_free_file_op, ANY_ROUTE},
 	{"file_write", (cmd_function)w_file_write, 2,
 		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"setxflag", (cmd_function)w_setxflag, 1,
@@ -172,12 +190,14 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-	{"alias_subdomains", STR_PARAM | USE_FUNC_PARAM,
+	{"alias_subdomains", PARAM_STRING | PARAM_USE_FUNC,
 				(void *)corex_alias_subdomains_param},
-	{"dns_cache", PARAM_STR | USE_FUNC_PARAM,
+	{"dns_cache", PARAM_STR | PARAM_USE_FUNC,
 				(void *)corex_dns_cache_param},
-	{"nio_intercept", INT_PARAM, &nio_intercept},
-	{"nio_min_msg_len", INT_PARAM, &nio_min_msg_len},
+	{"dns_file", PARAM_STR | PARAM_USE_FUNC,
+				(void *)corex_dns_file_param},
+	{"nio_intercept", PARAM_INT, &nio_intercept},
+	{"nio_min_msg_len", PARAM_INT, &nio_min_msg_len},
 	{"nio_msg_avp", PARAM_STR, &nio_msg_avp_param},
 	{"evcb_reply_out", PARAM_STR, &corex_evcb_reply_out},
 
@@ -226,6 +246,9 @@ static int mod_init(void)
 			return -1;
 		}
 	}
+	if(corex_dns_file_load() < 0) {
+		return -1;
+	}
 
 	if((nio_intercept > 0) && (nio_intercept_init() < 0)) {
 		LM_ERR("failed to register network io intercept callback\n");
@@ -256,6 +279,68 @@ static int child_init(int rank)
  */
 static void mod_destroy(void)
 {
+}
+
+/**
+ * forward request like initial uac sender, with only one via
+ */
+static int ki_forward_uac(sip_msg_t *msg)
+{
+	int ret;
+
+	ret = forward_uac_uri(msg, NULL);
+	if(ret >= 0) {
+		return 1;
+	}
+	return -1;
+}
+
+/**
+ * forward request like initial uac sender, with only one via
+ */
+static int ki_forward_uac_uri(sip_msg_t *msg, str *vuri)
+{
+	int ret;
+
+	ret = forward_uac_uri(msg, vuri);
+	if(ret >= 0) {
+		return 1;
+	}
+	return -1;
+}
+
+/**
+ * forward request like initial uac sender, with only one via
+ */
+static int w_forward_uac(sip_msg_t *msg, char *p1, char *p2)
+{
+	int ret;
+
+	ret = forward_uac_uri(msg, NULL);
+	if(ret >= 0) {
+		return 1;
+	}
+	return -1;
+}
+
+/**
+ * forward request to uri like initial uac sender, with only one via
+ */
+static int w_forward_uac_uri(sip_msg_t *msg, char *puri, char *p2)
+{
+	int ret;
+	str vuri = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t *)puri, &vuri)) {
+		LM_ERR("cannot get the destination parameter\n");
+		return -1;
+	}
+
+	ret = forward_uac_uri(msg, &vuri);
+	if(ret >= 0) {
+		return 1;
+	}
+	return -1;
 }
 
 /**
@@ -381,6 +466,67 @@ int corex_dns_cache_param(modparam_t type, void *val)
 		sit->next = corex_dns_cache_list;
 	}
 	corex_dns_cache_list = sit;
+
+	return 0;
+}
+
+int corex_dns_file_param(modparam_t type, void *val)
+{
+	str_list_t *sit;
+
+	if(val == NULL || ((str *)val)->s == NULL || ((str *)val)->len == 0) {
+		LM_ERR("invalid parameter\n");
+		return -1;
+	}
+
+	sit = (str_list_t *)pkg_mallocxz(sizeof(str_list_t));
+	if(sit == NULL) {
+		PKG_MEM_ERROR;
+		return -1;
+	}
+	sit->s = *((str *)val);
+	if(corex_dns_file_list != NULL) {
+		sit->next = corex_dns_file_list;
+	}
+	corex_dns_file_list = sit;
+
+	return 0;
+}
+
+int corex_dns_file_load(void)
+{
+	str_list_t *sit;
+	str sline;
+	char lbuf[512];
+	FILE *FP;
+
+	for(sit = corex_dns_file_list; sit != NULL; sit = sit->next) {
+		FP = fopen(sit->s.s, "r");
+		if(FP == NULL) {
+			LM_ERR("failed to open file '%.*s'\n", sit->s.len, sit->s.s);
+			return -1;
+		}
+		while(fgets(lbuf, 512, FP)) {
+			sline.s = lbuf;
+			sline.len = strlen(sline.s);
+			trim(&sline);
+			if(sline.len <= 0) {
+				/* empty line */
+				continue;
+			}
+			if(sline.s[0] == '#') {
+				/* comment */
+				continue;
+			}
+			if(corex_dns_cache_param_add(&sline) < 0) {
+				LM_ERR("failed to add record: '%.*s' (%.*s)\n", sline.len,
+						sline.s, sit->s.len, sit->s.s);
+				fclose(FP);
+				return -1;
+			}
+		}
+		fclose(FP);
+	}
 
 	return 0;
 }
@@ -517,6 +663,7 @@ static msg_iflag_name_t _msg_iflag_list[] = {
 static unsigned long long msg_lookup_flag(str *fname)
 {
 	int i;
+
 	for(i = 0; _msg_iflag_list[i].name.len > 0; i++) {
 		if(fname->len == _msg_iflag_list[i].name.len
 				&& strncasecmp(_msg_iflag_list[i].name.s, fname->s, fname->len)
@@ -524,7 +671,22 @@ static unsigned long long msg_lookup_flag(str *fname)
 			return _msg_iflag_list[i].value;
 		}
 	}
-	return 0;
+	if(fname->len < 1 || fname->len > 2) {
+		return 0;
+	}
+	if(!(fname->s[0] >= '0' && fname->s[0] <= '9')) {
+		return 0;
+	}
+	if(fname->len == 1) {
+		return 1ULL << (fname->s[0] - '0');
+	}
+	if(!(fname->s[1] >= '0' && fname->s[1] <= '9')) {
+		return 0;
+	}
+	if((10 * (fname->s[0] - '0') - (fname->s[1] - '0')) > 63) {
+		return 0;
+	}
+	return 1ULL << (10 * (fname->s[0] - '0') - (fname->s[1] - '0'));
 }
 
 /**
@@ -750,6 +912,23 @@ static int fixup_file_op(void **param, int param_no)
 			return -1;
 		}
 		return 0;
+	}
+
+	LM_ERR("invalid parameter number <%d>\n", param_no);
+	return -1;
+}
+
+/**
+ *
+ */
+static int fixup_free_file_op(void **param, int param_no)
+{
+	if(param_no == 1) {
+		return fixup_free_spve_null(param, 1);
+	}
+
+	if(param_no == 2) {
+		return fixup_free_pvar_null(param, 1);
 	}
 
 	LM_ERR("invalid parameter number <%d>\n", param_no);
@@ -1293,6 +1472,81 @@ static int corex_sip_reply_out(sr_event_param_t *evp)
 	return 0;
 }
 
+/**
+ *
+ */
+static int pv_get_atkv(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
+{
+	async_tkv_param_t *atkvp = NULL;
+	async_wgroup_t *awg = NULL;
+
+	atkvp = ksr_async_tkv_param_get();
+
+	if(atkvp == NULL) {
+		return pv_get_null(msg, param, res);
+	}
+
+	switch(param->pvn.u.isname.name.n) {
+		case 0:
+			return pv_get_sintval(msg, param, res, (long)atkvp->dtype);
+		case 1:
+			if(atkvp->skey.s == NULL || atkvp->skey.len < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_strval(msg, param, res, &atkvp->skey);
+		case 2:
+			if(atkvp->sval.s == NULL || atkvp->sval.len < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_strval(msg, param, res, &atkvp->sval);
+		case 3:
+			awg = async_task_workers_get_crt();
+			if(awg == NULL || awg->name.s == NULL || awg->name.len < 0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_strval(msg, param, res, &awg->name);
+		default:
+			return pv_get_null(msg, param, res);
+	}
+}
+
+/**
+ *
+ */
+static int pv_parse_atkv_name(pv_spec_t *sp, str *in)
+{
+	if(sp == NULL || in == NULL || in->len <= 0)
+		return -1;
+
+	switch(in->len) {
+		case 3:
+			if(strncmp(in->s, "key", 3) == 0) {
+				sp->pvp.pvn.u.isname.name.n = 1;
+			} else if(strncmp(in->s, "val", 3) == 0) {
+				sp->pvp.pvn.u.isname.name.n = 2;
+			}
+			break;
+		case 4:
+			if(strncmp(in->s, "type", 4) == 0)
+				sp->pvp.pvn.u.isname.name.n = 0;
+			break;
+		case 5:
+			if(strncmp(in->s, "gname", 5) == 0)
+				sp->pvp.pvn.u.isname.name.n = 3;
+			break;
+		default:
+			goto error;
+	}
+	sp->pvp.pvn.type = PV_NAME_INTSTR;
+	sp->pvp.pvn.u.isname.type = 0;
+
+	return 0;
+
+error:
+	LM_ERR("unknown PV atkv name %.*s\n", in->len, in->s);
+	return -1;
+}
+
 
 /**
  *
@@ -1411,6 +1665,16 @@ static sr_kemi_t sr_kemi_corex_exports[] = {
 	},
 	{ str_init("corex"), str_init("is_socket_name"),
 		SR_KEMIP_INT, ki_is_socket_name,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("corex"), str_init("forward_uac"),
+		SR_KEMIP_INT, ki_forward_uac,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("corex"), str_init("forward_uac_uri"),
+		SR_KEMIP_INT, ki_forward_uac_uri,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

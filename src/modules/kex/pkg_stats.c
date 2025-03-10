@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -39,21 +41,7 @@
 #include "../../core/mem/shm_mem.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
-
-
-/**
- *
- */
-typedef struct pkg_proc_stats
-{
-	int rank;
-	unsigned int pid;
-	unsigned long used;
-	unsigned long available;
-	unsigned long real_used;
-	unsigned long total_frags;
-	unsigned long total_size;
-} pkg_proc_stats_t;
+#include "pkg_stats.h"
 
 /**
  *
@@ -63,7 +51,23 @@ static pkg_proc_stats_t *_pkg_proc_stats_list = NULL;
 /**
  *
  */
+pkg_proc_stats_t *get_pkg_proc_stats_list(void)
+{
+	return _pkg_proc_stats_list;
+}
+
+/**
+ *
+ */
 static int _pkg_proc_stats_no = 0;
+
+/**
+ *
+ */
+int get_pkg_proc_stats_no(void)
+{
+	return _pkg_proc_stats_no;
+}
 
 /**
  *

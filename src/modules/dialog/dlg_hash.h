@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -68,7 +70,7 @@
 
 #define DLG_FLAG_TM (1 << 9)			 /*!< dialog is set in transaction */
 #define DLG_FLAG_EXPIRED (1 << 10)		 /*!< dialog is expired */
-#define DLG_FLAG_CHANGED_PROF (1 << 10)	 /*!< dialog-profiles changed DMQ*/
+#define DLG_FLAG_CHANGED_PROF (1 << 11)	 /*!< dialog-profiles changed - DMQ */
 #define DLG_FLAG_DB_LOAD_EXTRA (1 << 12) /*!< dialog loaded extra from db */
 
 /* internal flags stored in db */

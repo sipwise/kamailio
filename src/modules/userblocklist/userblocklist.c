@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -87,6 +89,7 @@ static struct dtrie_node_t *gnode = NULL;
 
 /* ---- fixup functions: */
 static int check_blocklist_fixup(void **param, int param_no);
+static int check_blocklist_fixup_free(void **arg, int arg_no);
 static int check_user_blocklist_fixup(void **param, int param_no);
 static int check_globalblocklist_fixup(void **param, int param_no);
 
@@ -112,60 +115,66 @@ static int child_init(int rank);
 static int rpc_child_init(void);
 static void mod_destroy(void);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"check_user_blocklist", (cmd_function)check_user_blocklist2, 2,
-				check_user_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_user_allowlist", (cmd_function)check_user_allowlist2, 2,
-				check_user_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_user_blocklist", (cmd_function)check_user_blocklist3, 3,
-				check_user_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_user_allowlist", (cmd_function)check_user_allowlist3, 3,
-				check_user_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_user_blocklist", (cmd_function)check_user_blocklist, 4,
-				check_user_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_user_allowlist", (cmd_function)check_user_allowlist, 4,
-				check_user_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_blocklist", (cmd_function)check_blocklist, 1,
-				check_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_allowlist", (cmd_function)check_allowlist, 1,
-				check_blocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"check_blocklist", (cmd_function)check_globalblocklist, 0,
-				check_globalblocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
+	{"check_user_blocklist", (cmd_function)check_user_blocklist2, 2,
+			check_user_blocklist_fixup, fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_user_allowlist", (cmd_function)check_user_allowlist2, 2,
+			check_user_blocklist_fixup, fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_user_blocklist", (cmd_function)check_user_blocklist3, 3,
+			check_user_blocklist_fixup, fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_user_allowlist", (cmd_function)check_user_allowlist3, 3,
+			check_user_blocklist_fixup, fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_user_blocklist", (cmd_function)check_user_blocklist, 4,
+			check_user_blocklist_fixup, fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_user_allowlist", (cmd_function)check_user_allowlist, 4,
+			check_user_blocklist_fixup, fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_blocklist", (cmd_function)check_blocklist, 1,
+			check_blocklist_fixup, check_blocklist_fixup_free, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_allowlist", (cmd_function)check_allowlist, 1,
+			check_blocklist_fixup, check_blocklist_fixup_free, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"check_blocklist", (cmd_function)check_globalblocklist, 0,
+			check_globalblocklist_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		userblocklist_DB_URL userblocklist_DB_TABLE globalblocklist_DB_TABLE
-				userblocklist_DB_COLS globalblocklist_DB_COLS{
-						"use_domain", INT_PARAM, &use_domain},
-		{"match_mode", INT_PARAM, &match_mode}, {0, 0, 0}};
-
+	userblocklist_DB_URL
+	userblocklist_DB_TABLE
+	globalblocklist_DB_TABLE
+	userblocklist_DB_COLS
+	globalblocklist_DB_COLS
+	{"use_domain", PARAM_INT, &use_domain},
+	{"match_mode", PARAM_INT, &match_mode},
+	{0, 0, 0}
+};
 
 #ifdef MI_REMOVED
 /* Exported MI functions */
-static mi_export_t mi_cmds[] = {{"reload_blocklist", mi_reload_blocklist,
-										MI_NO_INPUT_FLAG, 0, mi_child_init},
-		{"dump_blocklist", mi_dump_blocklist, MI_NO_INPUT_FLAG, 0, 0},
-		{"check_blocklist", mi_check_blocklist, 0, 0, 0},
-		{"check_allowlist", mi_check_allowlist, 0, 0, 0},
-		{"check_userblocklist", mi_check_userblocklist, 0, 0, 0},
-		{"check_userallowlist", mi_check_userallowlist, 0, 0, 0},
-		{0, 0, 0, 0, 0}};
+static mi_export_t mi_cmds[] = {
+	{"reload_blocklist", mi_reload_blocklist,	MI_NO_INPUT_FLAG, 0, mi_child_init},
+	{"dump_blocklist", mi_dump_blocklist, MI_NO_INPUT_FLAG, 0, 0},
+	{"check_blocklist", mi_check_blocklist, 0, 0, 0},
+	{"check_allowlist", mi_check_allowlist, 0, 0, 0},
+	{"check_userblocklist", mi_check_userblocklist, 0, 0, 0},
+	{"check_userallowlist", mi_check_userallowlist, 0, 0, 0},
+	{0, 0, 0, 0, 0}
+};
 #endif
 
 struct module_exports exports = {
-		"userblocklist", /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* cmd (cfg function) exports */
-		params,			 /* param exports */
-		0,				 /* RPC method exports */
-		0,				 /* pseudo-variables exports */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		child_init,		 /* per-child init function */
-		mod_destroy		 /* module destroy function */
+	"userblocklist", /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	0,               /* pseudo-variables exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	mod_destroy      /* module destroy function */
 };
-
+/* clang-format on */
 
 struct source_t
 {
@@ -605,6 +614,12 @@ static int check_blocklist_fixup(void **arg, int arg_no)
 	new_arg->dtrie_root = node;
 	*arg = (void *)new_arg;
 
+	return 0;
+}
+
+static int check_blocklist_fixup_free(void **arg, int arg_no)
+{
+	pkg_free(*arg);
 	return 0;
 }
 

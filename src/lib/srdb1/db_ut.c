@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -595,6 +597,10 @@ int db_val2pv_spec(struct sip_msg *msg, db_val_t *dbval, pv_spec_t *pvs)
 			case DB1_INT:
 				pv.flags = PV_VAL_INT | PV_TYPE_INT;
 				pv.ri = (long)dbval->val.int_val;
+				break;
+			case DB1_UINT:
+				pv.flags = PV_VAL_INT | PV_TYPE_INT;
+				pv.ri = (long)dbval->val.uint_val;
 				break;
 			case DB1_DATETIME:
 				pv.flags = PV_VAL_INT | PV_TYPE_INT;

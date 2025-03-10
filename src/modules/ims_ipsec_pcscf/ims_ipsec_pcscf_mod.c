@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -40,6 +42,8 @@ str ipsec_listen_addr = STR_NULL;
 str ipsec_listen_addr6 = STR_NULL;
 int ipsec_client_port = 5062;
 int ipsec_server_port = 5063;
+str ipsec_listen_name = STR_NULL;
+str ipsec_listen_agname = STR_NULL;
 int ipsec_reuse_server_port = 1;
 int ipsec_max_connections = 2;
 int spi_id_start = 100;
@@ -66,7 +70,7 @@ static int domain_fixup(void **param, int param_no);
 static int save_fixup2(void **param, int param_no);
 static int free_uint_fixup(void **param, int param_no);
 static int unregister_fixup(void **param, int param_no);
-static int unregister2_fixup(void **param, int param_no);
+static int unregister_fixup_free(void **param, int param_no);
 
 extern int bind_ipsec_pcscf(usrloc_api_t *api);
 
@@ -89,9 +93,9 @@ static cmd_export_t cmds[] = {
 	{"ipsec_destroy", (cmd_function)w_destroy, 1, save_fixup2,
 		0, REQUEST_ROUTE | ONREPLY_ROUTE },
 	{"ipsec_destroy", (cmd_function)w_destroy, 2, unregister_fixup,
-		0, ANY_ROUTE },
-	{"ipsec_destroy_by_contact", (cmd_function)w_destroy_by_contact, 4,
-		unregister2_fixup, 0, ANY_ROUTE},
+		unregister_fixup_free, ANY_ROUTE },
+	{"ipsec_destroy_by_contact", (cmd_function)w_destroy_by_contact, 4, unregister_fixup,
+        unregister_fixup_free, ANY_ROUTE},
 	{"bind_ims_ipsec_pcscf", (cmd_function)bind_ipsec_pcscf, 1, 0,
 		0, 0},
 	{0, 0, 0, 0, 0, 0}
@@ -103,12 +107,14 @@ static cmd_export_t cmds[] = {
 static param_export_t params[] = {
 	{"ipsec_listen_addr",		PARAM_STR, &ipsec_listen_addr		},
 	{"ipsec_listen_addr6",  	PARAM_STR, &ipsec_listen_addr6		},
-	{"ipsec_client_port",		INT_PARAM, &ipsec_client_port		},
-	{"ipsec_server_port",		INT_PARAM, &ipsec_server_port		},
-	{"ipsec_reuse_server_port",	INT_PARAM, &ipsec_reuse_server_port	},
-	{"ipsec_max_connections",	INT_PARAM, &ipsec_max_connections	},
-	{"ipsec_spi_id_start",		INT_PARAM, &spi_id_start			},
-	{"ipsec_spi_id_range",		INT_PARAM, &spi_id_range			},
+	{"ipsec_client_port",		PARAM_INT, &ipsec_client_port		},
+	{"ipsec_server_port",		PARAM_INT, &ipsec_server_port		},
+	{"ipsec_listen_name",		PARAM_STR, &ipsec_listen_name		},
+	{"ipsec_listen_agname",		PARAM_STR, &ipsec_listen_agname		},
+	{"ipsec_reuse_server_port",	PARAM_INT, &ipsec_reuse_server_port	},
+	{"ipsec_max_connections",	PARAM_INT, &ipsec_max_connections	},
+	{"ipsec_spi_id_start",		PARAM_INT, &spi_id_start			},
+	{"ipsec_spi_id_range",		PARAM_INT, &spi_id_range			},
 	{"ipsec_preferred_alg",		PARAM_STR, &ipsec_preferred_alg		},
 	{"ipsec_preferred_ealg",	PARAM_STR, &ipsec_preferred_ealg	},
 	{0, 0, 0}
@@ -208,13 +214,13 @@ static void ipsec_print_all_socket_lists()
 	} while((proto = next_proto(proto)));
 }
 
+#define IPSEC_SOCKET_NAME_SIZE 128
 static int ipsec_add_listen_ifaces()
 {
-	char addr4[128];
-	char addr6[128];
-	int i;
+	socket_attrs_t sa;
+	char sname[IPSEC_SOCKET_NAME_SIZE];
 
-	if(ipsec_listen_addr.len) {
+	if(ipsec_listen_addr.len > 0) {
 		if(str2ipbuf(&ipsec_listen_addr, &ipsec_listen_ip_addr) < 0) {
 			LM_ERR("Unable to convert ipsec addr4 [%.*s]\n",
 					ipsec_listen_addr.len, ipsec_listen_addr.s);
@@ -222,7 +228,7 @@ static int ipsec_add_listen_ifaces()
 		}
 	}
 
-	if(ipsec_listen_addr6.len) {
+	if(ipsec_listen_addr6.len > 0) {
 		if(str2ip6buf(&ipsec_listen_addr6, &ipsec_listen_ip_addr6) < 0) {
 			LM_ERR("Unable to convert ipsec addr6 [%.*s]\n",
 					ipsec_listen_addr6.len, ipsec_listen_addr6.s);
@@ -230,93 +236,117 @@ static int ipsec_add_listen_ifaces()
 		}
 	}
 
-	for(i = 0; i < ipsec_max_connections; ++i) {
-		if(ipsec_listen_addr.len) {
-			if(ipsec_listen_addr.len > sizeof(addr4) - 1) {
-				LM_ERR("Bad value for ipsec listen address IPv4: %.*s\n",
-						ipsec_listen_addr.len, ipsec_listen_addr.s);
-				return -1;
-			}
-
-			memset(addr4, 0, sizeof(addr4));
-			memcpy(addr4, ipsec_listen_addr.s, ipsec_listen_addr.len);
-
-			//add listen interfaces for IPv4
-			if(add_listen_iface(
-					   addr4, NULL, ipsec_client_port + i, PROTO_TCP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec client TCP interface for "
-					   "IPv4\n");
-				return -1;
-			}
-
-			if(add_listen_iface(
-					   addr4, NULL, ipsec_server_port + i, PROTO_TCP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec server TCP interface for "
-					   "IPv4\n");
-				return -1;
-			}
-
-			if(add_listen_iface(
-					   addr4, NULL, ipsec_client_port + i, PROTO_UDP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec client UDP interface for "
-					   "IPv4\n");
-				return -1;
-			}
-
-			if(add_listen_iface(
-					   addr4, NULL, ipsec_server_port + i, PROTO_UDP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec server UDP interface for "
-					   "IPv4\n");
-				return -1;
-			}
+	if(ipsec_listen_addr.len > 0) {
+		// add listen interfaces for IPv4
+		memset(&sa, 0, sizeof(socket_attrs_t));
+		sa.bindaddr = ipsec_listen_addr;
+		sa.agname = ipsec_listen_agname;
+		sa.bindproto = PROTO_TCP;
+		sa.bindport = ipsec_client_port;
+		sa.bindportend = ipsec_client_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%sc4tcp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
 		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec client TCP interface for IPv4\n");
+			return -1;
+		}
+		sa.bindport = ipsec_server_port;
+		sa.bindportend = ipsec_server_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%ss4tcp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec server TCP interface for IPv4\n");
+			return -1;
+		}
+		sa.bindproto = PROTO_UDP;
+		sa.bindport = ipsec_client_port;
+		sa.bindportend = ipsec_client_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%sc4udp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec client UDP interface for IPv4\n");
+			return -1;
+		}
+		sa.bindport = ipsec_server_port;
+		sa.bindportend = ipsec_server_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%ss4udp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec server UDP interface for IPv4\n");
+			return -1;
+		}
+	}
 
-		if(ipsec_listen_addr6.len) {
-			if(ipsec_listen_addr6.len > sizeof(addr6) - 1) {
-				LM_ERR("Bad value for ipsec listen address IPv6: %.*s\n",
-						ipsec_listen_addr6.len, ipsec_listen_addr6.s);
-				return -1;
-			}
-
-			memset(addr6, 0, sizeof(addr6));
-			memcpy(addr6, ipsec_listen_addr6.s, ipsec_listen_addr6.len);
-
-			//add listen interfaces for IPv6
-			if(add_listen_iface(
-					   addr6, NULL, ipsec_client_port + i, PROTO_TCP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec client TCP interface for "
-					   "IPv6\n");
-				return -1;
-			}
-
-			if(add_listen_iface(
-					   addr6, NULL, ipsec_server_port + i, PROTO_TCP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec server TCP interface for "
-					   "IPv6\n");
-				return -1;
-			}
-
-			if(add_listen_iface(
-					   addr6, NULL, ipsec_client_port + i, PROTO_UDP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec client UDP interface for "
-					   "IPv6\n");
-				return -1;
-			}
-
-			if(add_listen_iface(
-					   addr6, NULL, ipsec_server_port + i, PROTO_UDP, 0)
-					!= 0) {
-				LM_ERR("Error adding listen ipsec server UDP interface for "
-					   "IPv6\n");
-				return -1;
-			}
+	if(ipsec_listen_addr6.len > 0) {
+		// add listen interfaces for IPv6
+		memset(&sa, 0, sizeof(socket_attrs_t));
+		sa.bindaddr = ipsec_listen_addr6;
+		sa.agname = ipsec_listen_agname;
+		sa.bindproto = PROTO_TCP;
+		sa.bindport = ipsec_client_port;
+		sa.bindportend = ipsec_client_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%sc6tcp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec client TCP interface for IPv6\n");
+			return -1;
+		}
+		sa.bindport = ipsec_server_port;
+		sa.bindportend = ipsec_server_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%ss6tcp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec server TCP interface for IPv6\n");
+			return -1;
+		}
+		sa.bindproto = PROTO_UDP;
+		sa.bindport = ipsec_client_port;
+		sa.bindportend = ipsec_client_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%sc6udp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec client UDP interface for IPv6\n");
+			return -1;
+		}
+		sa.bindport = ipsec_server_port;
+		sa.bindportend = ipsec_server_port + ipsec_max_connections - 1;
+		if(ipsec_listen_name.len > 0) {
+			snprintf(sname, IPSEC_SOCKET_NAME_SIZE, "%ss6udp",
+					ipsec_listen_name.s);
+			sa.sockname.s = sname;
+			sa.sockname.len = strlen(sa.sockname.s);
+		}
+		if(add_listen_socket(&sa) < 0) {
+			LM_ERR("Error adding listen ipsec server UDP interface for IPv6\n");
+			return -1;
 		}
 	}
 
@@ -472,15 +502,14 @@ static int unregister_fixup(void **param, int param_no)
 	} else {
 		return fixup_spve_all(param, param_no);
 	}
-	return E_CFG;
 }
 
-static int unregister2_fixup(void **param, int param_no)
+static int unregister_fixup_free(void **param, int param_no)
 {
 	if(param_no == 1) {
-		return domain_fixup(param, param_no);
+		return 0;
 	} else {
-		return fixup_spve_all(param, param_no);
+		return fixup_free_spve_all(param, param_no);
 	}
 }
 

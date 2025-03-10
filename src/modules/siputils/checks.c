@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -100,6 +102,66 @@ int is_reply(struct sip_msg *msg)
 	return -1;
 }
 
+
+/**
+ * return 1 (true) if it is a SIP message
+ */
+int w_is_sip(sip_msg_t *msg, char *foo, char *bar)
+{
+	if(msg == NULL)
+		return -1;
+
+	if(msg->first_line.flags & FLINE_FLAG_PROTO_SIP) {
+		return 1;
+	}
+
+	return -1;
+}
+
+/**
+ * return 1 (true) if it is a SIP message
+ */
+int ki_is_sip(sip_msg_t *msg)
+{
+	if(msg == NULL)
+		return -1;
+
+	if(msg->first_line.flags & FLINE_FLAG_PROTO_SIP) {
+		return 1;
+	}
+
+	return -1;
+}
+
+/**
+ * return 1 (true) if it is a HTTP message
+ */
+int w_is_http(sip_msg_t *msg, char *foo, char *bar)
+{
+	if(msg == NULL)
+		return -1;
+
+	if(msg->first_line.flags & FLINE_FLAG_PROTO_HTTP) {
+		return 1;
+	}
+
+	return -1;
+}
+
+/**
+ * return 1 (true) if it is a HTTP message
+ */
+int ki_is_http(sip_msg_t *msg)
+{
+	if(msg == NULL)
+		return -1;
+
+	if(msg->first_line.flags & FLINE_FLAG_PROTO_HTTP) {
+		return 1;
+	}
+
+	return -1;
+}
 
 /*
  * Checks if From includes a To-tag -- good to identify

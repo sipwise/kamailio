@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -96,10 +98,10 @@ static cmd_export_t cmds[] = {
 		{0, 0, 0, 0, 0, 0}};
 
 
-static param_export_t params[] = {{"diameter_flag", INT_PARAM, &diameter_flag},
-		{"diameter_missed_flag", INT_PARAM, &diameter_missed_flag},
+static param_export_t params[] = {{"diameter_flag", PARAM_INT, &diameter_flag},
+		{"diameter_missed_flag", PARAM_INT, &diameter_missed_flag},
 		{"diameter_client_host", PARAM_STRING, &diameter_client_host},
-		{"diameter_client_port", INT_PARAM, &diameter_client_port},
+		{"diameter_client_port", PARAM_INT, &diameter_client_port},
 		{"diameter_extra", PARAM_STRING, &diameter_extra_str}, {0, 0, 0}};
 
 

@@ -6,7 +6,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -16,7 +16,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -26,6 +26,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,12 +59,13 @@
 #define USERNAME_MAX_SIZE 64
 #define DOMAIN_MAX_SIZE 128
 
-typedef struct ims_registrar_pcscf_params {
+typedef struct ims_registrar_pcscf_params
+{
 	int delete_delay;
 } ims_registrar_pcscf_params_t;
 
-extern unsigned short rcv_avp_type;
-extern int_str rcv_avp_name;
+extern avp_flags_t rcv_avp_type;
+extern avp_name_t rcv_avp_name;
 extern int is_registered_fallback2ip;
 extern int ignore_reg_state;
 

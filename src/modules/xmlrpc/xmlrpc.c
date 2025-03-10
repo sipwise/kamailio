@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
  * Foundation; either version 2 of the License, or (at your option) any later
@@ -408,41 +410,44 @@ static regex_t xmlrpc_url_skip_regexp;
 
 static str xmlrpc_event_callback = STR_NULL;
 
+/* clang-format off */
 /*
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-		{"dispatch_rpc", w_dispatch_rpc, 0, 0, 0, REQUEST_ROUTE},
-		{"xmlrpc_reply", w_xmlrpc_reply, 2, fixup_xmlrpc_reply, 0,
-				REQUEST_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
-
+	{"dispatch_rpc", w_dispatch_rpc, 0, 0, 0, REQUEST_ROUTE},
+	{"xmlrpc_reply", w_xmlrpc_reply, 2, fixup_xmlrpc_reply, 0, REQUEST_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /*
  * Exported parameters
  */
-static param_export_t params[] = {{"route", PARAM_STRING, &xmlrpc_route},
-		{"autoconversion", PARAM_INT, &autoconvert},
-		{"escape_cr", PARAM_INT, &escape_cr},
-		{"double_lf_to_crlf", PARAM_INT, &lflf2crlf},
-		{"mode", PARAM_INT, &xmlrpc_mode},
-		{"url_match", PARAM_STRING, &xmlrpc_url_match},
-		{"url_skip", PARAM_STRING, &xmlrpc_url_skip},
-		{"event_callback", PARAM_STR, &xmlrpc_event_callback}, {0, 0, 0}};
-
+static param_export_t params[] = {
+	{"route", PARAM_STRING, &xmlrpc_route},
+	{"autoconversion", PARAM_INT, &autoconvert},
+	{"escape_cr", PARAM_INT, &escape_cr},
+	{"double_lf_to_crlf", PARAM_INT, &lflf2crlf},
+	{"mode", PARAM_INT, &xmlrpc_mode},
+	{"url_match", PARAM_STRING, &xmlrpc_url_match},
+	{"url_skip", PARAM_STRING, &xmlrpc_url_skip},
+	{"event_callback", PARAM_STR, &xmlrpc_event_callback},
+	{0, 0, 0}
+};
 
 struct module_exports exports = {
-		"xmlrpc",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* cmd (cfg function) exports */
-		params,			 /* param exports */
-		0,				 /* RPC method exports */
-		0,				 /* pv exports */
-		0,				 /* response handling function */
-		mod_init,		 /* module init function */
-		0,				 /* per-child init function */
-		0				 /* module destroy function */
+	"xmlrpc",        /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	0,               /* pv exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	0,               /* per-child init function */
+	0                /* module destroy function */
 };
+/* clang-format on */
 
 /* XML-RPC reply helper functions */
 
@@ -2019,7 +2024,7 @@ static int rpc_struct_printf(
 		struct rpc_struct *s, char *member_name, char *fmt, ...)
 {
 	int n, buf_size;
-	char *buf;
+	char *buf = NULL;
 	va_list ap;
 	str st, name;
 	struct xmlrpc_reply *reply;
@@ -2071,6 +2076,7 @@ static int rpc_struct_printf(
 			if(add_xmlrpc_reply(out, &member_suffix) < 0)
 				goto err;
 
+			mxr_free(buf);
 			return 0;
 		}
 		/* Else try again with more space. */
@@ -2085,7 +2091,7 @@ static int rpc_struct_printf(
 			goto err;
 		}
 	}
-	return 0;
+
 err:
 	if(buf)
 		mxr_free(buf);
@@ -2740,7 +2746,7 @@ static int ki_xmlrpc_reply(sip_msg_t *msg, int rcode, str *reason)
 		if(add_xmlrpc_reply(&reply, &int_suffix) < 0)
 			goto error;
 		if(add_xmlrpc_reply(&reply, &success_suffix) < 0)
-			return -1;
+			goto error;
 	}
 	if(send_reply(msg, &reply.body) < 0)
 		goto error;

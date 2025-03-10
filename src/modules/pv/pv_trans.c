@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -238,6 +240,60 @@ int tr_eval_string(
 						&& val->rs.s[i] != '\r' && val->rs.s[i] != '\n') {
 					_tr_buffer[j] = val->rs.s[i];
 					j++;
+				}
+			}
+			_tr_buffer[j] = '\0';
+			val->flags = PV_VAL_STR;
+			val->ri = 0;
+			val->rs.s = _tr_buffer;
+			val->rs.len = j;
+			break;
+		case TR_S_RMHDWS:
+			if(!(val->flags & PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			if(val->rs.len >= TR_BUFFER_SIZE - 1)
+				return -1;
+			j = 0;
+			c = 0;
+			for(i = 0; i < val->rs.len; i++) {
+				if(val->rs.s[i] == '\r' || val->rs.s[i] == '\n') {
+					c = 1;
+				} else if(c != 0
+						  && (val->rs.s[i] == ' ' || val->rs.s[i] == '\t')) {
+					if(c == 1) {
+						_tr_buffer[j] = ' ';
+						j++;
+						c = 2;
+					}
+				} else {
+					_tr_buffer[j] = val->rs.s[i];
+					j++;
+					c = 0;
+				}
+			}
+			_tr_buffer[j] = '\0';
+			val->flags = PV_VAL_STR;
+			val->ri = 0;
+			val->rs.s = _tr_buffer;
+			val->rs.len = j;
+			break;
+		case TR_S_RMHLWS:
+			if(!(val->flags & PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			if(val->rs.len >= TR_BUFFER_SIZE - 1)
+				return -1;
+			j = 0;
+			c = 0;
+			for(i = 0; i < val->rs.len; i++) {
+				if(val->rs.s[i] == '\r' || val->rs.s[i] == '\n') {
+					c = 1;
+				} else if(c != 0
+						  && (val->rs.s[i] == ' ' || val->rs.s[i] == '\t')) {
+					c = 2;
+				} else {
+					_tr_buffer[j] = val->rs.s[i];
+					j++;
+					c = 0;
 				}
 			}
 			_tr_buffer[j] = '\0';
@@ -566,6 +622,32 @@ int tr_eval_string(
 			val->rs.s = _tr_buffer;
 			val->rs.len = i;
 			break;
+		case TR_S_ESCAPECRLF:
+			if(!(val->flags & PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			if(val->rs.len > TR_BUFFER_SIZE / 2 - 1)
+				return -1;
+			st.s = _tr_buffer;
+			st.len = TR_BUFFER_SIZE;
+			if(escape_crlf(&val->rs, &st))
+				return -1;
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs = st;
+			break;
+		case TR_S_UNESCAPECRLF:
+			if(!(val->flags & PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			if(val->rs.len > TR_BUFFER_SIZE - 1)
+				return -1;
+			st.s = _tr_buffer;
+			st.len = TR_BUFFER_SIZE;
+			if(unescape_crlf(&val->rs, &st))
+				return -1;
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs = st;
+			break;
 		case TR_S_ESCAPEUSER:
 			if(!(val->flags & PV_VAL_STR))
 				val->rs.s = int2str(val->ri, &val->rs.len);
@@ -738,6 +820,9 @@ int tr_eval_string(
 					case 't':
 						c = '\t';
 						break;
+					case 's':
+						c = ' ';
+						break;
 					default:
 						LM_ERR("invalid select escape char (cfg line: %d)\n",
 								get_cfg_crt_line());
@@ -754,7 +839,10 @@ int tr_eval_string(
 				i = -i;
 				i--;
 				while(p >= val->rs.s) {
-					if(*p == c) {
+					if(((c == 1)
+							   && (*p == ' ' || *p == '\t' || *p == '\n'
+									   || *p == '\r'))
+							|| (*p == c)) {
 						if(i == 0)
 							break;
 						s = p - 1;
@@ -772,7 +860,10 @@ int tr_eval_string(
 				s = val->rs.s;
 				p = s;
 				while(p < val->rs.s + val->rs.len) {
-					if(*p == c) {
+					if(((c == 1)
+							   && (*p == ' ' || *p == '\t' || *p == '\n'
+									   || *p == '\r'))
+							|| (*p == c)) {
 						if(i == 0)
 							break;
 						s = p + 1;
@@ -2695,6 +2786,12 @@ char *tr_parse_string(str *in, trans_t *t)
 	} else if(name.len == 4 && strncasecmp(name.s, "rmws", 4) == 0) {
 		t->subtype = TR_S_RMWS;
 		goto done;
+	} else if(name.len == 6 && strncasecmp(name.s, "rmhdws", 6) == 0) {
+		t->subtype = TR_S_RMHDWS;
+		goto done;
+	} else if(name.len == 6 && strncasecmp(name.s, "rmhlws", 6) == 0) {
+		t->subtype = TR_S_RMHLWS;
+		goto done;
 	} else if(name.len == 6 && strncasecmp(name.s, "sha256", 6) == 0) {
 		t->subtype = TR_S_SHA256;
 		goto done;
@@ -2767,6 +2864,12 @@ char *tr_parse_string(str *in, trans_t *t)
 	} else if(name.len == 15
 			  && strncasecmp(name.s, "unescape.common", 15) == 0) {
 		t->subtype = TR_S_UNESCAPECOMMON;
+		goto done;
+	} else if(name.len == 11 && strncasecmp(name.s, "escape.crlf", 11) == 0) {
+		t->subtype = TR_S_ESCAPECRLF;
+		goto done;
+	} else if(name.len == 13 && strncasecmp(name.s, "unescape.crlf", 13) == 0) {
+		t->subtype = TR_S_UNESCAPECRLF;
 		goto done;
 	} else if(name.len == 11 && strncasecmp(name.s, "escape.user", 11) == 0) {
 		t->subtype = TR_S_ESCAPEUSER;

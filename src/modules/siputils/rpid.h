@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -47,7 +49,7 @@ int init_rpid_avp(char *rpid_avp_param);
  * \param rpid_avp_p AVP name
  * \param rpid_avp_type_p AVP type
  */
-void get_rpid_avp(int_str *rpid_avp_p, int *rpid_avp_type_p);
+void get_rpid_avp(avp_name_t *rpid_avp_p, avp_flags_t *rpid_avp_type_p);
 
 
 /*!

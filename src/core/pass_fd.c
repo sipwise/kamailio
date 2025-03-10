@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -33,6 +35,7 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <stdlib.h> /* for NULL definition on openbsd */
+#include <limits.h>
 #include <errno.h>
 #include <string.h>
 #ifdef NO_MSG_WAITALL
@@ -287,9 +290,14 @@ again:
 		/* blocking recv_all */
 		n = recv_all(
 				unix_socket, (char *)data + ret, data_len - ret, MSG_WAITALL);
-		if(n >= 0)
+		if(n >= 0) {
+			if(ret >= INT_MAX - n) {
+				LM_ERR("int size overflowing: %d + %d\n", ret, n);
+				ret = -1;
+				goto error;
+			}
 			ret += n;
-		else {
+		} else {
 			ret = n;
 			goto error;
 		}

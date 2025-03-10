@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -75,28 +77,28 @@ int *fo_number_of_files = NULL;
 
 time_t fo_current_timestamp = 0;
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"file_out", (cmd_function)fo_write_to_file, 2, fo_fixup_int_pvar,
-				fo_fixup_free_int_pvar, ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"file_out", (cmd_function)fo_write_to_file, 2, fo_fixup_int_pvar, fo_fixup_free_int_pvar, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}};
 
 static param_export_t params[] = {{"base_folder", PARAM_STR, &fo_base_folder},
-		{"file", PARAM_STR | PARAM_USE_FUNC, &fo_add_filename},
-		{"worker_usleep", PARAM_INT, &fo_worker_usleep}, {0, 0, 0}};
+	{"file", PARAM_STR | PARAM_USE_FUNC, &fo_add_filename},
+	{"worker_usleep", PARAM_INT, &fo_worker_usleep}, {0, 0, 0}};
 
 struct module_exports exports = {
-		"file_out",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* RPC method exports */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* per-child init function */
-		destroy			 /* module destroy function */
+	"file_out",		 /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,			 /* exported functions */
+	params,			 /* exported parameters */
+	0,				 /* RPC method exports */
+	0,				 /* exported pseudo-variables */
+	0,				 /* response handling function */
+	mod_init,		 /* module initialization function */
+	child_init,		 /* per-child init function */
+	destroy			 /* module destroy function */
 };
-
+/* clang-format on */
 
 static int mod_init(void)
 {

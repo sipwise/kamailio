@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -34,7 +36,7 @@
 #include "../../core/parser/msg_parser.h"
 
 
-int reginfo_subscribe_real(
-		struct sip_msg *msg, pv_elem_t *uri, str *service_routes, int expires);
+int reginfo_subscribe_real(struct sip_msg *msg, pv_elem_t *uri,
+		str *service_routes, int num_service_routes, int expires);
 
 #endif

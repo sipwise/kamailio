@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -112,7 +114,8 @@
 /**
  *
  */
-typedef struct ksr_loglevels {
+typedef struct ksr_loglevels
+{
 	int ll_alert;
 	int ll_bug;
 	int ll_crit;
@@ -123,8 +126,10 @@ typedef struct ksr_loglevels {
 	int ll_dbg;
 } ksr_loglevels_t;
 
-#define KSR_LOGLEVELS_DEFAULTS {L_ALERT, L_BUG, L_CRIT2, L_ERR, L_WARN, \
-	L_NOTICE, L_INFO, L_DBG}
+#define KSR_LOGLEVELS_DEFAULTS                                          \
+	{                                                                   \
+		L_ALERT, L_BUG, L_CRIT2, L_ERR, L_WARN, L_NOTICE, L_INFO, L_DBG \
+	}
 /**
  * data fileds used for structured logging
  */
@@ -148,6 +153,7 @@ typedef void (*ksr_slog_f)(ksr_logdata_t *, const char *, ...);
 void ksr_slog_init(char *ename);
 
 extern ksr_slog_f _ksr_slog_func;
+void km_slog_func_set(ksr_slog_f f);
 
 /** @brief my_pid(), process_no are from pt.h but we cannot \#include it here
    because of circular dependencies */
@@ -458,9 +464,9 @@ void log_prefix_init(void);
 
 #ifdef MOD_NAMEID
 
-#define KSR_LLMODVAR_COMBINEZ(X,Y) X##Y
-#define KSR_LLMODVAR_COMBINE(X,Y) KSR_LLMODVAR_COMBINEZ(X,Y)
-#define KSR_LLMODVAR KSR_LLMODVAR_COMBINE(_ksr_loglevels_,MOD_NAMEID)
+#define KSR_LLMODVAR_COMBINEZ(X, Y) X##Y
+#define KSR_LLMODVAR_COMBINE(X, Y) KSR_LLMODVAR_COMBINEZ(X, Y)
+#define KSR_LLMODVAR KSR_LLMODVAR_COMBINE(_ksr_loglevels_, MOD_NAMEID)
 
 /* use local log level mapping */
 #define LLM_ALERT(fmt, args...) LOG(KSR_LLMODVAR.alert, fmt, ##args)

@@ -34,11 +34,15 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdarg.h>
 
 #include "dprint.h"
 #include "sr_module.h"
 #include "ut.h"
 #include "pt.h"
+#include "kemi.h"
+#include "fmsg.h"
+#include "receive.h"
 #include "cfg/cfg_struct.h"
 #include "parser/parse_param.h"
 
@@ -416,6 +420,26 @@ int async_task_push(async_task_t *task)
 /**
  *
  */
+async_wgroup_t *async_task_group_find(str *gname)
+{
+	async_wgroup_t *awg = NULL;
+
+	if(_async_wgroup_list == NULL) {
+		LM_WARN("no async group\n");
+		return NULL;
+	}
+	for(awg = _async_wgroup_list; awg != NULL; awg = awg->next) {
+		if(awg->name.len == gname->len
+				&& memcmp(awg->name.s, gname->s, gname->len) == 0) {
+			return awg;
+		}
+	}
+	return NULL;
+}
+
+/**
+ *
+ */
 int async_task_group_push(str *gname, async_task_t *task)
 {
 	int len;
@@ -442,6 +466,27 @@ int async_task_group_push(str *gname, async_task_t *task)
 		return -1;
 	}
 	LM_DBG("task [%p] sent to group [%.*s]\n", task, gname->len, gname->s);
+	return 0;
+}
+
+/**
+ *
+ */
+int async_task_group_send(async_wgroup_t *awg, async_task_t *task)
+{
+	int len;
+	if(awg == NULL) {
+		LM_WARN("group not provided\n");
+		return -1;
+	}
+	len = write(awg->sockets[1], &task, sizeof(async_task_t *));
+	if(len <= 0) {
+		LM_ERR("failed to pass the task [%p] to group [%.*s]\n", task,
+				awg->name.len, awg->name.s);
+		return -1;
+	}
+	LM_DBG("task [%p] sent to group [%.*s]\n", task, awg->name.len,
+			awg->name.s);
 	return 0;
 }
 
@@ -480,6 +525,162 @@ int async_task_run(async_wgroup_t *awg, int idx)
 			LM_DBG("task with no callback function - ignoring\n");
 		}
 		shm_free(ptask);
+	}
+
+	return 0;
+}
+
+
+/**
+ *
+ */
+static async_wgroup_t *_async_tkv_awg = NULL;
+static async_tkv_param_t *_ksr_async_tkv_param = NULL;
+static int _ksr_async_tkv_ridx = -1;
+/* async group name: eg., 'tkv' */
+static str async_tkv_gname = str_init("");
+/* event route callback name: eg., 'core:tkv' */
+static str async_tkv_evcb = str_init("");
+
+/**
+ *
+ */
+void async_tkv_gname_set(char *gname)
+{
+	async_tkv_gname.s = gname;
+	async_tkv_gname.len = strlen(async_tkv_gname.s);
+}
+
+/**
+ *
+ */
+void async_tkv_evcb_set(char *gname)
+{
+	async_tkv_evcb.s = gname;
+	async_tkv_evcb.len = strlen(async_tkv_evcb.s);
+}
+
+/**
+ *
+ */
+async_tkv_param_t *ksr_async_tkv_param_get(void)
+{
+	return _ksr_async_tkv_param;
+}
+
+/**
+ *
+ */
+void async_tkv_init(void)
+{
+	if(async_tkv_gname.len <= 0) {
+		return;
+	}
+	if(async_tkv_evcb.len <= 0) {
+		return;
+	}
+	_async_tkv_awg = async_task_group_find(&async_tkv_gname);
+
+	_ksr_async_tkv_ridx = route_lookup(&event_rt, async_tkv_evcb.s);
+	if(_ksr_async_tkv_ridx <= 0
+			|| event_rt.rlist[_ksr_async_tkv_ridx] == NULL) {
+		LM_DBG("event_route[%s] not defined - skipping\n", async_tkv_evcb.s);
+		_ksr_async_tkv_ridx = -2;
+		return;
+	}
+}
+
+/**
+ *
+ */
+void async_exec_tkv(void *param)
+{
+	async_tkv_param_t *adp;
+	sr_kemi_eng_t *keng = NULL;
+	sip_msg_t *fmsg = NULL;
+	str evname = str_init("core:tkv");
+	int rtype = 0;
+
+	adp = (async_tkv_param_t *)param;
+	fmsg = faked_msg_next();
+	rtype = get_route_type();
+	_ksr_async_tkv_param = adp;
+	set_route_type(REQUEST_ROUTE);
+	keng = sr_kemi_eng_get();
+	if(keng != NULL) {
+		if(sr_kemi_route(keng, fmsg, EVENT_ROUTE, &async_tkv_evcb, &evname)
+				< 0) {
+			LM_ERR("error running event route kemi callback [%.*s]\n",
+					async_tkv_evcb.len, async_tkv_evcb.s);
+		}
+	} else {
+		if(_ksr_async_tkv_ridx >= 0) {
+			run_top_route(event_rt.rlist[_ksr_async_tkv_ridx], fmsg, 0);
+		}
+	}
+	ksr_msg_env_reset();
+	set_route_type(rtype);
+	_ksr_async_tkv_param = NULL;
+	/* param is freed along with the async task strucutre in core */
+}
+
+/**
+ *
+ */
+int async_tkv_emit(int dtype, char *pkey, char *fmt, ...)
+{
+	async_task_t *at = NULL;
+	int dsize = 0;
+	async_tkv_param_t *adp;
+	va_list va;
+	char buf[KSR_ASYNC_TKV_SIZE];
+	int n = 0;
+	int klen = 0;
+	sr_kemi_eng_t *keng = NULL;
+
+	if(_async_tkv_awg == NULL) {
+		LM_DBG("the async group has not been set\n");
+		return -1;
+	}
+	keng = sr_kemi_eng_get();
+	if(keng == NULL && _ksr_async_tkv_ridx == -2) {
+		LM_DBG("the event_route[core:tkv] has not been defined\n");
+		return -1;
+	}
+
+	va_start(va, fmt);
+	n = vsnprintf(buf, KSR_ASYNC_TKV_SIZE, fmt, va);
+	va_end(va);
+
+	if(n < 0 || n > KSR_ASYNC_TKV_SIZE) {
+		LM_ERR("failed to print the arguments for key: %s\n", pkey);
+		return -1;
+	}
+
+	klen = strlen(pkey);
+	dsize = sizeof(async_task_t) + sizeof(async_tkv_param_t) + klen + 1 + n + 1;
+	at = (async_task_t *)shm_malloc(dsize);
+	if(at == NULL) {
+		SHM_MEM_ERROR;
+		return -1;
+	}
+	memset(at, 0, dsize);
+	at->exec = async_exec_tkv;
+	at->param = (char *)at + sizeof(async_task_t);
+	adp = (async_tkv_param_t *)at->param;
+	adp->dtype = dtype;
+	adp->skey.s = (char *)adp + sizeof(async_tkv_param_t);
+	adp->skey.len = klen;
+	memcpy(adp->skey.s, pkey, klen);
+	adp->skey.len = klen;
+	adp->sval.s = (char *)adp->skey.s + klen + 1;
+	memcpy(adp->sval.s, buf, n);
+	adp->sval.len = n;
+
+	if(async_task_group_send(_async_tkv_awg, at) < 0) {
+		LM_ERR("failed to send task with key: %s\n", pkey);
+		shm_free(at);
+		return -1;
 	}
 
 	return 0;

@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -53,8 +55,8 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-		{"timeout", PARAM_STRING | USE_FUNC_PARAM, (void *)&set_timeout},
-		{"reconnect", PARAM_STRING | USE_FUNC_PARAM, (void *)&set_reconnect},
+		{"timeout", PARAM_STRING | PARAM_USE_FUNC, (void *)&set_timeout},
+		{"reconnect", PARAM_STRING | PARAM_USE_FUNC, (void *)&set_reconnect},
 		{0, 0, 0}};
 
 

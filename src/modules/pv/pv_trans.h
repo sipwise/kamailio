@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -60,6 +62,8 @@ enum _tr_s_subtype
 	TR_S_DECODEBASE64,
 	TR_S_ESCAPECOMMON,
 	TR_S_UNESCAPECOMMON,
+	TR_S_ESCAPECRLF,
+	TR_S_UNESCAPECRLF,
 	TR_S_ESCAPEUSER,
 	TR_S_UNESCAPEUSER,
 	TR_S_ESCAPEPARAM,
@@ -94,6 +98,8 @@ enum _tr_s_subtype
 	TR_S_ENCODEBASE64URLT,
 	TR_S_DECODEBASE64URLT,
 	TR_S_RMWS,
+	TR_S_RMHDWS,
+	TR_S_RMHLWS,
 	TR_S_BEFORE,
 	TR_S_AFTER,
 	TR_S_RBEFORE,

@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -33,8 +35,10 @@
 #include <inttypes.h>
 #include <stdarg.h>
 
+#include "../../core/globals.h"
 #include "../../core/counters.h"
 #include "../../core/ut.h"
+#include "../../core/pt.h"
 
 #include "prom.h"
 #include "prom_metric.h"
@@ -187,8 +191,9 @@ static int metric_generate(
 			(uint64_t)ts);
 
 	/* Print metric name. */
-	if(prom_body_name_printf(ctx, "%.*s%.*s_%.*s", xhttp_prom_beginning.len,
-			   xhttp_prom_beginning.s, group->len, group->s, name->len, name->s)
+	if(prom_body_name_printf(ctx, "%.*s%.*s_%.*s%s", xhttp_prom_beginning.len,
+			   xhttp_prom_beginning.s, group->len, group->s, name->len, name->s,
+			   xhttp_prom_tags_braces)
 			== -1) {
 		LM_ERR("Fail to print\n");
 		return -1;
@@ -201,6 +206,110 @@ static int metric_generate(
 	}
 
 	return 0;
+}
+
+/**
+ * @brief Generate a string suitable for Prometheus pkgmem metric.
+ *
+ * @return 0 on success.
+ */
+static int prom_metric_uptime_print(prom_ctx_t *ctx)
+{
+	int uptime;
+	time_t now;
+	uint64_t ts;
+
+	if(get_timestamp(&ts)) {
+		LM_ERR("Fail to get timestamp\n");
+		goto error;
+	}
+
+	time(&now);
+	uptime = (int)(now - up_since);
+	if(prom_body_printf(ctx, "%.*suptime%s %d %" PRIu64 "\n",
+			   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
+			   xhttp_prom_tags_braces, uptime, ts)
+			== -1) {
+		LM_ERR("Fail to print\n");
+		goto error;
+	}
+	return 0;
+
+error:
+	return -1;
+}
+
+/**
+ * @brief Generate a string suitable for Prometheus pkgmem metric.
+ *
+ * @return 0 on success.
+ */
+static int prom_metric_pkgmem_print(prom_ctx_t *ctx)
+{
+	int i = 0;
+	uint64_t ts;
+
+	if(get_timestamp(&ts)) {
+		LM_ERR("Fail to get timestamp\n");
+		goto error;
+	}
+
+	for(; i < pkg_proc_stats_no; i++) {
+		if(prom_body_printf(ctx,
+				   "%.*spkgmem_used{pid=\"%u\", rank=\"%d\", desc=\"%s\"%s} "
+				   "%lu %" PRIu64 "\n",
+				   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
+				   pkg_proc_stats[i].pid, pkg_proc_stats[i].rank, pt[i].desc,
+				   xhttp_prom_tags_comma, pkg_proc_stats[i].used, ts)
+				== -1) {
+			LM_ERR("Fail to print\n");
+			goto error;
+		}
+		if(prom_body_printf(ctx,
+				   "%.*spkgmem_available{pid=\"%u\", rank=\"%d\", "
+				   "desc=\"%s\"%s} %lu %" PRIu64 "\n",
+				   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
+				   pkg_proc_stats[i].pid, pkg_proc_stats[i].rank, pt[i].desc,
+				   xhttp_prom_tags_comma, pkg_proc_stats[i].available, ts)
+				== -1) {
+			LM_ERR("Fail to print\n");
+			goto error;
+		}
+		if(prom_body_printf(ctx,
+				   "%.*spkgmem_real_used{pid=\"%u\", rank=\"%d\", "
+				   "desc=\"%s\"%s} %lu %" PRIu64 "\n",
+				   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
+				   pkg_proc_stats[i].pid, pkg_proc_stats[i].rank, pt[i].desc,
+				   xhttp_prom_tags_comma, pkg_proc_stats[i].real_used, ts)
+				== -1) {
+			LM_ERR("Fail to print\n");
+			goto error;
+		}
+		if(prom_body_printf(ctx,
+				   "%.*spkgmem_total_frags{pid=\"%u\", rank=\"%d\", "
+				   "desc=\"%s\"%s} %lu %" PRIu64 "\n",
+				   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
+				   pkg_proc_stats[i].pid, pkg_proc_stats[i].rank, pt[i].desc,
+				   xhttp_prom_tags_comma, pkg_proc_stats[i].total_frags, ts)
+				== -1) {
+			LM_ERR("Fail to print\n");
+			goto error;
+		}
+		if(prom_body_printf(ctx,
+				   "%.*spkgmem_total_size{pid=\"%u\", rank=\"%d\" "
+				   "desc=\"%s\"%s} %lu %" PRIu64 "\n",
+				   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
+				   pkg_proc_stats[i].pid, pkg_proc_stats[i].rank, pt[i].desc,
+				   xhttp_prom_tags_comma, pkg_proc_stats[i].total_size, ts)
+				== -1) {
+			LM_ERR("Fail to print\n");
+			goto error;
+		}
+	}
+	return 0;
+
+error:
+	return -1;
 }
 
 /**
@@ -239,6 +348,20 @@ int prom_stats_get(prom_ctx_t *ctx, str *stat)
 	if(prom_metric_list_print(ctx)) {
 		LM_ERR("Fail to print user defined metrics\n");
 		return -1;
+	}
+
+	if(pkgmem_stats_enabled) {
+		if(prom_metric_pkgmem_print(ctx)) {
+			LM_ERR("Fail to print pkgmem metrics\n");
+			return -1;
+		}
+	}
+
+	if(uptime_stat_enabled) {
+		if(prom_metric_uptime_print(ctx)) {
+			LM_ERR("Fail to print uptime metric\n");
+			return -1;
+		}
 	}
 
 	LM_DBG("Statistics for: %.*s\n", stat->len, stat->s);

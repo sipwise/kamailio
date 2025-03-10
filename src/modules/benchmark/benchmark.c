@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -129,10 +131,10 @@ static cmd_export_t cmds[] = {
 /*
  * Exported parameters
  */
-static param_export_t params[] = {{"enable", INT_PARAM, &bm_enable_global},
-		{"granularity", INT_PARAM, &bm_granularity},
-		{"loglevel", INT_PARAM, &bm_loglevel},
-		{"register", PARAM_STRING | USE_FUNC_PARAM,
+static param_export_t params[] = {{"enable", PARAM_INT, &bm_enable_global},
+		{"granularity", PARAM_INT, &bm_granularity},
+		{"loglevel", PARAM_INT, &bm_loglevel},
+		{"register", PARAM_STRING | PARAM_USE_FUNC,
 				(void *)bm_register_timer_param},
 
 		{0, 0, 0}};

@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -109,7 +111,7 @@ static int ul_db_failover_get_spare(db_func_t *dbf, db1_con_t *dbh, ul_db_t *db)
 	db1_res_t *res = NULL;
 	db_row_t *row;
 	int query_len;
-	str tmp;
+	str str_tmp;
 
 	if(!dbf || !dbh || !db) {
 		LM_ERR("Null pointer as parameter.\n");
@@ -149,10 +151,10 @@ static int ul_db_failover_get_spare(db_func_t *dbf, db1_con_t *dbh, ul_db_t *db)
 		LM_ERR("could not print query\n");
 		return -1;
 	}
-	tmp.s = query;
-	tmp.len = strlen(query);
+	str_tmp.s = query;
+	str_tmp.len = strlen(query);
 
-	if(dbf->raw_query(dbh, &tmp, &res) < 0) {
+	if(dbf->raw_query(dbh, &str_tmp, &res) < 0) {
 		LM_ERR("could not query database.\n");
 		return -1;
 	}

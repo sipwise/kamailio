@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -194,7 +196,7 @@ void dlg_tmcb_dummy(struct cell *t, int type, struct tmcb_params *param);
  * \return void
  */
 
-void print_all_dlgs();
+void print_all_dlgs(unsigned int ticks, void *param);
 
 /*!
  * \brief Helper function that prints all the properties of a dialog including all the dlg_out's

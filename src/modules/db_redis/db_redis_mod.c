@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -55,7 +57,7 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-		{"keys", PARAM_STRING | USE_FUNC_PARAM, (void *)keys_param},
+		{"keys", PARAM_STRING | PARAM_USE_FUNC, (void *)keys_param},
 		{"schema_path", PARAM_STR, &redis_schema_path},
 		{"verbosity", PARAM_INT, &db_redis_verbosity},
 #ifdef WITH_SSL

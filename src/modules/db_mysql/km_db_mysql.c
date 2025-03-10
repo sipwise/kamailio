@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -58,9 +60,9 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-		/*	{"ping_interval",    INT_PARAM, &db_mysql_ping_interval}, */
-		{"timeout_interval", INT_PARAM, &db_mysql_timeout_interval},
-		{"auto_reconnect", INT_PARAM, &db_mysql_auto_reconnect}, {0, 0, 0}};
+		/*	{"ping_interval",    PARAM_INT, &db_mysql_ping_interval}, */
+		{"timeout_interval", PARAM_INT, &db_mysql_timeout_interval},
+		{"auto_reconnect", PARAM_INT, &db_mysql_auto_reconnect}, {0, 0, 0}};
 
 struct module_exports kam_exports = {
 		"db_mysql",			/* module name */

@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -87,7 +89,7 @@ static cmd_export_t cmds[] = {
 
 static param_export_t params[] = {
 	{"ping_interval", PARAM_INT, &ka_ping_interval},
-	{"destination", PARAM_STRING | USE_FUNC_PARAM,
+	{"destination", PARAM_STRING | PARAM_USE_FUNC,
 		(void *)ka_mod_add_destination},
 	{"ping_from", PARAM_STR, &ka_ping_from},
 	{"delete_counter", PARAM_INT, &ka_counter_del},

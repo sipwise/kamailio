@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -106,6 +108,7 @@ static volatile int mt_reload_flag = 0;
 
 int mt_param(modparam_t type, void *val);
 static int fixup_mt_match(void **param, int param_no);
+static int fixup_free_mt_match(void **param, int param_no);
 static int w_mt_match(struct sip_msg *msg, char *str1, char *str2, char *str3);
 
 static int mod_init(void);
@@ -119,40 +122,48 @@ static int mt_match(sip_msg_t *msg, str *tname, str *tomatch, int mval);
 static int mt_load_db(m_tree_t *pt);
 static int mt_load_db_trees();
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"mt_match", (cmd_function)w_mt_match, 3, fixup_mt_match, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
-		{"bind_mtree", (cmd_function)bind_mtree, 0, 0, 0}, {0, 0, 0, 0, 0, 0}};
-
-static param_export_t params[] = {
-		{"mtree", PARAM_STRING | USE_FUNC_PARAM, (void *)mt_param},
-		{"db_url", PARAM_STR, &db_url}, {"db_table", PARAM_STR, &db_table},
-		{"tname_column", PARAM_STR, &tname_column},
-		{"tprefix_column", PARAM_STR, &tprefix_column},
-		{"tvalue_column", PARAM_STR, &tvalue_column},
-		{"char_list", PARAM_STR, &mt_char_list},
-		{"fetch_rows", INT_PARAM, &mt_fetch_rows},
-		{"pv_value", PARAM_STR, &value_param},
-		{"pv_values", PARAM_STR, &values_param},
-		{"pv_dstid", PARAM_STR, &dstid_param},
-		{"pv_weight", PARAM_STR, &weight_param},
-		{"pv_count", PARAM_STR, &count_param},
-		{"mt_tree_type", INT_PARAM, &_mt_tree_type},
-		{"mt_ignore_duplicates", INT_PARAM, &_mt_ignore_duplicates},
-		{"mt_allow_duplicates", INT_PARAM, &_mt_allow_duplicates}, {0, 0, 0}};
-
-struct module_exports exports = {
-		"mtree", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,					  /*·exported·functions·*/
-		params,					  /*·exported·functions·*/
-		0,						  /*·exported·RPC·methods·*/
-		0,						  /* exported pseudo-variables */
-		0,						  /* response·function */
-		mod_init,				  /* module initialization function */
-		child_init,				  /* per child init function */
-		mod_destroy				  /* destroy function */
+	{"mt_match", (cmd_function)w_mt_match, 3,
+		fixup_mt_match, fixup_free_mt_match,
+		REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
+	{"bind_mtree", (cmd_function)bind_mtree, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
 };
 
+static param_export_t params[] = {
+	{"mtree", PARAM_STRING | PARAM_USE_FUNC, (void *)mt_param},
+	{"db_url", PARAM_STR, &db_url},
+	{"db_table", PARAM_STR, &db_table},
+	{"tname_column", PARAM_STR, &tname_column},
+	{"tprefix_column", PARAM_STR, &tprefix_column},
+	{"tvalue_column", PARAM_STR, &tvalue_column},
+	{"char_list", PARAM_STR, &mt_char_list},
+	{"fetch_rows", PARAM_INT, &mt_fetch_rows},
+	{"pv_value", PARAM_STR, &value_param},
+	{"pv_values", PARAM_STR, &values_param},
+	{"pv_dstid", PARAM_STR, &dstid_param},
+	{"pv_weight", PARAM_STR, &weight_param},
+	{"pv_count", PARAM_STR, &count_param},
+	{"mt_tree_type", PARAM_INT, &_mt_tree_type},
+	{"mt_ignore_duplicates", PARAM_INT, &_mt_ignore_duplicates},
+	{"mt_allow_duplicates", PARAM_INT, &_mt_allow_duplicates},
+	{0, 0, 0}
+};
+
+struct module_exports exports = {
+	"mtree",
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /*·exported·functions·*/
+	params,          /*·exported·functions·*/
+	0,               /*·exported·RPC·methods·*/
+	0,               /* exported pseudo-variables */
+	0,               /* response·function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per child init function */
+	mod_destroy      /* destroy function */
+};
+/* clang-format on */
 
 /**
  * init module function
@@ -312,15 +323,6 @@ static int child_init(int rank)
 static void mod_destroy(void)
 {
 	LM_DBG("cleaning up\n");
-	mt_destroy_trees();
-	if(db_con != NULL && mt_dbf.close != NULL)
-		mt_dbf.close(db_con);
-	/* destroy lock */
-	if(mt_lock) {
-		lock_destroy(mt_lock);
-		lock_dealloc(mt_lock);
-		mt_lock = 0;
-	}
 }
 
 static int fixup_mt_match(void **param, int param_no)
@@ -335,6 +337,17 @@ static int fixup_mt_match(void **param, int param_no)
 	return fixup_igp_null(param, 1);
 }
 
+static int fixup_free_mt_match(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2) {
+		return fixup_free_spve_null(param, 1);
+	}
+	if(param_no != 3) {
+		LM_ERR("invalid parameter number %d\n", param_no);
+		return E_UNSPEC;
+	}
+	return fixup_free_igp_null(param, 1);
+}
 
 /* use tree tn, match var, by mode, output in avp params */
 static int mt_match(sip_msg_t *msg, str *tname, str *tomatch, int mval)

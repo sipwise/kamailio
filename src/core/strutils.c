@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -107,6 +109,68 @@ int unescape_common(char *dst, char *src, int src_len)
 		i++;
 	}
 	return j;
+}
+
+/*! \brief
+ * add backslashes for CR LF
+ */
+int escape_crlf(str *sin, str *sout)
+{
+	int i, j;
+
+	if(sout == 0 || sin == 0 || sin->len <= 0)
+		return -1;
+	j = 0;
+	for(i = 0; i < sin->len; i++) {
+		switch(sin->s[i]) {
+			case '\n':
+				sout->s[j++] = '\\';
+				sout->s[j++] = 'n';
+				break;
+			case '\r':
+				sout->s[j++] = '\\';
+				sout->s[j++] = 'r';
+				break;
+			default:
+				sout->s[j++] = sin->s[i];
+		}
+	}
+	sout->len = j;
+	return 0;
+}
+
+/*! \brief
+ * remove backslashes for CR LF
+ */
+int unescape_crlf(str *sin, str *sout)
+{
+	int i, j;
+
+	if(sout == 0 || sin == 0 || sin->len <= 0)
+		return -1;
+	j = 0;
+	i = 0;
+	while(i < sin->len) {
+		if(sin->s[i] == '\\' && i + 1 < sin->len) {
+			switch(sin->s[i + 1]) {
+				case 'n':
+					sout->s[j++] = '\n';
+					i++;
+					break;
+				case 'r':
+					sout->s[j++] = '\r';
+					i++;
+					break;
+				default:
+					sout->s[j++] = sin->s[i];
+			}
+		} else {
+			sout->s[j++] = sin->s[i];
+		}
+		i++;
+	}
+	sout->len = j;
+	return 0;
 }
 
 /*! \brief Unscape all printable ASCII characters */

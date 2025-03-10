@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -132,34 +134,38 @@ static int w_pl_drop_forced(struct sip_msg *, char *, char *);
 static int w_pl_drop(struct sip_msg *, char *, char *);
 static void destroy(void);
 static int fixup_pl_check3(void **param, int param_no);
+static int fixup_free_pl_check3(void **param, int param_no);
 
 /* clang-format off */
 static cmd_export_t cmds[] = {
-	{"pl_check", (cmd_function)w_pl_check, 1, fixup_spve_null, 0, ANY_ROUTE},
-	{"pl_check", (cmd_function)w_pl_check3, 3, fixup_pl_check3, 0, ANY_ROUTE},
-	{"pl_active", (cmd_function)w_pl_active, 1, fixup_spve_null, 0, ANY_ROUTE},
-	{"pl_drop", (cmd_function)w_pl_drop_default, 0, 0, 0,
-		REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
-	{"pl_drop", (cmd_function)w_pl_drop_forced, 1, fixup_uint_null, 0,
-		REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
-	{"pl_drop", (cmd_function)w_pl_drop, 2, fixup_uint_uint, 0,
-		REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
+	{"pl_check", (cmd_function)w_pl_check, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"pl_check", (cmd_function)w_pl_check3, 3,
+		fixup_pl_check3, fixup_free_pl_check3, ANY_ROUTE},
+	{"pl_active", (cmd_function)w_pl_active, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"pl_drop", (cmd_function)w_pl_drop_default, 0,
+		0, 0, REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
+	{"pl_drop", (cmd_function)w_pl_drop_forced, 1,
+		fixup_uint_null, 0, REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
+	{"pl_drop", (cmd_function)w_pl_drop, 2,
+		fixup_uint_uint, 0, REQUEST_ROUTE | BRANCH_ROUTE | FAILURE_ROUTE | ONSEND_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
 static param_export_t params[] = {
-	{"timer_interval", INT_PARAM, &pl_timer_interval},
-	{"timer_mode", INT_PARAM, &pl_timer_mode},
-	{"reply_code", INT_PARAM, &pl_drop_code},
+	{"timer_interval", PARAM_INT, &pl_timer_interval},
+	{"timer_mode", PARAM_INT, &pl_timer_mode},
+	{"reply_code", PARAM_INT, &pl_drop_code},
 	{"reply_reason", PARAM_STR, &pl_drop_reason},
 	{"db_url", PARAM_STR, &pl_db_url},
 	{"plp_table_name", PARAM_STR, &rlp_table_name},
 	{"plp_pipeid_column", PARAM_STR, &rlp_pipeid_col},
 	{"plp_limit_column", PARAM_STR, &rlp_limit_col},
 	{"plp_algorithm_column", PARAM_STR, &rlp_algorithm_col},
-	{"hash_size", INT_PARAM, &pl_hash_size},
-	{"load_fetch", INT_PARAM, &pl_load_fetch},
-	{"clean_unused", INT_PARAM, &pl_clean_unused},
+	{"hash_size", PARAM_INT, &pl_hash_size},
+	{"load_fetch", PARAM_INT, &pl_load_fetch},
+	{"clean_unused", PARAM_INT, &pl_clean_unused},
 
 	{0, 0, 0}
 };
@@ -433,45 +439,7 @@ static int mod_init(void)
 
 static void destroy(void)
 {
-	pl_destroy_htable();
-
-	if(network_load_value) {
-		shm_free(network_load_value);
-		network_load_value = NULL;
-	}
-	if(load_value) {
-		shm_free(load_value);
-		load_value = NULL;
-	}
-	if(load_source) {
-		shm_free(load_source);
-		load_source = NULL;
-	}
-	if(pid_kp) {
-		shm_free(pid_kp);
-		pid_kp = NULL;
-	}
-	if(pid_ki) {
-		shm_free(pid_ki);
-		pid_ki = NULL;
-	}
-	if(pid_kd) {
-		shm_free(pid_kd);
-		pid_kd = NULL;
-	}
-	if(_pl_pid_setpoint) {
-		shm_free(_pl_pid_setpoint);
-		_pl_pid_setpoint = NULL;
-	}
-	if(drop_rate) {
-		shm_free(drop_rate);
-		drop_rate = NULL;
-	}
-
-	if(pl_timer) {
-		timer_free(pl_timer);
-		pl_timer = NULL;
-	}
+	LM_DBG("done");
 }
 
 
@@ -724,6 +692,17 @@ static int fixup_pl_check3(void **param, int param_no)
 		return fixup_spve_null(param, 1);
 	if(param_no == 3)
 		return fixup_igp_null(param, 1);
+	return 0;
+}
+
+static int fixup_free_pl_check3(void **param, int param_no)
+{
+	if(param_no == 1)
+		return fixup_free_spve_null(param, 1);
+	if(param_no == 2)
+		return fixup_free_spve_null(param, 1);
+	if(param_no == 3)
+		return fixup_free_igp_null(param, 1);
 	return 0;
 }
 

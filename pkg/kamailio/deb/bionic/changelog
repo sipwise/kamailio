@@ -1,65 +1,47 @@
-kamailio (5.8.5) unstable; urgency=medium
+kamailio (6.0.1) unstable; urgency=medium
 
-  * version set 5.8.5
+  * version set 6.0.1
 
- -- Victor Seva <vseva@debian.org>  Thu, 23 Jan 2025 08:31:22 +0100
+ -- Victor Seva <vseva@debian.org>  Mon, 10 Mar 2025 08:18:43 +0100
 
-kamailio (5.8.4) unstable; urgency=medium
+kamailio (6.0.0) unstable; urgency=medium
 
-  * version set 5.8.4
+  * version set 6.0.0
 
- -- Victor Seva <vseva@debian.org>  Tue, 12 Nov 2024 10:53:35 +0100
+ -- Victor Seva <vseva@debian.org>  Wed, 29 Jan 2025 09:06:18 +0100
 
-kamailio (5.8.3) unstable; urgency=medium
+kamailio (6.0.0~rc0) unstable; urgency=medium
 
-  * version set 5.8.3
+  * version set 6.0.0~rc0
 
- -- Victor Seva <vseva@debian.org>  Wed, 04 Sep 2024 09:29:45 +0200
+ -- Victor Seva <vseva@debian.org>  Thu, 23 Jan 2025 08:54:27 +0100
 
-kamailio (5.8.2) unstable; urgency=medium
+kamailio (6.0.0~pre0) unstable; urgency=medium
 
-  * version set 5.8.2
+  * version set 6.0.0~pre0
 
- -- Victor Seva <vseva@debian.org>  Wed, 12 Jun 2024 09:00:17 +0200
+ -- Victor Seva <vseva@debian.org>  Tue, 17 Dec 2024 20:14:42 +0100
 
-kamailio (5.8.1) unstable; urgency=medium
+kamailio (6.0.0~dev3) unstable; urgency=medium
 
-  * version set 5.8.1
+  * version set 6.0.0~dev3
 
- -- Victor Seva <vseva@debian.org>  Wed, 03 Apr 2024 08:21:53 +0200
+ -- Victor Seva <vseva@debian.org>  Mon, 30 Sep 2024 13:58:53 +0200
 
-kamailio (5.8.0) unstable; urgency=medium
+kamailio (6.0.0~dev2) unstable; urgency=medium
 
-  * version set 5.8.0
+  * version set 6.0.0~dev2
 
- -- Victor Seva <vseva@debian.org>  Thu, 07 Mar 2024 11:40:20 +0100
+ -- Victor Seva <vseva@debian.org>  Thu, 16 May 2024 09:46:08 +0200
 
-kamailio (5.8.0~rc0) unstable; urgency=medium
+kamailio (5.9.0~dev1) unstable; urgency=medium
 
-  * version set 5.8.0~rc0
+  * version set 5.9.0~dev1
 
- -- Victor Seva <vseva@debian.org>  Fri, 23 Feb 2024 20:04:35 +0100
+ -- Victor Seva <vseva@debian.org>  Mon, 15 Apr 2024 08:52:26 +0200
 
-kamailio (5.8.0~pre0) unstable; urgency=medium
+kamailio (5.9.0~dev0) unstable; urgency=medium
 
-  * version set 5.8.0~pre0
+  * version set 5.9.0~dev0
 
- -- Victor Seva <vseva@debian.org>  Fri, 02 Feb 2024 15:20:05 +0100
-
-kamailio (5.8.0~dev2) unstable; urgency=medium
-
-  * version set 5.8.0~dev2
-
- -- Victor Seva <vseva@debian.org>  Tue, 05 Dec 2023 12:04:06 +0100
-
-kamailio (5.8.0~dev1) unstable; urgency=medium
-
-  * version set 5.8.0~dev1
-
- -- Victor Seva <vseva@debian.org>  Wed, 28 Jun 2023 15:03:56 +0200
-
-kamailio (5.8.0~dev0) unstable; urgency=medium
-
-  * version set 5.8.0~dev0
-
- -- Victor Seva <vseva@debian.org>  Thu, 04 May 2023 21:45:08 +0200
+ -- Victor Seva <vseva@debian.org>  Thu, 23 Feb 2024 19:45:08 +0209

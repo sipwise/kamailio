@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -131,6 +133,14 @@ typedef struct advertise_info
 	str sock_str;			/* Socket proto, ip, and port as string */
 } advertise_info_t;
 
+#define KSR_AGROUP_NAME_SIZE 64
+
+typedef struct action_group
+{
+	char agname[KSR_AGROUP_NAME_SIZE]; /* name of action group */
+	void *agptr;
+} action_group_t;
+
 typedef struct socket_info
 {
 	int socket;
@@ -153,6 +163,7 @@ typedef struct socket_info
 	int workers_tcpidx; /* index of workers in tcp children array */
 	str sockname;		/* socket name given in config listen value */
 	struct advertise_info useinfo; /* details to be used in SIP msg */
+	action_group_t agroup;		   /* action group attributes */
 #ifdef USE_MCAST
 	str mcast; /* name of interface that should join multicast group*/
 #endif		   /* USE_MCAST */
@@ -163,12 +174,14 @@ typedef struct socket_attrs
 	int bindproto;
 	str bindaddr;
 	int bindport;
+	int bindportend;
 	int useproto;
 	str useaddr;
 	int useport;
 	str sockname;
 	int workers;
 	int sflags;
+	str agname;
 } socket_attrs_t;
 
 /* send flags */

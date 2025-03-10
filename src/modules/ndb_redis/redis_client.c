@@ -9,6 +9,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -886,11 +888,11 @@ srv_disabled:
 int check_cluster_reply(redisReply *reply, redisc_server_t **rsrv)
 {
 	redisc_server_t *rsrv_new;
-	char buffername[100];
+	char buffername[512];
 	unsigned int port;
 	str addr = {0, 0}, tmpstr = {0, 0}, name = {0, 0};
 	int server_len = 0;
-	char spec_new[100];
+	char spec_new[512];
 
 	if(redis_cluster_param) {
 		LM_DBG("Redis replied: \"%.*s\"\n", (int)reply->len, reply->str);
@@ -944,12 +946,13 @@ int check_cluster_reply(redisReply *reply, redisc_server_t **rsrv)
 						addr.len, addr.s, port);
 
 				if(server_len < 0 || server_len > sizeof(spec_new) - 1) {
-					LM_ERR("failed to print server spec string\n");
+					LM_ERR("failed to print server spec string (%d)\n",
+							server_len);
 					return 0;
 				}
 				server_new = (char *)pkg_malloc(server_len + 1);
 				if(server_new == NULL) {
-					LM_ERR("Error allocating pkg mem\n");
+					PKG_MEM_ERROR;
 					return 0;
 				}
 
@@ -969,7 +972,7 @@ int check_cluster_reply(redisReply *reply, redisc_server_t **rsrv)
 									name.len, name.s);
 							return 1;
 						} else {
-							LM_ERR("ERROR connecting to the new server with "
+							LM_ERR("failed connecting to the new server with "
 								   "name: %.*s\n",
 									name.len, name.s);
 							return 0;

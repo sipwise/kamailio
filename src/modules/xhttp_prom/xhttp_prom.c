@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -62,6 +64,7 @@ str XHTTP_PROM_CONTENT_TYPE_TEXT_HTML = str_init("text/plain; version=0.0.4");
 
 static rpc_export_t rpc_cmds[];
 static int mod_init(void);
+static int child_init(int rank);
 static void mod_destroy(void);
 static int w_prom_check_uri(sip_msg_t *msg);
 static int w_prom_dispatch(sip_msg_t *msg);
@@ -101,7 +104,9 @@ static int w_prom_histogram_observe_l2(
 static int w_prom_histogram_observe_l3(struct sip_msg *msg, char *pname,
 		char *pnumber, char *l1, char *l2, char *l3);
 static int fixup_metric_reset(void **param, int param_no);
+static int fixup_free_metric_reset(void **param, int param_no);
 static int fixup_counter_inc(void **param, int param_no);
+static int fixup_free_counter_inc(void **param, int param_no);
 
 int prom_counter_param(modparam_t type, void *val);
 int prom_gauge_param(modparam_t type, void *val);
@@ -116,7 +121,25 @@ int prom_histogram_param(modparam_t type, void *val);
  */
 static prom_ctx_t _prom_ctx;
 
+/**
+ * @brief api interface for the xhttp module
+ */
 static xhttp_api_t xhttp_api;
+
+/**
+ * @brief api interface for the kex module
+ */
+static kex_api_t kex_api;
+
+/**
+ * @brief pointer to pkgmem statistics.
+ */
+pkg_proc_stats_t *pkg_proc_stats = NULL;
+
+/**
+ * @brief number of pkgmem statistics.
+ */
+int pkg_proc_stats_no = 0;
 
 /**
  * @brief String to indicate which statistics to display.
@@ -130,78 +153,86 @@ str xhttp_prom_stats = str_init("");
  */
 str xhttp_prom_beginning = str_init("kamailio_");
 
+/**
+ * @brief string for metrics tags.
+ */
+str xhttp_prom_tags = str_init("");
+
+/**
+ * @brief helper string for metrics tags. Used for appending tag lists
+ */
+char *xhttp_prom_tags_comma = "";
+
+/**
+ * @brief helper string for metrics tags. Used for appending to metric
+ */
+char *xhttp_prom_tags_braces = "";
+
 int buf_size = 0; /**< size of buffer that contains the reply. */
 
 int timeout_minutes = 60; /**< timeout in minutes to delete old metrics. */
 
+int uptime_stat_enabled = 0; /**< enable or disable uptime statistic. */
+
+int pkgmem_stats_enabled = 0; /**< enable or disable pkgmem statistics. */
+
 char error_buf[ERROR_REASON_BUF_LEN];
 
+/* clang-format off */
 /* module commands */
-static cmd_export_t cmds[] = {{"prom_check_uri", (cmd_function)w_prom_check_uri,
-									  0, 0, 0, REQUEST_ROUTE | EVENT_ROUTE},
-		{"prom_dispatch", (cmd_function)w_prom_dispatch, 0, 0, 0,
-				REQUEST_ROUTE | EVENT_ROUTE},
-		{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l0, 1,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l1, 2,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l2, 3,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l3, 4,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l0, 1,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l1, 2,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l2, 3,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l3, 4,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l0, 2,
-				fixup_counter_inc, 0, ANY_ROUTE},
-		{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l1, 3,
-				fixup_counter_inc, 0, ANY_ROUTE},
-		{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l2, 4,
-				fixup_counter_inc, 0, ANY_ROUTE},
-		{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l3, 5,
-				fixup_counter_inc, 0, ANY_ROUTE},
-		{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l0, 2,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l1, 3,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l2, 4,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l3, 5,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l0, 2,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l1, 3,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l2, 4,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l3, 5,
-				fixup_metric_reset, 0, ANY_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+static cmd_export_t cmds[] = {
+	{"prom_check_uri", (cmd_function)w_prom_check_uri, 0, 0, 0, REQUEST_ROUTE | EVENT_ROUTE},
+	{"prom_dispatch", (cmd_function)w_prom_dispatch, 0, 0, 0, REQUEST_ROUTE | EVENT_ROUTE},
+	{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l0, 1, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l1, 2, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l2, 3, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_counter_reset", (cmd_function)w_prom_counter_reset_l3, 4, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l0, 1, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l1, 2, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l2, 3, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_reset", (cmd_function)w_prom_gauge_reset_l3, 4, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l0, 2, fixup_counter_inc, fixup_free_counter_inc, ANY_ROUTE},
+	{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l1, 3, fixup_counter_inc, fixup_free_counter_inc, ANY_ROUTE},
+	{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l2, 4, fixup_counter_inc, fixup_free_counter_inc, ANY_ROUTE},
+	{"prom_counter_inc", (cmd_function)w_prom_counter_inc_l3, 5, fixup_counter_inc, fixup_free_counter_inc, ANY_ROUTE},
+	{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l0, 2, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l1, 3, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l2, 4, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_gauge_set", (cmd_function)w_prom_gauge_set_l3, 5, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l0, 2, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l1, 3, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l2, 4, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{"prom_histogram_observe", (cmd_function)w_prom_histogram_observe_l3, 5, fixup_metric_reset, fixup_free_metric_reset, ANY_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t params[] = {{"xhttp_prom_buf_size", INT_PARAM, &buf_size},
-		{"xhttp_prom_stats", PARAM_STR, &xhttp_prom_stats},
-		{"xhttp_prom_beginning", PARAM_STR, &xhttp_prom_beginning},
-		{"prom_counter", PARAM_STRING | USE_FUNC_PARAM,
-				(void *)prom_counter_param},
-		{"prom_gauge", PARAM_STRING | USE_FUNC_PARAM, (void *)prom_gauge_param},
-		{"prom_histogram", PARAM_STRING | USE_FUNC_PARAM,
-				(void *)prom_histogram_param},
-		{"xhttp_prom_timeout", INT_PARAM, &timeout_minutes}, {0, 0, 0}};
+static param_export_t params[] = {
+	{"xhttp_prom_buf_size", PARAM_INT, &buf_size},
+	{"xhttp_prom_stats", PARAM_STR, &xhttp_prom_stats},
+	{"xhttp_prom_beginning", PARAM_STR, &xhttp_prom_beginning},
+	{"xhttp_prom_tags", PARAM_STR, &xhttp_prom_tags},
+	{"prom_counter", PARAM_STRING | PARAM_USE_FUNC, (void *)prom_counter_param},
+	{"prom_gauge", PARAM_STRING | PARAM_USE_FUNC, (void *)prom_gauge_param},
+	{"prom_histogram", PARAM_STRING | PARAM_USE_FUNC, (void *)prom_histogram_param},
+	{"xhttp_prom_timeout", PARAM_INT, &timeout_minutes},
+	{"xhttp_prom_uptime_stat", PARAM_INT, &uptime_stat_enabled},
+	{"xhttp_prom_pkg_stats", PARAM_INT, &pkgmem_stats_enabled},
+	{0, 0, 0}
+};
 
 struct module_exports exports = {
-		"xhttp_prom", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds, params, 0,			   /* exported RPC methods */
-		0,							   /* exported pseudo-variables */
-		0,							   /* response function */
-		mod_init,					   /* module initialization function */
-		0,							   /* per child init function */
-		mod_destroy					   /* destroy function */
+	"xhttp_prom",    /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	0,               /* pv exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	mod_destroy      /* module destroy function */
 };
+/* clang-format on */
 
 /**
  * @brief Implementation of prom_fault function required by the management API.
@@ -247,6 +278,14 @@ static int mod_init(void)
 		return -1;
 	}
 
+	/* bind the kex API */
+	if(pkgmem_stats_enabled) {
+		if(load_kex_api(&kex_api) < 0) {
+			LM_ERR("cannot bind to kex API - required for pkgmem stats\n");
+			return -1;
+		}
+	}
+
 	/* Check xhttp_prom_buf_size param */
 	if(buf_size == 0)
 		buf_size = pkg_mem_size / 3;
@@ -259,12 +298,56 @@ static int mod_init(void)
 		return -1;
 	}
 
+	/* Write helper variables used to make handling additional metrics easier*/
+	if(xhttp_prom_tags.len > 0) {
+		/* 4 characters more for comma, space and terminating null */
+		size_t len_comma = xhttp_prom_tags.len + 4;
+		xhttp_prom_tags_comma = shm_malloc(len_comma);
+		if(xhttp_prom_tags_comma == NULL) {
+			SHM_MEM_ERROR;
+			return -1;
+		}
+		memset(xhttp_prom_tags_comma, 0, len_comma);
+		snprintf(xhttp_prom_tags_comma, len_comma - 1, ", %.*s",
+				xhttp_prom_tags.len, xhttp_prom_tags.s);
+		/* 4 characters more for curly braces and  terminating null */
+		size_t len_braces = xhttp_prom_tags.len + 4;
+		xhttp_prom_tags_braces = shm_malloc(len_braces);
+		if(xhttp_prom_tags_braces == NULL) {
+			SHM_MEM_ERROR;
+			shm_free(xhttp_prom_tags_comma);
+			return -1;
+		}
+		memset(xhttp_prom_tags_braces, 0, len_braces);
+		snprintf(xhttp_prom_tags_braces, len_braces - 1, "{%.*s}",
+				xhttp_prom_tags.len, xhttp_prom_tags.s);
+		LM_DBG("mod_init initalized helper variables to '%s' and '%s'\n",
+				xhttp_prom_tags_comma, xhttp_prom_tags_braces);
+	}
+
+	return 0;
+}
+
+static int child_init(int rank)
+{
+	if(pkgmem_stats_enabled) {
+		pkg_proc_stats_no = kex_api.get_pkmem_stats(&pkg_proc_stats);
+	}
+
 	return 0;
 }
 
 static void mod_destroy(void)
 {
 	LM_DBG("cleaning up\n");
+
+	/* Remove helper variables for tags */
+	if(xhttp_prom_tags.len > 0) {
+		if(xhttp_prom_tags_comma != NULL)
+			shm_free(xhttp_prom_tags_comma);
+		if(xhttp_prom_tags_braces != NULL)
+			shm_free(xhttp_prom_tags_braces);
+	}
 
 	prom_metric_close();
 }
@@ -476,10 +559,10 @@ static int fixup_metric_reset(void **param, int param_no)
 	return fixup_spve_null(param, 1);
 }
 
-/* static int fixup_free_metric_reset(void** param, int param_no) */
-/* { */
-/* 	return fixup_free_spve_null(param, 1); */
-/* } */
+static int fixup_free_metric_reset(void **param, int param_no)
+{
+	return fixup_free_spve_null(param, 1);
+}
 
 /**
  * @brief Reset a counter (No labels)
@@ -939,14 +1022,14 @@ static int fixup_counter_inc(void **param, int param_no)
 	}
 }
 
-/* static int fixup_free_counter_inc(void** param, int param_no) */
-/* { */
-/* 	if (param_no == 1 || param_no == 2) { */
-/* 		return fixup_free_spve_igp(param, param_no); */
-/* 	} else { */
-/* 		return fixup_free_spve_null(param, 1); */
-/* 	} */
-/* } */
+static int fixup_free_counter_inc(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2) {
+		return fixup_free_spve_igp(param, param_no);
+	} else {
+		return fixup_free_spve_null(param, 1);
+	}
+}
 
 /**
  * @brief Add an integer to a counter (No labels).

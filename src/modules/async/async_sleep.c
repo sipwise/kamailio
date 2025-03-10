@@ -603,8 +603,7 @@ void async_exec_data(void *param)
 /**
  *
  */
-int async_send_data(
-		sip_msg_t *msg, cfg_action_t *act, str *cbname, str *gname, str *sdata)
+int async_send_data(cfg_action_t *act, str *cbname, str *gname, str *sdata)
 {
 	async_task_t *at;
 	int dsize;
@@ -702,7 +701,7 @@ int pv_parse_async_name(pv_spec_t *sp, str *in)
 	return 0;
 
 error:
-	LM_ERR("unknown PV time name %.*s\n", in->len, in->s);
+	LM_ERR("unknown PV async name %.*s\n", in->len, in->s);
 	return -1;
 }
 

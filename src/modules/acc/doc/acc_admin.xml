@@ -327,7 +327,7 @@ if (uri=~"sip:+40") /* calls to Romania */ {
                 <para>
                 The dialog module needs to be engaged on the dialogs that should be accounted, that
                 they will be tracked by the server. This is usally done by calling the function
-                <emphasis>dlg_manage()</emphasis> or setting the <emphasis>dlg_flag</emphasis>.
+                <emphasis>dlg_manage()</emphasis>.
                 Refer to the documentation of the dialog module for more information.
                 </para>
 
@@ -1156,7 +1156,7 @@ modparam("acc", "cdr_facility", "LOG_DAEMON")
 		<title>cdr_extra example</title>
 		<programlisting format="linespecific">
 ...
-modparam("acc", "cdr_extra", "c1=$dlg_var(caller);c2=$dlg_var(callee)"
+modparam("acc", "cdr_extra", "c1=$dlg_var(caller);c2=$dlg_var(callee)")
 ...
 </programlisting>
 		</example>
@@ -1611,4 +1611,3 @@ acc_db_request("$var(code) $avp(reason)", "acc");
 	</section>
 	</section>
 </chapter>
-

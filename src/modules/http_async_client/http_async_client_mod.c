@@ -50,9 +50,6 @@
 #include "../../core/cfg/cfg_struct.h"
 #include "../../core/fmsg.h"
 #include "../../core/kemi.h"
-#define KSR_RTHREAD_NEED_V
-#define KSR_RTHREAD_SKIP_P
-#include "../../core/rthreads.h"
 
 #include "../../modules/tm/tm_load.h"
 #include "../../modules/pv/pv_api.h"
@@ -166,27 +163,27 @@ enum http_time_name_t
 /* clang-format off */
 static cmd_export_t cmds[] = {
 	{"http_async_query", (cmd_function)w_http_async_query, 2,
-			fixup_spve_spve, 0, ANY_ROUTE},
+			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
 static param_export_t params[] = {
-	{"workers", INT_PARAM, &num_workers},
-	{"connection_timeout", INT_PARAM, &http_timeout},
-	{"hash_size", INT_PARAM, &hash_size},
-	{"tls_version", INT_PARAM, &tls_version},
-	{"tls_verify_host", INT_PARAM, &tls_verify_host},
-	{"tls_verify_peer", INT_PARAM, &tls_verify_peer},
-	{"curl_verbose", INT_PARAM, &curl_verbose},
-	{"curl_follow_redirect", INT_PARAM, &curl_follow_redirect},
+	{"workers", PARAM_INT, &num_workers},
+	{"connection_timeout", PARAM_INT, &http_timeout},
+	{"hash_size", PARAM_INT, &hash_size},
+	{"tls_version", PARAM_INT, &tls_version},
+	{"tls_verify_host", PARAM_INT, &tls_verify_host},
+	{"tls_verify_peer", PARAM_INT, &tls_verify_peer},
+	{"curl_verbose", PARAM_INT, &curl_verbose},
+	{"curl_follow_redirect", PARAM_INT, &curl_follow_redirect},
 	{"tls_client_cert", PARAM_STRING, &tls_client_cert},
 	{"tls_client_key", PARAM_STRING, &tls_client_key},
 	{"tls_ca_path", PARAM_STRING, &tls_ca_path},
 	{"memory_manager", PARAM_STRING, &memory_manager},
 	{"authmethod", PARAM_INT, &default_authmethod},
-	{"tcp_keepalive", INT_PARAM, &tcp_keepalive},
-	{"tcp_ka_idle", INT_PARAM, &tcp_ka_idle},
-	{"tcp_ka_interval", INT_PARAM, &tcp_ka_interval},
+	{"tcp_keepalive", PARAM_INT, &tcp_keepalive},
+	{"tcp_ka_idle", PARAM_INT, &tcp_ka_idle},
+	{"tcp_ka_interval", PARAM_INT, &tcp_ka_interval},
 	{0, 0, 0}
 };
 
@@ -294,7 +291,7 @@ static int mod_init(void)
 		return -1;
 	}
 
-	run_threadV((_thread_protoV)&set_curl_mem_callbacks);
+	set_curl_mem_callbacks();
 
 	/* init faked sip msg */
 	if(faked_msg_init() < 0) {

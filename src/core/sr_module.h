@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -112,11 +114,6 @@ typedef int (*child_init_function)(int rank);
 #define PARAM_VAR (1U << 3)	   /**< var parameter type - mdoparamx */
 #define PARAM_USE_FUNC (1U << (8 * sizeof(int) - 1))
 #define PARAM_TYPE_MASK(_x) ((_x) & (~PARAM_USE_FUNC))
-
-/* temporary, for backward compatibility only until all modules adjust it */
-#define STR_PARAM PARAM_STRING
-#define INT_PARAM PARAM_INT
-#define USE_FUNC_PARAM PARAM_USE_FUNC
 
 typedef unsigned int modparam_t;
 

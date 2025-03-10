@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -78,9 +80,9 @@ static cmd_export_t cmds[] = {{"autheph_check", (cmd_function)autheph_check, 1,
 		{0, 0, 0, 0, 0, 0}};
 
 static param_export_t params[] = {
-		{"secret", PARAM_STRING | USE_FUNC_PARAM, (void *)secret_param},
-		{"username_format", INT_PARAM, &autheph_username_format},
-		{"sha_algorithm", INT_PARAM, &autheph_sha_alg}, {0, 0, 0}};
+		{"secret", PARAM_STRING | PARAM_USE_FUNC, (void *)secret_param},
+		{"username_format", PARAM_INT, &autheph_username_format},
+		{"sha_algorithm", PARAM_INT, &autheph_sha_alg}, {0, 0, 0}};
 
 struct module_exports exports = {
 		"auth_ephemeral", DEFAULT_DLFLAGS, /* dlopen flags */

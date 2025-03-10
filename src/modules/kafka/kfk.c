@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -35,6 +37,14 @@
 #include "../../core/mem/pkg.h"
 #include "../../core/mem/shm_mem.h"
 #include "../../core/locking.h"
+#include "../../core/counters.h"
+
+extern stat_var *total_messages;
+extern stat_var *total_messages_err;
+extern int child_init_ok;
+extern int init_without_kafka;
+extern int log_without_overflow;
+extern int metadata_timeout;
 
 /**
  * \brief data type for a configuration property.
@@ -99,7 +109,7 @@ gen_lock_t *stats_lock = NULL;	/**< Lock to protect shared statistics data. */
  *
  * First node (mandatory) is the general one with NULL topic.
  * Next nodes are topic dependant ones and are optional.
- * This way because general node is created in kfk_stats_init in mod_init is
+ * This way because general node is created in kfk_stats_init in child_init is
  * shared among every Kamailio process.
  */
 static kfk_stats_t *stats_general;
@@ -111,7 +121,7 @@ static int kfk_conf_configure();
 static int kfk_topic_list_configure();
 static int kfk_topic_exist(str *topic_name);
 static rd_kafka_topic_t *kfk_topic_get(str *topic_name);
-static int kfk_stats_add(const char *topic, rd_kafka_resp_err_t err);
+static int kfk_stats_add(str *topic, rd_kafka_resp_err_t err);
 static void kfk_stats_topic_free(kfk_stats_t *st_topic);
 
 /**
@@ -120,6 +130,12 @@ static void kfk_stats_topic_free(kfk_stats_t *st_topic);
 static void kfk_logger(
 		const rd_kafka_t *rk, int level, const char *fac, const char *buf)
 {
+
+	if(log_without_overflow && strstr(buf, "Connection refused") != NULL) {
+		// libkafka will keep retrying to connect if kafka server is down
+		// FIX: ignore these types of errors not to get overflowed
+		return;
+	}
 
 	switch(level) {
 		case LOG_EMERG:
@@ -178,23 +194,57 @@ static void kfk_msg_delivered(
 	LM_DBG("Message delivered callback\n");
 
 	const char *topic_name = NULL;
+	str topic_name_str;
 	topic_name = rd_kafka_topic_name(rkmessage->rkt);
 	if(!topic_name) {
 		LM_ERR("Cannot get topic name for delivered message\n");
 		return;
 	}
 
-	kfk_stats_add(topic_name, rkmessage->err);
+	topic_name_str.s = (char *)topic_name;
+	topic_name_str.len = strlen(topic_name);
+	kfk_stats_add(&topic_name_str, rkmessage->err);
 
 	if(rkmessage->err) {
-		LM_ERR("RDKAFKA Message delivery failed: %s\n",
-				rd_kafka_err2str(rkmessage->err));
+		if(log_without_overflow) {
+			// libkafka will log all undelivered msgs as ERR
+			// FIX: ignore these types of errors not to get overflowed; check stats instead
+			;
+		} else {
+			LM_ERR("RDKAFKA Message delivery failed: %s\n",
+					rd_kafka_err2str(rkmessage->err));
+		}
 	} else {
 		LM_DBG("RDKAFKA Message delivered (%zd bytes, offset %" PRId64 ", "
 			   "partition %" PRId32 "): %.*s\n",
 				rkmessage->len, rkmessage->offset, rkmessage->partition,
 				(int)rkmessage->len, (const char *)rkmessage->payload);
 	}
+}
+
+#if RD_KAFKA_VERSION >= 0x020000ff
+static rd_kafka_resp_err_t ic_broker_state_change(rd_kafka_t *rk,
+		int32_t broker_id, const char *secproto, const char *name, int port,
+		const char *state, void *ic_opaque)
+{
+	if(strcmp(state, "UP") == 0) {
+		LM_NOTICE("Connected broker: id: %d, proto: %s, name: %s, port: %d",
+				broker_id, secproto, name, port);
+	}
+	return RD_KAFKA_RESP_ERR_NO_ERROR;
+}
+#endif
+
+static rd_kafka_resp_err_t ic_on_new(rd_kafka_t *rk,
+		const rd_kafka_conf_t *conf, void *ic_opaque, char *errstr,
+		size_t errstr_size)
+{
+
+#if RD_KAFKA_VERSION >= 0x020000ff
+	rd_kafka_interceptor_add_on_broker_state_change(
+			rk, "ic_broker_state_change", ic_broker_state_change, NULL);
+#endif
+	return RD_KAFKA_RESP_ERR_NO_ERROR;
 }
 
 /**
@@ -212,45 +262,53 @@ int kfk_init(char *brokers)
 		return -1;
 	}
 
-	/*
+	if(!rk) {
+		/*
 	 * Create Kafka client configuration place-holder
 	 */
-	rk_conf = rd_kafka_conf_new();
+		rk_conf = rd_kafka_conf_new();
 
-	/* Set logger */
-	rd_kafka_conf_set_log_cb(rk_conf, kfk_logger);
+		/* Add brokers */
+		LM_DBG("Adding brokers: %s\n", brokers);
+		if(rd_kafka_conf_set(rk_conf, "bootstrap.servers", brokers, errstr,
+				   sizeof(errstr))
+				!= RD_KAFKA_CONF_OK) {
+			LM_ERR("No valid brokers specified: %s\n", brokers);
+			return -1;
+		}
+		LM_DBG("Added brokers: %s\n", brokers);
 
-	/* Set message delivery callback. */
-	rd_kafka_conf_set_dr_msg_cb(rk_conf, kfk_msg_delivered);
+		/* Set logger */
+		rd_kafka_conf_set_log_cb(rk_conf, kfk_logger);
 
-	/* Configure properties: */
-	if(kfk_conf_configure()) {
-		LM_ERR("Failed to configure general properties\n");
-		return -1;
-	}
+		/* Set message delivery callback. */
+		rd_kafka_conf_set_dr_msg_cb(rk_conf, kfk_msg_delivered);
 
-	/*
+		/* Set interceptors init function. */
+		rd_kafka_conf_interceptor_add_on_new(
+				rk_conf, "ic_on_new", ic_on_new, NULL);
+
+		/* Configure properties: */
+		if(kfk_conf_configure()) {
+			LM_ERR("Failed to configure general properties\n");
+			return -1;
+		}
+
+		/*
 	 * Create producer instance.
 	 *
 	 * NOTE: rd_kafka_new() takes ownership of the conf object
 	 *       and the application must not reference it again after
 	 *       this call.
 	 */
-	rk = rd_kafka_new(RD_KAFKA_PRODUCER, rk_conf, errstr, sizeof(errstr));
-	if(!rk) {
-		LM_ERR("Failed to create new producer: %s\n", errstr);
-		return -1;
+		rk = rd_kafka_new(RD_KAFKA_PRODUCER, rk_conf, errstr, sizeof(errstr));
+		if(!rk) {
+			LM_ERR("Failed to create new producer: %s\n", errstr);
+			return -1;
+		}
+		rk_conf = NULL; /* Now owned by producer. */
+		LM_DBG("Producer handle created\n");
 	}
-	rk_conf = NULL; /* Now owned by producer. */
-	LM_DBG("Producer handle created\n");
-
-	LM_DBG("Adding broker: %s\n", brokers);
-	/* Add brokers */
-	if(rd_kafka_brokers_add(rk, brokers) == 0) {
-		LM_ERR("No valid brokers specified: %s\n", brokers);
-		return -1;
-	}
-	LM_DBG("Added broker: %s\n", brokers);
 
 	/* Topic creation and configuration. */
 	if(kfk_topic_list_configure()) {
@@ -270,24 +328,13 @@ void kfk_close()
 
 	LM_DBG("Closing Kafka\n");
 
-	/* Destroy the producer instance */
+	/* Flushing messages. */
 	if(rk) {
-		/* Flushing messages. */
 		LM_DBG("Flushing messages\n");
 		err = rd_kafka_flush(rk, 0);
 		if(err) {
 			LM_ERR("Failed to flush messages: %s\n", rd_kafka_err2str(err));
 		}
-
-		/* Destroy producer. */
-		LM_DBG("Destroying instance of Kafka producer\n");
-		rd_kafka_destroy(rk);
-	}
-
-	/* Destroy configuration if not freed by rd_kafka_destroy. */
-	if(rk_conf) {
-		LM_DBG("Destroying instance of Kafka configuration\n");
-		rd_kafka_conf_destroy(rk_conf);
 	}
 
 	/* Free list of configuration properties. */
@@ -300,6 +347,12 @@ void kfk_close()
 		kfk_topic_t *next = kfk_topic->next;
 		kfk_topic_free(kfk_topic);
 		kfk_topic = next;
+	}
+
+	/* Destroy the producer instance. */
+	if(rk) {
+		LM_DBG("Destroying instance of Kafka producer\n");
+		rd_kafka_destroy(rk);
 	}
 }
 
@@ -377,7 +430,7 @@ int kfk_conf_parse(char *spec)
 		/* Place node at beginning of knode list. */
 		knode->next = kconf->property;
 		kconf->property = knode;
-	} /* for pit */
+	}
 
 	kfk_conf = kconf;
 	return 0;
@@ -540,7 +593,7 @@ int kfk_topic_parse(char *spec)
 			knode->next = ktopic->property;
 			ktopic->property = knode;
 		} /* if pit->name.len == 4 */
-	}	  /* for pit */
+	}
 
 	/* Topic name is mandatory. */
 	if(ktopic->topic_name == NULL) {
@@ -587,7 +640,9 @@ static int kfk_topic_configure(kfk_topic_t *ktopic)
 	}
 
 	int topic_found = kfk_topic_exist(ktopic->topic_name);
-	if(topic_found == -1) {
+	if(init_without_kafka) {
+		;
+	} else if(topic_found == -1) {
 		LM_ERR("Failed to search for topic %.*s in cluster\n",
 				ktopic->topic_name->len, ktopic->topic_name->s);
 		goto error;
@@ -712,11 +767,6 @@ static int kfk_topic_list_configure()
 	return 0;
 }
 
-/* -1 means RD_POLL_INFINITE */
-/* 100000 means 100 seconds */
-#define METADATA_TIMEOUT \
-	100000 /**< Timeout when asking for metadata in milliseconds. */
-
 /**
  * \brief check that a topic exists in cluster.
  *
@@ -738,7 +788,7 @@ static int kfk_topic_exist(str *topic_name)
 
 	/* Get metadata for all topics. */
 	rd_kafka_resp_err_t res;
-	res = rd_kafka_metadata(rk, 1, NULL, &metadatap, METADATA_TIMEOUT);
+	res = rd_kafka_metadata(rk, 1, NULL, &metadatap, metadata_timeout);
 	if(res != RD_KAFKA_RESP_ERR_NO_ERROR) {
 		LM_ERR("Failed to get metadata: %s\n", rd_kafka_err2str(res));
 		goto error;
@@ -825,11 +875,31 @@ clean:
  */
 int kfk_message_send(str *topic_name, str *message, str *key)
 {
+	/* Poll to handle delivery reports */
+	if(rk) {
+		rd_kafka_poll(rk, 0);
+		LM_DBG("Message polled\n");
+	} else {
+		LM_ERR("kafka module is unusable: no kafka object! Skip sending "
+			   "message, message lost!");
+	}
+
 	/* Get topic from name. */
+	rd_kafka_resp_err_t err = RD_KAFKA_RESP_ERR__STATE;
 	rd_kafka_topic_t *rkt = kfk_topic_get(topic_name);
+
+	if(!child_init_ok) {
+		LM_ERR("kafka module is unusable: child init NOT ok! Skip sending "
+			   "message, message lost!");
+
+		kfk_stats_add(topic_name, err);
+		return -1;
+	}
 
 	if(!rkt) {
 		LM_ERR("Topic not found: %.*s\n", topic_name->len, topic_name->s);
+
+		kfk_stats_add(topic_name, err);
 		return -1;
 	}
 
@@ -853,17 +923,19 @@ int kfk_message_send(str *topic_name, str *message, str *key)
 			 * msg_opaque. */
 			   NULL)
 			== -1) {
-		rd_kafka_resp_err_t err = rd_kafka_last_error();
-		LM_ERR("Error sending message: %s\n", rd_kafka_err2str(err));
+		err = rd_kafka_last_error();
+		kfk_stats_add(topic_name, err);
+
+		if(!log_without_overflow) {
+			LM_ERR("Error sending message: %s\n", rd_kafka_err2str(err));
+		} else {
+			return 0;
+		}
 
 		return -1;
 	}
 
 	LM_DBG("Message sent\n");
-
-	/* Poll to handle delivery reports */
-	rd_kafka_poll(rk, 0);
-	LM_DBG("Message polled\n");
 
 	return 0;
 }
@@ -949,18 +1021,12 @@ static void kfk_stats_topic_free(kfk_stats_t *st_topic)
  * \return the new kfk_stats_t on success.
  * \return NULL on error.
  */
-static kfk_stats_t *kfk_stats_topic_new(
-		const char *topic, rd_kafka_resp_err_t err)
+static kfk_stats_t *kfk_stats_topic_new(str *topic, rd_kafka_resp_err_t err)
 {
 	kfk_stats_t *st = NULL;
 
-	if(!topic) {
+	if(!topic || topic->len == 0) {
 		LM_ERR("No topic\n");
-		goto error;
-	}
-	int topic_len = strlen(topic);
-	if(topic_len == 0) {
-		LM_ERR("Void topic\n");
 		goto error;
 	}
 
@@ -978,14 +1044,14 @@ static kfk_stats_t *kfk_stats_topic_new(
 	}
 	memset(st->topic_name, 0, sizeof(str));
 
-	st->topic_name->s = shm_malloc(topic_len + 1);
+	st->topic_name->s = shm_malloc(topic->len + 1);
 	if(!st->topic_name->s) {
 		SHM_MEM_ERROR;
 		goto error;
 	}
-	memcpy(st->topic_name->s, topic, topic_len);
-	st->topic_name->s[topic_len] = '\0';
-	st->topic_name->len = topic_len;
+	memcpy(st->topic_name->s, topic->s, topic->len);
+	st->topic_name->s[topic->len] = '\0';
+	st->topic_name->len = topic->len;
 
 	st->total++;
 	if(err) {
@@ -1008,22 +1074,23 @@ error:
  *
  * \return 0 on success.
  */
-static int kfk_stats_add(const char *topic, rd_kafka_resp_err_t err)
+static int kfk_stats_add(str *topic, rd_kafka_resp_err_t err)
 {
-	LM_DBG("Adding stats: (topic: %s) (error: %d)\n", topic, err);
-
-	if(topic == NULL || *topic == '\0') {
+	if(topic == NULL || topic->len == 0) {
 		LM_ERR("No topic to add to statistics\n");
 		return -1;
 	}
-	int topic_len = strlen(topic);
+	LM_DBG("Adding stats: (topic: %.*s) (error: %d)\n", topic->len, topic->s,
+			err);
 
 	lock_get(stats_lock);
 
 	stats_general->total++;
+	update_stat(total_messages, 1);
 
 	if(err) {
 		stats_general->error++;
+		update_stat(total_messages_err, 1);
 	}
 
 	LM_DBG("General stats: total = %" PRIu64 "  error = %" PRIu64 "\n",
@@ -1033,8 +1100,8 @@ static int kfk_stats_add(const char *topic, rd_kafka_resp_err_t err)
 	while(*stats_pre != NULL) {
 		LM_DBG("Topic search: %.*s\n", (*stats_pre)->topic_name->len,
 				(*stats_pre)->topic_name->s);
-		if((*stats_pre)->topic_name->len == topic_len
-				&& strncmp(topic, (*stats_pre)->topic_name->s,
+		if((*stats_pre)->topic_name->len == topic->len
+				&& strncmp(topic->s, (*stats_pre)->topic_name->s,
 						   (*stats_pre)->topic_name->len)
 						   == 0) {
 			/* Topic match. */
@@ -1048,20 +1115,21 @@ static int kfk_stats_add(const char *topic, rd_kafka_resp_err_t err)
 
 	if(*stats_pre == NULL) {
 		/* Topic not found. */
-		LM_DBG("Topic: %s not found\n", topic);
+		LM_DBG("Topic: %.*s not found\n", topic->len, topic->s);
 
 		/* Add a new stats topic. */
 		kfk_stats_t *new_topic = NULL;
 		new_topic = kfk_stats_topic_new(topic, err);
 		if(!new_topic) {
-			LM_ERR("Failed to create stats for topic: %s\n", topic);
+			LM_ERR("Failed to create stats for topic: %.*s\n", topic->len,
+					topic->s);
 			goto error;
 		}
 
 		*stats_pre = new_topic;
-		LM_DBG("Created Topic stats (%s): total = %" PRIu64 "  error = %" PRIu64
-			   "\n",
-				topic, new_topic->total, new_topic->error);
+		LM_DBG("Created Topic stats (%.*s): total = %" PRIu64
+			   "  error = %" PRIu64 "\n",
+				topic->len, topic->s, new_topic->total, new_topic->error);
 
 		goto clean;
 	}
@@ -1073,8 +1141,8 @@ static int kfk_stats_add(const char *topic, rd_kafka_resp_err_t err)
 		current->error++;
 	}
 
-	LM_DBG("Topic stats (%s): total = %" PRIu64 "  error = %" PRIu64 "\n",
-			topic, current->total, current->error);
+	LM_DBG("Topic stats (%.*s): total = %" PRIu64 "  error = %" PRIu64 "\n",
+			topic->len, topic->s, current->total, current->error);
 
 clean:
 	lock_release(stats_lock);

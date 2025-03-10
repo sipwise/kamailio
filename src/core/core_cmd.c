@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -940,10 +942,13 @@ static void core_sockets_list(rpc_t *rpc, void *c)
 						si->address_str.s);
 				for(ai = si->addr_info_lst; ai; ai = ai->next)
 					rpc->struct_add(ha, "ss", "address", ai->address_str.s);
-				rpc->struct_add(ha, "ssss", "port", si->port_no_str.s, "mcast",
-						si->flags & SI_IS_MCAST ? "yes" : "no", "mhomed",
-						si->flags & SI_IS_MHOMED ? "yes" : "no", "virtual",
-						si->flags & SI_IS_VIRTUAL ? "yes" : "no");
+				rpc->struct_add(ha, "sssss", "port", si->port_no_str.s,
+						"agname",
+						(si->agroup.agname[0] != '\0') ? si->agroup.agname
+													   : "none",
+						"mcast", si->flags & SI_IS_MCAST ? "yes" : "no",
+						"mhomed", si->flags & SI_IS_MHOMED ? "yes" : "no",
+						"virtual", si->flags & SI_IS_VIRTUAL ? "yes" : "no");
 			} else {
 				printf("             %s: %s", get_proto_name(proto),
 						si->name.s);
@@ -951,10 +956,13 @@ static void core_sockets_list(rpc_t *rpc, void *c)
 						"proto", get_proto_name(proto), "address", si->name.s);
 				if(!(si->flags & SI_IS_IP))
 					rpc->struct_add(ha, "s", "ipaddress", si->address_str.s);
-				rpc->struct_add(ha, "ssss", "port", si->port_no_str.s, "mcast",
-						si->flags & SI_IS_MCAST ? "yes" : "no", "mhomed",
-						si->flags & SI_IS_MHOMED ? "yes" : "no", "virtual",
-						si->flags & SI_IS_VIRTUAL ? "yes" : "no");
+				rpc->struct_add(ha, "sssss", "port", si->port_no_str.s,
+						"agname",
+						(si->agroup.agname[0] != '\0') ? si->agroup.agname
+													   : "none",
+						"mcast", si->flags & SI_IS_MCAST ? "yes" : "no",
+						"mhomed", si->flags & SI_IS_MHOMED ? "yes" : "no",
+						"virtual", si->flags & SI_IS_VIRTUAL ? "yes" : "no");
 			}
 		}
 	} while((proto = next_proto(proto)));

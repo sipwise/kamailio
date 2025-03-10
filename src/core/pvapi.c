@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -1254,8 +1256,8 @@ int pv_parse_avp_name(pv_spec_p sp, str *in)
  * fill avp name details (id and type)
  * @return 0 on success, -1 on error
  */
-int pv_get_avp_name(struct sip_msg *msg, pv_param_p ip, int_str *avp_name,
-		unsigned short *name_type)
+int pv_get_avp_name(struct sip_msg *msg, pv_param_p ip, avp_name_t *avp_name,
+		avp_flags_t *name_type)
 {
 	pv_value_t tv;
 	if(ip == NULL || avp_name == NULL || name_type == NULL)

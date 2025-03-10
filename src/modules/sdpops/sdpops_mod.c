@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -23,6 +25,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <limits.h>
 
 #include "../../core/sr_module.h"
 #include "../../core/dprint.h"
@@ -95,42 +98,42 @@ static int mod_init(void);
 /* clang-format off */
 static cmd_export_t cmds[] = {
 	{"sdp_remove_line_by_prefix", (cmd_function)w_sdp_remove_line_by_prefix,
-			1, fixup_spve_null, 0, ANY_ROUTE},
+			1,  fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_remove_line_by_prefix", (cmd_function)w_sdp_remove_line_by_prefix,
-			2, fixup_spve_spve, 0, ANY_ROUTE},
+			2,  fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sdp_remove_codecs_by_id", (cmd_function)w_sdp_remove_codecs_by_id, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_remove_codecs_by_id", (cmd_function)w_sdp_remove_codecs_by_id, 2,
-			fixup_spve_spve, 0, ANY_ROUTE},
+			 fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sdp_remove_codecs_by_name", (cmd_function)w_sdp_remove_codecs_by_name,
-			1, fixup_spve_null, 0, ANY_ROUTE},
+			1,  fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_remove_codecs_by_name", (cmd_function)w_sdp_remove_codecs_by_name,
-			2, fixup_spve_spve, 0, ANY_ROUTE},
+			2,  fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sdp_keep_codecs_by_id", (cmd_function)w_sdp_keep_codecs_by_id, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_keep_codecs_by_id", (cmd_function)w_sdp_keep_codecs_by_id, 2,
-			fixup_spve_spve, 0, ANY_ROUTE},
+			 fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sdp_keep_codecs_by_name", (cmd_function)w_sdp_keep_codecs_by_name, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_keep_codecs_by_name", (cmd_function)w_sdp_keep_codecs_by_name, 2,
-			fixup_spve_spve, 0, ANY_ROUTE},
+			 fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"sdp_with_media", (cmd_function)w_sdp_with_media, 1, fixup_spve_null,
 			0, ANY_ROUTE},
 	{"sdp_with_active_media", (cmd_function)w_sdp_with_active_media, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_remove_media", (cmd_function)w_sdp_remove_media, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_with_transport", (cmd_function)w_sdp_with_transport, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_with_transport_like", (cmd_function)w_sdp_with_transport_like, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_remove_transport", (cmd_function)w_sdp_remove_transport, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_transport", (cmd_function)w_sdp_transport, 1, 0, 0, ANY_ROUTE},
 	{"sdp_with_codecs_by_id", (cmd_function)w_sdp_with_codecs_by_id, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_with_codecs_by_name", (cmd_function)w_sdp_with_codecs_by_name, 1,
-			fixup_spve_null, 0, ANY_ROUTE},
+			 fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"sdp_print", (cmd_function)w_sdp_print, 1, fixup_igp_null, 0,
 			ANY_ROUTE},
 	{"sdp_get", (cmd_function)w_sdp_get, 1, 0, 0, ANY_ROUTE},
@@ -138,7 +141,7 @@ static cmd_export_t cmds[] = {
 	{"sdp_content", (cmd_function)w_sdp_content_sloppy, 1, 0, 0, ANY_ROUTE},
 	{"sdp_with_ice", (cmd_function)w_sdp_with_ice, 0, 0, 0, ANY_ROUTE},
 	{"sdp_get_line_startswith", (cmd_function)w_sdp_get_line_startswith, 2,
-			fixup_none_spve, 0, ANY_ROUTE},
+			fixup_none_spve, fixup_free_none_spve, ANY_ROUTE},
 	{"sdp_get_address_family", (cmd_function)w_sdp_get_address_family, 0, 0,
 			0, ANY_ROUTE},
 
@@ -1201,9 +1204,9 @@ static int sdp_with_transport(sip_msg_t *msg, str *transport, int like)
  */
 static int sdp_transport_helper(sip_msg_t *msg, char *avp)
 {
-	int_str avp_val;
-	int_str avp_name;
-	static unsigned short avp_type = 0;
+	avp_value_t avp_val;
+	avp_name_t avp_name;
+	static avp_flags_t avp_type = 0;
 	str s;
 	pv_spec_t *avp_spec = NULL;
 	int sdp_session_num;
@@ -1633,9 +1636,9 @@ static int w_sdp_print(sip_msg_t *msg, char *level, char *bar)
 static int sdp_get_helper(sip_msg_t *msg, char *avp)
 {
 	sdp_info_t *sdp = NULL;
-	int_str avp_val;
-	int_str avp_name;
-	static unsigned short avp_type = 0;
+	avp_value_t avp_val;
+	avp_name_t avp_name;
+	static avp_flags_t avp_type = 0;
 	str s;
 	pv_spec_t *avp_spec = NULL;
 	int sdp_missing = 1;
@@ -1814,10 +1817,10 @@ static int ki_sdp_get_line_startswith(sip_msg_t *msg, str *aname, str *sline)
 	str body = {NULL, 0};
 	str line = {NULL, 0};
 	char *p = NULL;
-	int_str avp_val;
-	int_str avp_name;
+	avp_value_t avp_val;
+	avp_name_t avp_name;
 	pv_spec_t *avp_spec = NULL;
-	static unsigned short avp_type = 0;
+	static avp_flags_t avp_type = 0;
 	int sdp_missing = 1;
 
 	if(sline == NULL || sline->len <= 0) {
@@ -2062,11 +2065,56 @@ int bind_sdpops(struct sdpops_binds *sob)
 /**
  *
  */
+int sdpops_attr_val(str *payload, str *attr, str *val)
+{
+	char *sline;
+	char *eline;
+
+	val->s = NULL;
+	val->len = 0;
+	sline = find_sdp_line_start(
+			payload->s, payload->s + payload->len, attr->s[0], 0);
+	while(sline != NULL) {
+		/* find EoL or EoData */
+		eline = sline;
+		while(eline < payload->s + payload->len) {
+			if(*eline == '\r' || *eline == '\n') {
+				break;
+			}
+			eline++;
+		}
+		if(eline - sline > attr->len) {
+			if(strncmp(sline, attr->s, attr->len) == 0) {
+				if(attr->s[attr->len - 1] == ':') {
+					val->s = sline + attr->len;
+				} else if(sline[attr->len] == ':') {
+					val->s = sline + attr->len + 1;
+				}
+				if(val->s != NULL) {
+					val->len = eline - val->s;
+					return 0;
+				}
+			}
+		}
+		sline = find_next_sdp_line(
+				sline, payload->s + payload->len, attr->s[0], NULL);
+	}
+	return -1;
+}
+
+/**
+ *
+ */
 static int pv_get_sdp(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 {
 	sdp_info_t *sdp = NULL;
 	str sess_version = STR_NULL;
 	long sess_version_num = 0;
+	unsigned int uport = 0;
+	static char uport_buf[INT2STR_MAX_LEN];
+	str s = STR_NULL;
+	str sattr = STR_NULL;
+	str sval = STR_NULL;
 
 	if(msg == NULL || param == NULL)
 		return -1;
@@ -2098,7 +2146,7 @@ static int pv_get_sdp(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			}
 			return pv_get_null(msg, param, res);
 		case 2:
-			/* connection ip */
+			/* c:ip - connection ip */
 			if(sdp->sessions == NULL) {
 				return pv_get_null(msg, param, res);
 			}
@@ -2125,6 +2173,156 @@ static int pv_get_sdp(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 					}
 				}
 			}
+		case 3:
+			/* o:ip - origin ip */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->o_ip_addr.s != NULL
+					&& sdp->sessions->o_ip_addr.len > 0) {
+				return pv_get_strval(
+						msg, param, res, &sdp->sessions->o_ip_addr);
+			}
+			return pv_get_null(msg, param, res);
+		case 4:
+			/* m0:rtp:port */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams->port.s != NULL
+					&& sdp->sessions->streams->port.len > 0) {
+				return pv_get_strval(
+						msg, param, res, &sdp->sessions->streams->port);
+			}
+			return pv_get_null(msg, param, res);
+		case 5:
+			/* m0:rtcp:port */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams->rtcp_port.s != NULL
+					&& sdp->sessions->streams->rtcp_port.len > 0) {
+				return pv_get_strval(
+						msg, param, res, &sdp->sessions->streams->rtcp_port);
+			}
+			if(sdp->sessions->streams->port.s != NULL
+					&& sdp->sessions->streams->port.len > 0) {
+				if(str2int(&sdp->sessions->streams->port, &uport) < 0
+						|| uport >= USHRT_MAX) {
+					return pv_get_null(msg, param, res);
+				}
+				uport++;
+				s.s = int2strbuf(uport, uport_buf, INT2STR_MAX_LEN, &s.len);
+				return pv_get_strval(msg, param, res, &s);
+			}
+			return pv_get_null(msg, param, res);
+		case 6:
+			/* c:af - connection address family */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				if(sdp->sessions->ip_addr.s != NULL
+						&& sdp->sessions->ip_addr.len > 0) {
+					return pv_get_sintval(msg, param, res, sdp->sessions->pf);
+				} else {
+					return pv_get_null(msg, param, res);
+				}
+			} else {
+				if(sdp->sessions->streams->ip_addr.s != NULL
+						&& sdp->sessions->streams->ip_addr.len > 0) {
+					return pv_get_sintval(
+							msg, param, res, sdp->sessions->streams->pf);
+				} else {
+					if(sdp->sessions->ip_addr.s != NULL
+							&& sdp->sessions->ip_addr.len > 0) {
+						return pv_get_sintval(
+								msg, param, res, sdp->sessions->pf);
+					} else {
+						return pv_get_null(msg, param, res);
+					}
+				}
+			}
+		case 7:
+			/* m0:raw - all (raw) lines for m0 stream */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams->raw_stream.s != NULL
+					&& sdp->sessions->streams->raw_stream.len > 0) {
+				return pv_get_strval(
+						msg, param, res, &sdp->sessions->streams->raw_stream);
+			}
+			return pv_get_null(msg, param, res);
+		case 8:
+			/* m0:b:AS */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams->raw_stream.s != NULL
+					&& sdp->sessions->streams->raw_stream.len > 0) {
+				sattr.s = "b=AS:";
+				sattr.len = 5;
+				if(sdpops_attr_val(
+						   &sdp->sessions->streams->raw_stream, &sattr, &sval)
+						< 0) {
+					return pv_get_null(msg, param, res);
+				}
+				return pv_get_strval(msg, param, res, &sval);
+			}
+			return pv_get_null(msg, param, res);
+		case 9:
+			/* m0:b:RR */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams->raw_stream.s != NULL
+					&& sdp->sessions->streams->raw_stream.len > 0) {
+				sattr.s = "b=RR:";
+				sattr.len = 5;
+				if(sdpops_attr_val(
+						   &sdp->sessions->streams->raw_stream, &sattr, &sval)
+						< 0) {
+					return pv_get_null(msg, param, res);
+				}
+				return pv_get_strval(msg, param, res, &sval);
+			}
+			return pv_get_null(msg, param, res);
+		case 10:
+			/* m0:b:RS */
+			if(sdp->sessions == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams == NULL) {
+				return pv_get_null(msg, param, res);
+			}
+			if(sdp->sessions->streams->raw_stream.s != NULL
+					&& sdp->sessions->streams->raw_stream.len > 0) {
+				sattr.s = "b=RS:";
+				sattr.len = 5;
+				if(sdpops_attr_val(
+						   &sdp->sessions->streams->raw_stream, &sattr, &sval)
+						< 0) {
+					return pv_get_null(msg, param, res);
+				}
+				return pv_get_strval(msg, param, res, &sval);
+			}
+			return pv_get_null(msg, param, res);
 
 		default:
 			return pv_get_null(msg, param, res);
@@ -2168,19 +2366,51 @@ static int pv_parse_sdp_name(pv_spec_p sp, str *in)
 		return -1;
 
 	switch(in->len) {
+		case 3:
+			if(strncmp(in->s, "raw", 3) == 0)
+				sp->pvp.pvn.u.isname.name.n = 0;
+			else
+				goto error;
+			break;
 		case 4:
 			if(strncmp(in->s, "body", 4) == 0)
 				sp->pvp.pvn.u.isname.name.n = 0;
 			else if(strncmp(in->s, "c:ip", 4) == 0)
 				sp->pvp.pvn.u.isname.name.n = 2;
+			else if(strncmp(in->s, "c:af", 4) == 0)
+				sp->pvp.pvn.u.isname.name.n = 6;
 			else if(strncmp(in->s, "o:ip", 4) == 0)
 				sp->pvp.pvn.u.isname.name.n = 3;
+			else
+				goto error;
+			break;
+		case 6:
+			if(strncmp(in->s, "m0:raw", 6) == 0)
+				sp->pvp.pvn.u.isname.name.n = 7;
+			else
+				goto error;
+			break;
+		case 7:
+			if(strncmp(in->s, "m0:b:AS", 7) == 0)
+				sp->pvp.pvn.u.isname.name.n = 8;
+			else if(strncmp(in->s, "m0:b:RR", 7) == 0)
+				sp->pvp.pvn.u.isname.name.n = 9;
+			else if(strncmp(in->s, "m0:b:RS", 7) == 0)
+				sp->pvp.pvn.u.isname.name.n = 10;
+			else
+				goto error;
+			break;
+		case 11:
+			if(strncmp(in->s, "m0:rtp:port", 11) == 0)
+				sp->pvp.pvn.u.isname.name.n = 4;
 			else
 				goto error;
 			break;
 		case 12:
 			if(strncmp(in->s, "sess_version", 12) == 0)
 				sp->pvp.pvn.u.isname.name.n = 1;
+			else if(strncmp(in->s, "m0:rtcp:port", 12) == 0)
+				sp->pvp.pvn.u.isname.name.n = 5;
 			else
 				goto error;
 			break;

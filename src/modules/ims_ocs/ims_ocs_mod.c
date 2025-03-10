@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -53,22 +55,25 @@ int event_route_ccr_term = 0;
 static int w_ccr_result(
 		struct sip_msg *msg, char *result, char *grantedunits, char *final);
 
-static cmd_export_t cmds[] = {{"ccr_result", (cmd_function)w_ccr_result, 3,
-									  fixup_var_pve_str_12, 0, REQUEST_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+/* clang-format off */
+static cmd_export_t cmds[] = {{"ccr_result", (cmd_function)w_ccr_result, 3, fixup_var_pve_str_12, fixup_free_fparam_all, REQUEST_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {{0, 0, 0}};
 
 
 /** module exports */
 struct module_exports exports = {"ims_ocs", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			/* Exported functions */
-		params, 0,		/* exported RPC methods */
-		0,				/* exported pseudo-variables */
-		0,				/* response handling function */
-		mod_init,		/* module initialization function */
-		mod_child_init, /* per-child init function */
-		mod_destroy};
+	cmds,			/* Exported functions */
+	params, 0,		/* exported RPC methods */
+	0,				/* exported pseudo-variables */
+	0,				/* response handling function */
+	mod_init,		/* module initialization function */
+	mod_child_init, /* per-child init function */
+	mod_destroy
+};
+/* clang-format on */
 
 /**
  * init module function

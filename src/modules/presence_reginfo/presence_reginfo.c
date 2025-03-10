@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -50,26 +52,26 @@ add_event_t pres_add_event;
 int pres_reginfo_aggregate_presentities = 0;
 unsigned int pres_reginfo_default_expires = 3600;
 
+/* clang-format off */
 /* module exported parameters */
 static param_export_t params[] = {
-		{"default_expires", INT_PARAM, &pres_reginfo_default_expires},
-		{"aggregate_presentities", INT_PARAM,
-				&pres_reginfo_aggregate_presentities},
-		{0, 0, 0}};
+	{"default_expires", PARAM_INT, &pres_reginfo_default_expires},
+	{"aggregate_presentities", PARAM_INT, &pres_reginfo_aggregate_presentities},
+	{0, 0, 0}
+};
 
 /* module exports */
-/* clang-format off */
 struct module_exports exports= {
-    "presence_reginfo",	/* module name */
-	DEFAULT_DLFLAGS,	/* dlopen flags */
-	0,					/* exported functions */
-	params,				/* exported parameters */
-	0,				    /* RPC method exports */
-	0,					/* exported pseudo-variables */
-	0,					/* response handling function */
-	mod_init,			/* module initialization function */
-	0,					/* per-child init function */
-	0					/* module destroy function */
+	"presence_reginfo", /* module name */
+	DEFAULT_DLFLAGS,    /* dlopen flags */
+	0,                  /* exported functions */
+	params,             /* exported parameters */
+	0,                  /* RPC method exports */
+	0,                  /* exported pseudo-variables */
+	0,                  /* response handling function */
+	mod_init,           /* module initialization function */
+	0,                  /* per-child init function */
+	0                   /* module destroy function */
 };
 /* clang-format on */
 

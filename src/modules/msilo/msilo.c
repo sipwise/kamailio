@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -138,12 +140,12 @@ int ms_max_messages = 0;
 int ms_use_mode = 0;
 
 static str ms_snd_time_avp_param = {NULL, 0};
-int_str ms_snd_time_avp_name;
-unsigned short ms_snd_time_avp_type;
+avp_name_t ms_snd_time_avp_name;
+avp_flags_t ms_snd_time_avp_type;
 
 static str ms_extra_hdrs_avp_param = {NULL, 0};
-int_str ms_extra_hdrs_avp_name;
-unsigned short ms_extra_hdrs_avp_type;
+avp_name_t ms_extra_hdrs_avp_name;
+avp_flags_t ms_extra_hdrs_avp_type;
 
 str msg_type = str_init("MESSAGE");
 static int ms_skip_notification_flag = -1;
@@ -202,11 +204,11 @@ static param_export_t params[] = {
 	{"offline_message", PARAM_STRING, &ms_offline_message},
 	{"reminder", PARAM_STR, &ms_reminder},
 	{"outbound_proxy", PARAM_STR, &ms_outbound_proxy},
-	{"expire_time", INT_PARAM, &ms_expire_time},
-	{"check_time", INT_PARAM, &ms_check_time},
-	{"send_time", INT_PARAM, &ms_send_time},
-	{"clean_period", INT_PARAM, &ms_clean_period},
-	{"use_contact", INT_PARAM, &ms_use_contact},
+	{"expire_time", PARAM_INT, &ms_expire_time},
+	{"check_time", PARAM_INT, &ms_check_time},
+	{"send_time", PARAM_INT, &ms_send_time},
+	{"clean_period", PARAM_INT, &ms_clean_period},
+	{"use_contact", PARAM_INT, &ms_use_contact},
 	{"sc_mid", PARAM_STR, &sc_mid},
 	{"sc_from", PARAM_STR, &sc_from},
 	{"sc_to", PARAM_STR, &sc_to},
@@ -222,9 +224,9 @@ static param_export_t params[] = {
 	{"sc_status", PARAM_STR, &sc_status},
 	{"snd_time_avp", PARAM_STR, &ms_snd_time_avp_param},
 	{"extra_hdrs_avp", PARAM_STR, &ms_extra_hdrs_avp_param},
-	{"add_date", INT_PARAM, &ms_add_date},
-	{"max_messages", INT_PARAM, &ms_max_messages},
-	{"add_contact", INT_PARAM, &ms_add_contact},
+	{"add_date", PARAM_INT, &ms_add_date},
+	{"max_messages", PARAM_INT, &ms_max_messages},
+	{"add_contact", PARAM_INT, &ms_add_contact},
 	{"skip_notification_flag", PARAM_INT, &ms_skip_notification_flag},
 	{"use_mode", PARAM_INT, &ms_use_mode},
 	{0, 0, 0}

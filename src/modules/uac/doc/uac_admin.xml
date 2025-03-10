@@ -563,9 +563,7 @@ modparam("uac", "reg_active", 0)
 			Timer interval (in seconds) at which remote registrations are cleaned
 			up in case of failure or removed. When setting it take in consideration
 			the maximum value for retransmission timeout, this param should be greater
-			than it. This value also impacts how often the reload for remote
-			registrations table can be executed -- the RPC command will fail if
-			executed in less than reg_gc_interval value since the last reload.
+			than it.
 			</para>
 			<para>
 				<emphasis>
@@ -659,6 +657,35 @@ function ksr_uac_event(evname)
 end
  ...
  </programlisting>
+		</example>
+	</section>
+
+	<section id="uac.p.reload_delta">
+		<title><varname>reload_delta</varname> (int)</title>
+		<para>
+			The number of seconds that have to be waited before executing a new
+			RPC reload (uac.reg_reload). By default, RPC reloads are rate limited
+			to a maximum of one reload per the reload_delta interval.
+		</para>
+		<para>
+			If set to 0, no rate limit is configured. Note carefully: use this
+			configuration only in tests environments because executing two RPC
+			reloads of the same table at the same time can cause &kamailio;
+			to crash.
+		</para>
+		<para>
+			<emphasis>
+				The default value is 30 seconds.
+			</emphasis>
+		</para>
+
+		<example>
+			<title>Set <varname>reload_delta</varname> parameter</title>
+			<programlisting format="linespecific">
+...
+modparam("uac", "reload_delta", 20)
+...
+			</programlisting>
 		</example>
 	</section>
 	</section>
@@ -997,6 +1024,55 @@ uac_req_send();
 				</programlisting>
 			</example>
 		</section>
+
+		<section id="uac.f.uac_reg_send_register">
+			<title>
+				<function moreinfo="none">uac_reg_send_register(atttr,value)</function>
+			</title>
+			<para>
+			This function sends a REGISTER request for the registration
+			based on a filter specified by attribute and value. The attribute can be: l_uuid, l_username,
+			r_username or auth_username. The value is what should be matched
+			against the value of the attribute in the remote registration record.
+			</para>
+			<para>
+			This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
+			BRANCH_ROUTE, ONREPLY_ROUTE, LOCAL_ROUTE.
+			</para>
+			<example>
+				<title><function>uac_reg_send_register</function> usage</title>
+				<programlisting format="linespecific">
+...
+uac_reg_send_register("l_uuid", "account123");
+...
+				</programlisting>
+			</example>
+		</section>
+
+		<section id="uac.f.uac_reg_send_unregister">
+			<title>
+				<function moreinfo="none">uac_reg_send_unregister(atttr,value)</function>
+			</title>
+			<para>
+			This function sends a REGISTER request with expires 0 for the registration
+			based on a filter specified by attribute and value. The attribute can be: l_uuid, l_username,
+			r_username or auth_username. The value is what should be matched
+			against the value of the attribute in the remote registration record.
+			</para>
+			<para>
+			This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
+			BRANCH_ROUTE, ONREPLY_ROUTE, LOCAL_ROUTE.
+			</para>
+			<example>
+				<title><function>uac_reg_send_unregister</function> usage</title>
+				<programlisting format="linespecific">
+...
+uac_reg_send_unregister("l_uuid", "account123");
+...
+				</programlisting>
+			</example>
+		</section>
+
 		<section id="uac.f.uac_reg_lookup">
 			<title>
 				<function moreinfo="none">uac_reg_lookup(uuid, dst)</function>
@@ -1393,6 +1469,28 @@ event_route[uac:reply] {
 		</example>
 		</section>
 
+		<section id="uac.r.uac.reg_register">
+			<title>
+				<function moreinfo="none">uac.reg_register</function>
+			</title>
+		<para>
+			Send a REGISTER for the matching record based on a filter.
+			The command has two parameters: attribute and value.
+			The attribute can be: l_uuid, l_username, r_username or auth_username.
+			The value is what should be matched against the value of the attribute
+			in the remote registration record.
+		</para>
+		<example>
+		<title><function>uac.reg_register</function> usage</title>
+			<programlisting format="linespecific">
+...
+   kamcmd uac.reg_register l_uuid account123
+   kamcmd uac.reg_register l_uuid s:12345678
+...
+			</programlisting>
+		</example>
+		</section>
+
 		<section id="uac.r.uac.reg_unregister">
 			<title>
 				<function moreinfo="none">uac.reg_unregister</function>
@@ -1421,8 +1519,8 @@ event_route[uac:reply] {
 			</title>
 		<para>
 			Reload the records from database for remote registrations. There is
-			a limit of how often the reload command can be executed, by default
-			is 150 seconds between reloads -- see the reg_gc_interval parameter
+			a limit of how often the reload command can be executed. By default,
+			it is 30 seconds between reloads -- see the reload_delta parameter
 			for more details.
 		</para>
 		<example>
@@ -1659,4 +1757,3 @@ event_route[uac:reply] {
 		</example>
 	</section>
 </chapter>
-

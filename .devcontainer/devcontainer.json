@@ -4,7 +4,7 @@
    */
   "name": "Debian",
   "build": {
-    "cacheFrom": "ghcr.io/kamailio/kamailio-5.8-devcontainer",
+    "cacheFrom": "ghcr.io/kamailio/kamailio-6.0-devcontainer",
     "context": "../pkg/kamailio/deb",
     "dockerfile": "Dockerfile"
   },
@@ -28,7 +28,9 @@
         "ms-vscode.cpptools-extension-pack",
         "GitHub.vscode-github-actions",
         "eamodio.gitlens",
-        "xaver.clang-format"
+        "xaver.clang-format",
+        "cheshirekow.cmake-format",
+        "brobeson.vscode-cmake-lint"
       ]
     }
   },

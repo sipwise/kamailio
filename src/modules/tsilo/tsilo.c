@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -62,13 +64,15 @@ static int w_ts_append_to(struct sip_msg *msg, char *idx, char *lbl, char *d);
 static int w_ts_append_to2(
 		struct sip_msg *msg, char *idx, char *lbl, char *d, char *ruri);
 static int fixup_ts_append_to(void **param, int param_no);
+static int fixup_free_ts_append_to(void **param, int param_no);
 static int w_ts_append(struct sip_msg *_msg, char *_table, char *_ruri);
 static int fixup_ts_append(void **param, int param_no);
+static int fixup_free_ts_append(void **param, int param_no);
 static int w_ts_append_by_contact2(
 		struct sip_msg *_msg, char *_table, char *_ruri);
 static int w_ts_append_by_contact3(
 		struct sip_msg *_msg, char *_table, char *_ruri, char *_contact);
-static int fixup_ts_append_by_contact(void **param, int param_no);
+static int w_ts_append_branches(struct sip_msg *_msg, char *_ruri, char *_p2);
 static int w_ts_store(struct sip_msg *msg, char *p1, char *p2);
 static int w_ts_store1(struct sip_msg *msg, char *_ruri, char *p2);
 
@@ -78,50 +82,61 @@ stat_var *total_ruris;
 stat_var *total_transactions;
 stat_var *added_branches;
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"ts_append_to", (cmd_function)w_ts_append_to, 3, fixup_ts_append_to, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"ts_append_to", (cmd_function)w_ts_append_to2, 4, fixup_ts_append_to,
-				0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"ts_append", (cmd_function)w_ts_append, 2, fixup_ts_append, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"ts_append_by_contact", (cmd_function)w_ts_append_by_contact2,
-				2, /* for two parameters */
-				fixup_ts_append_by_contact, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"ts_append_by_contact", (cmd_function)w_ts_append_by_contact3,
-				3, /* for three parameters */
-				fixup_ts_append_by_contact, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-		{"ts_store", (cmd_function)w_ts_store, 0, 0, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{"ts_store", (cmd_function)w_ts_store1, 1, fixup_spve_null, 0,
-				REQUEST_ROUTE | FAILURE_ROUTE},
-		{0, 0, 0, 0, 0, 0}};
+	{"ts_append_to", (cmd_function)w_ts_append_to, 3, fixup_ts_append_to, fixup_free_ts_append_to,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_append_to", (cmd_function)w_ts_append_to2, 4, fixup_ts_append_to, fixup_free_ts_append_to,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_append", (cmd_function)w_ts_append, 2, fixup_ts_append, fixup_free_ts_append,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_append_by_contact", (cmd_function)w_ts_append_by_contact2, 2, fixup_ts_append, fixup_free_ts_append,
+			/* for two parameters */
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_append_by_contact", (cmd_function)w_ts_append_by_contact3, 3,fixup_ts_append, fixup_free_ts_append,
+			/* for three parameters */
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_append_branches", (cmd_function)w_ts_append_branches, 1, fixup_spve_null, fixup_free_spve_null,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_store", (cmd_function)w_ts_store, 0, 0, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"ts_store", (cmd_function)w_ts_store1, 1, fixup_spve_null, fixup_free_spve_null,
+			REQUEST_ROUTE | FAILURE_ROUTE},
+	{0, 0, 0, 0, 0, 0}
+};
 
-static param_export_t params[] = {{"hash_size", INT_PARAM, &hash_size},
-		{"use_domain", INT_PARAM, &use_domain}, {0, 0, 0}};
+static param_export_t params[] = {
+	{"hash_size", PARAM_INT, &hash_size},
+	{"use_domain", PARAM_INT, &use_domain},
+	{0, 0, 0}
+};
 
 #ifdef STATISTICS
 /*! \brief We expose internal variables via the statistic framework below.*/
-stat_export_t mod_stats[] = {{"stored_ruris", STAT_NO_RESET, &stored_ruris},
-		{"stored_transactions", STAT_NO_RESET, &stored_transactions},
-		{"total_ruris", STAT_NO_RESET, &total_ruris},
-		{"total_transactions", STAT_NO_RESET, &total_transactions},
-		{"added_branches", STAT_NO_RESET, &added_branches}, {0, 0, 0}};
+stat_export_t mod_stats[] = {
+	{"stored_ruris", STAT_NO_RESET, &stored_ruris},
+	{"stored_transactions", STAT_NO_RESET, &stored_transactions},
+	{"total_ruris", STAT_NO_RESET, &total_ruris},
+	{"total_transactions", STAT_NO_RESET, &total_transactions},
+	{"added_branches", STAT_NO_RESET, &added_branches},
+	{0, 0, 0}
+};
 #endif
 
 /** module exports */
 struct module_exports exports = {
-		"tsilo",		 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* exported RPC methods */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		0,				 /* per-child init function */
-		destroy			 /* destroy function */
+	"tsilo",         /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* exported RPC methods */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	0,               /* per-child init function */
+	destroy          /* destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function
@@ -226,6 +241,16 @@ static int fixup_ts_append_to(void **param, int param_no)
 	return 0;
 }
 
+static int fixup_free_ts_append_to(void **param, int param_no)
+{
+	if(param_no == 1 || param_no == 2) {
+		fixup_free_igp_null(param, 1);
+	} else if(param_no == 4) {
+		fixup_free_spve_null(param, 1);
+	}
+	return 0;
+}
+
 static int fixup_ts_append(void **param, int param_no)
 {
 	if(param_no == 1) {
@@ -244,19 +269,11 @@ static int fixup_ts_append(void **param, int param_no)
 	return 0;
 }
 
-static int fixup_ts_append_by_contact(void **param, int param_no)
+static int fixup_free_ts_append(void **param, int param_no)
 {
-	if(param_no == 1) {
-		if(strlen((char *)*param) <= 1
-				&& (*(char *)(*param) == 0 || *(char *)(*param) == '0')) {
-			*param = (void *)0;
-			LM_ERR("empty table name\n");
-			return -1;
-		}
-	}
 
 	if(param_no == 2 || param_no == 3) {
-		return fixup_spve_null(param, 1);
+		fixup_free_spve_null(param, 1);
 	}
 
 	return 0;
@@ -442,19 +459,19 @@ static int w_ts_append_by_contact2(
 
 	if(ts_check_uri(&ruri) < 0) {
 		LM_ERR("failed to parse R-URI.\n");
-		return -1;
+		goto error;
 	}
 
 	/* parse Contact header */
 	if((!_msg->contact && parse_headers(_msg, HDR_CONTACT_F, 0) != 0)
 			|| !_msg->contact) {
 		LM_WARN("missing contact header or the value is empty/malformed.\n");
-		return -1;
+		goto error;
 	}
 	if(_msg->contact) {
 		if(parse_contact(_msg->contact) < 0) {
 			LM_WARN("failed to parse Contact header.\n");
-			return -1;
+			goto error;
 		}
 		if(parse_uri(((struct contact_body *)_msg->contact->parsed)
 							 ->contacts->uri.s,
@@ -464,7 +481,7 @@ static int w_ts_append_by_contact2(
 				!= 0) {
 			if(ts_check_uri(&_msg->contact->body) < 0) { /* one more attempt */
 				LM_WARN("failed to parse Contact header.\n");
-				return -1;
+				goto error;
 			}
 		}
 
@@ -473,7 +490,7 @@ static int w_ts_append_by_contact2(
 		tmp_contact.s = (char *)pkg_malloc(tmp_contact.len + 1);
 		if(tmp_contact.s == NULL) {
 			PKG_MEM_ERROR;
-			return -1;
+			goto error;
 		}
 		memcpy(tmp_contact.s,
 				((struct contact_body *)_msg->contact->parsed)->contacts->uri.s,
@@ -485,7 +502,7 @@ static int w_ts_append_by_contact2(
 					< 0) { /* one more attempt */
 				LM_ERR("problems when calling ts_append_contact(), cannot copy "
 					   "Contact parameter.\n");
-				return -1;
+				goto error;
 			}
 		}
 	}
@@ -499,6 +516,18 @@ static int w_ts_append_by_contact2(
 	pkg_free(tmp_contact.s);
 
 	return rc;
+
+error:
+	if(ruri.s != NULL) {
+		pkg_free(ruri.s);
+	}
+	if(contact.s != NULL) {
+		pkg_free(contact.s);
+	}
+	if(tmp_contact.s != NULL) {
+		pkg_free(tmp_contact.s);
+	}
+	return -1;
 }
 
 /**
@@ -521,11 +550,11 @@ static int ki_ts_append_by_contact(sip_msg_t *_msg, str *_table, str *_ruri)
 	/* parse Contact header */
 	if((!_msg->contact && parse_headers(_msg, HDR_CONTACT_F, 0) != 0)
 			|| !_msg->contact)
-		return -1;
+		goto error;
 
 	if(_msg->contact) {
 		if(parse_contact(_msg->contact) < 0)
-			return -1;
+			goto error;
 		if(parse_uri(((struct contact_body *)_msg->contact->parsed)
 							 ->contacts->uri.s,
 				   ((struct contact_body *)_msg->contact->parsed)
@@ -533,7 +562,7 @@ static int ki_ts_append_by_contact(sip_msg_t *_msg, str *_table, str *_ruri)
 				   &curi)
 				!= 0) {
 			if(ts_check_uri(&_msg->contact->body) < 0) /* one more attempt */
-				return -1;
+				goto error;
 		}
 
 		tmp_contact.len = ((struct contact_body *)_msg->contact->parsed)
@@ -541,7 +570,7 @@ static int ki_ts_append_by_contact(sip_msg_t *_msg, str *_table, str *_ruri)
 		tmp_contact.s = (char *)pkg_malloc(tmp_contact.len + 1);
 		if(tmp_contact.s == NULL) {
 			PKG_MEM_ERROR;
-			return -1;
+			goto error;
 		}
 		memcpy(tmp_contact.s,
 				((struct contact_body *)_msg->contact->parsed)->contacts->uri.s,
@@ -551,7 +580,7 @@ static int ki_ts_append_by_contact(sip_msg_t *_msg, str *_table, str *_ruri)
 		if(pkg_str_dup(&contact, &tmp_contact) < 0) {
 			if(pkg_str_dup(&contact, &_msg->contact->body)
 					< 0) /* one more attempt */
-				return -1;
+				goto error;
 		}
 	}
 
@@ -563,6 +592,18 @@ static int ki_ts_append_by_contact(sip_msg_t *_msg, str *_table, str *_ruri)
 	pkg_free(tmp_contact.s);
 
 	return rc;
+
+error:
+	if(ruri.s != NULL) {
+		pkg_free(ruri.s);
+	}
+	if(contact.s != NULL) {
+		pkg_free(contact.s);
+	}
+	if(tmp_contact.s != NULL) {
+		pkg_free(tmp_contact.s);
+	}
+	return -1;
 }
 
 /**
@@ -601,27 +642,33 @@ static int w_ts_append_by_contact3(
 
 	if(ts_check_uri(&ruri) < 0) {
 		LM_ERR("failed to parse R-URI.\n");
+		pkg_free(ruri.s);
 		return -1;
 	}
 
 	/* parse Contact header */
 	if(fixup_get_svalue(_msg, (gparam_t *)_contact, &contact_fixed) != 0) {
 		LM_ERR("failed to convert contact parameter\n");
+		pkg_free(ruri.s);
 		return -1;
 	}
 
 	if(contact_fixed.s == NULL || contact_fixed.len <= 0) {
 		LM_ERR("invalid contact parameter value\n");
+		pkg_free(ruri.s);
 		return -1;
 	}
 
 	if(pkg_str_dup(&contact, &contact_fixed) < 0) {
 		LM_ERR("failed to copy r-uri parameter\n");
+		pkg_free(ruri.s);
 		return -1;
 	}
 
 	if(ts_check_uri(&contact) < 0) {
 		LM_ERR("failed to parse Contact parameter.\n");
+		pkg_free(ruri.s);
+		pkg_free(contact.s);
 		return -1;
 	}
 
@@ -646,22 +693,56 @@ static int ki_ts_append_by_contact_uri(
 	int rc;
 
 	/* parse R-URI */
-	if(ts_check_uri(_ruri) < 0)
+	if(ts_check_uri(_ruri) < 0) {
 		return -1;
-	if(pkg_str_dup(&ruri, _ruri) < 0)
+	}
+	if(pkg_str_dup(&ruri, _ruri) < 0) {
 		return -1;
+	}
 
 	/* parse Contact header */
-	if(ts_check_uri(_contact) < 0)
+	if(ts_check_uri(_contact) < 0) {
+		pkg_free(ruri.s);
 		return -1;
-	if(pkg_str_dup(&contact, _contact) < 0)
+	}
+	if(pkg_str_dup(&contact, _contact) < 0) {
+		pkg_free(ruri.s);
 		return -1;
+	}
 
 	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
 	rc = ts_append(_msg, &ruri, &contact, _table->s);
 
 	pkg_free(ruri.s);
 	pkg_free(contact.s);
+
+	return rc;
+}
+
+/**
+ *
+ */
+static int w_ts_append_branches(struct sip_msg *_msg, char *_ruri, char *_p2)
+{
+	str turi = STR_NULL;
+	str ruri = STR_NULL;
+	int rc;
+
+	if(_ruri == NULL
+			|| (fixup_get_svalue(_msg, (gparam_p)_ruri, &turi) != 0
+					|| turi.len <= 0)) {
+		LM_ERR("invalid ruri parameter\n");
+		return -1;
+	}
+	if(ts_check_uri(&turi) < 0)
+		return -1;
+
+	if(pkg_str_dup(&ruri, &turi) < 0)
+		return -1;
+
+	rc = ts_append_branches(_msg, &ruri);
+
+	pkg_free(ruri.s);
 
 	return rc;
 }

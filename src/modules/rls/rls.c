@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -209,59 +211,64 @@ void rlsubs_table_update(unsigned int ticks, void *param);
 int add_rls_event(modparam_t type, void *val);
 int rls_update_subs(struct sip_msg *msg, char *puri, char *pevent);
 int fixup_update_subs(void **param, int param_no);
+int fixup_free_update_subs(void **param, int param_no);
 
+/* clang-format off */
 static cmd_export_t cmds[] = {
-		{"rls_handle_subscribe", (cmd_function)w_rls_handle_subscribe0, 0, 0, 0,
-				REQUEST_ROUTE},
-		{"rls_handle_subscribe", (cmd_function)w_rls_handle_subscribe1, 1,
-				fixup_spve_null, 0, REQUEST_ROUTE},
-		{"rls_handle_notify", (cmd_function)w_rls_handle_notify, 0, 0, 0,
-				REQUEST_ROUTE},
-		{"rls_update_subs", (cmd_function)w_rls_update_subs, 2,
-				fixup_update_subs, 0, ANY_ROUTE},
-		{"bind_rls", (cmd_function)bind_rls, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0}};
+	{"rls_handle_subscribe", (cmd_function)w_rls_handle_subscribe0, 0, 0, 0, REQUEST_ROUTE},
+	{"rls_handle_subscribe", (cmd_function)w_rls_handle_subscribe1, 1,
+		fixup_spve_null, fixup_free_spve_null, REQUEST_ROUTE},
+	{"rls_handle_notify", (cmd_function)w_rls_handle_notify, 0, 0, 0, REQUEST_ROUTE},
+	{"rls_update_subs", (cmd_function)w_rls_update_subs, 2,
+		fixup_update_subs, fixup_free_update_subs, ANY_ROUTE},
+	{"bind_rls", (cmd_function)bind_rls, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"server_address", PARAM_STR, &rls_server_address},
-		{"db_url", PARAM_STR, &db_url},
-		{"rlpres_db_url", PARAM_STR, &rlpres_db_url},
-		{"xcap_db_url", PARAM_STR, &xcap_db_url},
-		{"rlsubs_table", PARAM_STR, &rlsubs_table},
-		{"rlpres_table", PARAM_STR, &rlpres_table},
-		{"xcap_table", PARAM_STR, &rls_xcap_table},
-		{"waitn_time", INT_PARAM, &waitn_time},
-		{"notifier_poll_rate", INT_PARAM, &rls_notifier_poll_rate},
-		{"notifier_processes", INT_PARAM, &rls_notifier_processes},
-		{"clean_period", INT_PARAM, &clean_period},
-		{"rlpres_clean_period", INT_PARAM, &rlpres_clean_period},
-		{"max_expires", INT_PARAM, &rls_max_expires},
-		{"hash_size", INT_PARAM, &hash_size},
-		{"integrated_xcap_server", INT_PARAM, &rls_integrated_xcap_server},
-		{"to_presence_code", INT_PARAM, &to_presence_code},
-		{"xcap_root", PARAM_STRING, &xcap_root},
-		{"rls_event", PARAM_STRING | USE_FUNC_PARAM, (void *)add_rls_event},
-		{"outbound_proxy", PARAM_STR, &rls_outbound_proxy},
-		{"reload_db_subs", INT_PARAM, &rls_reload_db_subs},
-		{"max_notify_body_length", INT_PARAM, &rls_max_notify_body_len},
-		{"db_mode", INT_PARAM, &dbmode},
-		{"expires_offset", INT_PARAM, &rls_expires_offset},
-		{"fetch_rows", INT_PARAM, &rls_fetch_rows},
-		{"disable_remote_presence", INT_PARAM, &rls_disable_remote_presence},
-		{"max_backend_subs", INT_PARAM, &rls_max_backend_subs}, {0, 0, 0}};
+	{"server_address", PARAM_STR, &rls_server_address},
+	{"db_url", PARAM_STR, &db_url},
+	{"rlpres_db_url", PARAM_STR, &rlpres_db_url},
+	{"xcap_db_url", PARAM_STR, &xcap_db_url},
+	{"rlsubs_table", PARAM_STR, &rlsubs_table},
+	{"rlpres_table", PARAM_STR, &rlpres_table},
+	{"xcap_table", PARAM_STR, &rls_xcap_table},
+	{"waitn_time", PARAM_INT, &waitn_time},
+	{"notifier_poll_rate", PARAM_INT, &rls_notifier_poll_rate},
+	{"notifier_processes", PARAM_INT, &rls_notifier_processes},
+	{"clean_period", PARAM_INT, &clean_period},
+	{"rlpres_clean_period", PARAM_INT, &rlpres_clean_period},
+	{"max_expires", PARAM_INT, &rls_max_expires},
+	{"hash_size", PARAM_INT, &hash_size},
+	{"integrated_xcap_server", PARAM_INT, &rls_integrated_xcap_server},
+	{"to_presence_code", PARAM_INT, &to_presence_code},
+	{"xcap_root", PARAM_STRING, &xcap_root},
+	{"rls_event", PARAM_STRING | PARAM_USE_FUNC, (void *)add_rls_event},
+	{"outbound_proxy", PARAM_STR, &rls_outbound_proxy},
+	{"reload_db_subs", PARAM_INT, &rls_reload_db_subs},
+	{"max_notify_body_length", PARAM_INT, &rls_max_notify_body_len},
+	{"db_mode", PARAM_INT, &dbmode},
+	{"expires_offset", PARAM_INT, &rls_expires_offset},
+	{"fetch_rows", PARAM_INT, &rls_fetch_rows},
+	{"disable_remote_presence", PARAM_INT, &rls_disable_remote_presence},
+	{"max_backend_subs", PARAM_INT, &rls_max_backend_subs},
+	{0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports = {
-		"rls",			 /* module name */
-		DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds,			 /* exported functions */
-		params,			 /* exported parameters */
-		0,				 /* exported RPC functions */
-		0,				 /* exported pseudo-variables */
-		0,				 /* response handling function */
-		mod_init,		 /* module initialization function */
-		child_init,		 /* per-child init function */
-		destroy			 /* destroy function */
+	"rls",           /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per-child init function */
+	destroy          /* module destroy function */
 };
+/* clang-format on */
 
 /**
  * init module function

@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -80,27 +82,34 @@ void stm_main_timer_exec(unsigned int ticks, void *param);
 int stm_get_worker(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 
 static int default_interval = 120;
-
+/* clang-format off */
 static pv_export_t rtimer_pvs[] = {
-		{{"rtimer_worker", (sizeof("rtimer_worker") - 1)}, PVT_OTHER,
-				stm_get_worker, 0, 0, 0, 0, 0},
-		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
+	{{"rtimer_worker", (sizeof("rtimer_worker") - 1)}, PVT_OTHER,
+			stm_get_worker, 0, 0, 0, 0, 0},
+	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
+};
 
 static param_export_t params[] = {
-		{"default_interval", INT_PARAM, &default_interval},
-		{"timer", PARAM_STRING | USE_FUNC_PARAM, (void *)stm_t_param},
-		{"exec", PARAM_STRING | USE_FUNC_PARAM, (void *)stm_e_param},
-		{0, 0, 0}};
-
+	{"default_interval", PARAM_INT, &default_interval},
+	{"timer", PARAM_STRING | PARAM_USE_FUNC, (void *)stm_t_param},
+	{"exec", PARAM_STRING | PARAM_USE_FUNC, (void *)stm_e_param},
+	{0, 0, 0}
+};
 
 /** module exports */
-struct module_exports exports = {"rtimer", DEFAULT_DLFLAGS, /* dlopen flags */
-		0, params, 0, /* exported RPC methods */
-		rtimer_pvs,	  /* exported pseudo-variables */
-		0, mod_init,  /* module initialization function */
-		child_init,	  /* per-child init function */
-		0};
-
+struct module_exports exports = {
+	"rtimer",
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	0,               /* exported functions */
+	params,          /* exported parameters */
+	0,               /* RPC method exports */
+	rtimer_pvs,      /* exported pseudo-variables */
+	0,               /* response handling function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per-child init function */
+	0                /* module destroy function */
+};
+/* clang-format on */
 
 /**
  * init module function

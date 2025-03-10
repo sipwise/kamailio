@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -297,7 +299,7 @@ static void fake_reply(struct cell *t, int branch, int code)
 
 	/* now when out-of-lock do the cancel I/O */
 	if(do_cancel_branch) {
-		cancel_branch(t, branch, &cancel_data.reason, 0);
+		cancel_branch(t, branch, NULL, &cancel_data.reason, 0);
 	}
 
 	/* it's cleaned up on error; if no error occurred and transaction
@@ -460,7 +462,7 @@ inline static void final_response_handler(
 		}
 #endif
 	}
-	fake_reply(t, r_buf->branch, 408);
+	fake_reply(t, r_buf->branch, _tm_reply_408_code);
 }
 
 

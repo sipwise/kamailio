@@ -4,7 +4,7 @@
  *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
- * Fruanhofer Institute. It was and still is maintained in a separate
+ * Fraunhofer FOKUS Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
@@ -14,7 +14,7 @@
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
  *
- * NB: Alot of this code was originally part of OpenIMSCore,
+ * NB: A lot of this code was originally part of OpenIMSCore,
  * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
  * Thanks for great work! This is an effort to
@@ -24,6 +24,8 @@
  * to manage in the Kamailio/SR environment
  *
  * This file is part of Kamailio, a free SIP server.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,7 +59,7 @@ inline dp_config *new_dp_config()
 	memset(x, 0, sizeof(dp_config));
 	return x;
 error:
-	LM_ERR("%s(): failed to create new dp_config.\n", __FUNCTION__);
+	LM_ERR("failed to create new dp_config.\n");
 	return 0;
 }
 
@@ -75,7 +77,7 @@ inline routing_realm *new_routing_realm()
 	memset(x, 0, sizeof(routing_realm));
 	return x;
 error:
-	LM_ERR("%s(): failed to create new routing_realm.\n", __FUNCTION__);
+	LM_ERR("failed to create new routing_realm.\n");
 	return 0;
 }
 
@@ -93,7 +95,7 @@ inline routing_entry *new_routing_entry()
 	memset(x, 0, sizeof(routing_entry));
 	return x;
 error:
-	LM_ERR("%s(): failed to create new routing_entry.\n", __FUNCTION__);
+	LM_ERR("failed to create new routing_entry.\n");
 	return 0;
 }
 

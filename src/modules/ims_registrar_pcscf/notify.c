@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -403,7 +405,7 @@ int process_body(struct sip_msg *msg, str notify_body, udomain_t *domain)
 				LM_ERR("wrong format[%.*s] - failed unsubscribing to reginfo\n",
 						aor.len, aor.s);
 			}
-			reginfo_subscribe_real(msg, presentity_uri_pv, 0, 0);
+			reginfo_subscribe_real(msg, presentity_uri_pv, 0, 0, 0);
 			pv_elem_free_all(presentity_uri_pv);
 		}
 

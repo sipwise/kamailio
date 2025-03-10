@@ -4,6 +4,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -235,10 +237,9 @@ int extract_body(struct sip_msg *msg, str *body, str *cl_field)
 			if(hf.type == HDR_ERROR_T)
 				return -1;
 			if(hf.type == HDR_CONTENTLENGTH_T) {
-				if (cl_field)
+				if(cl_field)
 					*cl_field = hf.body;
-			}
-			else if(hf.type == HDR_CONTENTTYPE_T) {
+			} else if(hf.type == HDR_CONTENTTYPE_T) {
 				if(decode_mime_type(hf.body.s, hf.body.s + hf.body.len, &mime)
 						== NULL)
 					return -1;

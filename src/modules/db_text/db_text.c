@@ -6,6 +6,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -64,10 +66,10 @@ static cmd_export_t cmds[] = {
 /*
  * Exported parameters
  */
-static param_export_t params[] = {{"db_mode", INT_PARAM, &db_mode},
-		{"emptystring", INT_PARAM, &empty_string},
-		{"file_buffer_size", INT_PARAM, &_db_text_read_buffer_size},
-		{"max_result_rows", INT_PARAM, &_db_text_max_result_rows},
+static param_export_t params[] = {{"db_mode", PARAM_INT, &db_mode},
+		{"emptystring", PARAM_INT, &empty_string},
+		{"file_buffer_size", PARAM_INT, &_db_text_read_buffer_size},
+		{"max_result_rows", PARAM_INT, &_db_text_max_result_rows},
 		{"default_connection", PARAM_STR, &dbt_default_connection},
 		{"db_delim", PARAM_STR, &_dbt_delim_str}, {0, 0, 0}};
 

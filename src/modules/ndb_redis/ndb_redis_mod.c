@@ -9,6 +9,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -75,6 +77,7 @@ static int w_redis_pipe_cmd5(struct sip_msg *msg, char *ssrv, char *scmd,
 static int w_redis_pipe_cmd6(struct sip_msg *msg, char *ssrv, char *scmd,
 		char *sargv1, char *sargv2, char *sargv3, char *sres);
 static int fixup_redis_cmd6(void **param, int param_no);
+static int fixup_free_redis_cmd6(void **param, int param_no);
 static int w_redis_execute(struct sip_msg *msg, char *ssrv);
 
 static int w_redis_free_reply(struct sip_msg *msg, char *res);
@@ -101,28 +104,27 @@ static pv_export_t mod_pvs[] = {
 	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
 };
 
-
 static cmd_export_t cmds[] = {
 	{"redis_cmd", (cmd_function)w_redis_cmd3, 3,
-			fixup_redis_cmd6, 0, ANY_ROUTE},
-	{"redis_cmd", (cmd_function)w_redis_cmd4, 4, fixup_redis_cmd6, 0,
-			ANY_ROUTE},
-	{"redis_cmd", (cmd_function)w_redis_cmd5, 5, fixup_redis_cmd6, 0,
-			ANY_ROUTE},
-	{"redis_cmd", (cmd_function)w_redis_cmd6, 6, fixup_redis_cmd6, 0,
-			ANY_ROUTE},
-	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd3, 3, fixup_redis_cmd6,
-			0, ANY_ROUTE},
-	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd4, 4, fixup_redis_cmd6,
-			0, ANY_ROUTE},
-	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd5, 5, fixup_redis_cmd6,
-			0, ANY_ROUTE},
-	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd6, 6, fixup_redis_cmd6,
-			0, ANY_ROUTE},
+			fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_cmd", (cmd_function)w_redis_cmd4, 4,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_cmd", (cmd_function)w_redis_cmd5, 5,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_cmd", (cmd_function)w_redis_cmd6, 6,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd3, 3,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd4, 4,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd5, 5,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
+	{"redis_pipe_cmd", (cmd_function)w_redis_pipe_cmd6, 6,
+		fixup_redis_cmd6, fixup_free_redis_cmd6, ANY_ROUTE},
 	{"redis_execute", (cmd_function)w_redis_execute, 1, fixup_redis_cmd6, 0,
 			ANY_ROUTE},
-	{"redis_free", (cmd_function)w_redis_free_reply, 1, fixup_spve_null, 0,
-			ANY_ROUTE},
+	{"redis_free", (cmd_function)w_redis_free_reply, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 
 	{"bind_ndb_redis", (cmd_function)bind_ndb_redis, 0, 0, 0, 0},
 
@@ -130,15 +132,15 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-	{"server", PARAM_STRING | USE_FUNC_PARAM, (void *)redis_srv_param},
-	{"init_without_redis", INT_PARAM, &init_without_redis},
-	{"connect_timeout", INT_PARAM, &redis_connect_timeout_param},
-	{"cmd_timeout", INT_PARAM, &redis_cmd_timeout_param},
-	{"cluster", INT_PARAM, &redis_cluster_param},
-	{"disable_time", INT_PARAM, &redis_disable_time_param},
-	{"allowed_timeouts", INT_PARAM, &redis_allowed_timeouts_param},
-	{"flush_on_reconnect", INT_PARAM, &redis_flush_on_reconnect_param},
-	{"allow_dynamic_nodes", INT_PARAM, &redis_allow_dynamic_nodes_param},
+	{"server", PARAM_STRING | PARAM_USE_FUNC, (void *)redis_srv_param},
+	{"init_without_redis", PARAM_INT, &init_without_redis},
+	{"connect_timeout", PARAM_INT, &redis_connect_timeout_param},
+	{"cmd_timeout", PARAM_INT, &redis_cmd_timeout_param},
+	{"cluster", PARAM_INT, &redis_cluster_param},
+	{"disable_time", PARAM_INT, &redis_disable_time_param},
+	{"allowed_timeouts", PARAM_INT, &redis_allowed_timeouts_param},
+	{"flush_on_reconnect", PARAM_INT, &redis_flush_on_reconnect_param},
+	{"allow_dynamic_nodes", PARAM_INT, &redis_allow_dynamic_nodes_param},
 	{"debug", PARAM_INT, &ndb_redis_debug},
 #ifdef WITH_SSL
 	{"ca_path", PARAM_STRING, &ndb_redis_ca_path},
@@ -560,6 +562,10 @@ static int fixup_redis_cmd6(void **param, int param_no)
 	return fixup_spve_null(param, 1);
 }
 
+static int fixup_free_redis_cmd6(void **param, int param_no)
+{
+	return fixup_free_spve_null(param, 1);
+}
 
 /**
  *

@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -1330,6 +1332,7 @@ inline static int tcp_do_connect(union sockaddr_union *server,
 	union sockaddr_union my_name;
 	socklen_t my_name_len;
 	struct ip_addr ip;
+	unsigned short port;
 #ifdef TCP_ASYNC
 	int n;
 #endif /* TCP_ASYNC */
@@ -1435,14 +1438,19 @@ inline static int tcp_do_connect(union sockaddr_union *server,
 	from = &my_name; /* update from with the real "from" address */
 	su2ip_addr(&ip, &my_name);
 find_socket:
+#ifdef SO_REUSEPORT
+	port = cfg_get(tcp, tcp_cfg, reuse_port) ? su_getport(from) : 0;
+#else
+	port = 0;
+#endif
 #ifdef USE_TLS
 	if(unlikely(type == PROTO_TLS)) {
-		*res_si = find_si(&ip, 0, PROTO_TLS);
+		*res_si = find_si(&ip, port, PROTO_TLS);
 	} else {
-		*res_si = find_si(&ip, 0, PROTO_TCP);
+		*res_si = find_si(&ip, port, PROTO_TCP);
 	}
 #else
-	*res_si = find_si(&ip, 0, PROTO_TCP);
+	*res_si = find_si(&ip, port, PROTO_TCP);
 #endif
 
 	if(unlikely(*res_si == 0)) {
@@ -1737,7 +1745,8 @@ struct tcp_connection *_tcpconn_find(int id, struct ip_addr *ip, int port,
 			print_ip("ip=", &a->parent->rcv.src_ip, "\n");
 #endif
 			if((a->parent->state != S_CONN_BAD) && (port == a->port)
-					&& ((l_port == 0) || (l_port == a->parent->rcv.dst_port))
+					&& ((l_port == 0) || (l_port == a->parent->rcv.dst_port)
+							|| (l_port == a->parent->cinfo.dst_port))
 					&& (ip_addr_cmp(ip, &a->parent->rcv.src_ip))
 					&& (is_local_ip_any
 							|| ip_addr_cmp(l_ip, &a->parent->rcv.dst_ip)

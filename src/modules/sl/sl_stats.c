@@ -3,6 +3,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -146,7 +148,7 @@ void update_sl_stats(int code)
 
 	my_stats = &(*sl_stats)[process_no];
 
-	if(code >= 700 || code < 200) {
+	if(code >= 700 || code < 100) {
 		my_stats->err[RT_xxx]++;
 	} else if(code >= 600) {
 		my_stats->err[RT_6xx]++;
@@ -201,7 +203,7 @@ void update_sl_stats(int code)
 				my_stats->err[RT_3xx]++;
 				break;
 		}
-	} else { /* 2xx */
+	} else if(code >= 200) {
 		switch(code) {
 			case 200:
 				my_stats->err[RT_200]++;
@@ -213,6 +215,8 @@ void update_sl_stats(int code)
 				my_stats->err[RT_2xx]++;
 				break;
 		}
+	} else { /* 1xx */
+		my_stats->err[RT_1xx]++;
 	}
 }
 

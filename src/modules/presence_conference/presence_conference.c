@@ -7,6 +7,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -51,30 +53,36 @@ add_event_t pres_add_event;
 int use_partial_states = 0;
 unsigned int pres_conf_default_expires = 3600;
 
-/* module exported commands */
-static cmd_export_t cmds[] = {{0, 0, 0, 0, 0, 0}};
-
-/* module exported parameters */
-static param_export_t params[] = {
-		{"use_partial_states", INT_PARAM, &use_partial_states},
-		{"default_expires", INT_PARAM, &pres_conf_default_expires}, {0, 0, 0}};
-
 /* presence api bind structure */
 presence_api_t pres;
 
+/* clang-format off */
+/* module exported commands */
+static cmd_export_t cmds[] = {
+	{0, 0, 0, 0, 0, 0}
+};
+
+/* module exported parameters */
+static param_export_t params[] = {
+	{"use_partial_states", PARAM_INT, &use_partial_states},
+	{"default_expires", PARAM_INT, &pres_conf_default_expires},
+	{0, 0, 0}
+};
+
 /* module exports */
 struct module_exports exports = {
-		"presence_conference", /* module name */
-		DEFAULT_DLFLAGS,	   /* dlopen flags */
-		cmds,				   /* exported functions */
-		params,				   /* exported parameters */
-		0,					   /* RPC method exports */
-		0,					   /* exported pseudo-variables */
-		0,					   /* response handling function */
-		mod_init,			   /* module initialization function */
-		0,					   /* per-child init function */
-		0					   /* module destroy function */
+	"presence_conference", /* module name */
+	DEFAULT_DLFLAGS,    /* dlopen flags */
+	cmds,               /* exported functions */
+	params,             /* exported parameters */
+	0,                  /* RPC method exports */
+	0,                  /* exported pseudo-variables */
+	0,                  /* response handling function */
+	mod_init,           /* module initialization function */
+	0,                  /* per-child init function */
+	0                   /* module destroy function */
 };
+/* clang-format on */
 
 /*
  * init module function

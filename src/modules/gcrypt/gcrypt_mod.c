@@ -36,6 +36,8 @@
 #include "../../core/kemi.h"
 
 #include "gcrypt_uuid.h"
+#include "gcrypt_aes128.h"
+#include "api.h"
 
 MODULE_VERSION
 
@@ -45,10 +47,8 @@ static void mod_destroy(void);
 
 static int w_gcrypt_aes_encrypt(
 		sip_msg_t *msg, char *inb, char *keyb, char *outb);
-static int fixup_gcrypt_aes_encrypt(void **param, int param_no);
 static int w_gcrypt_aes_decrypt(
 		sip_msg_t *msg, char *inb, char *keyb, char *outb);
-static int fixup_gcrypt_aes_decrypt(void **param, int param_no);
 
 /* init vector value */
 static str _gcrypt_init_vector = str_init("SIP/2.0 is RFC3261");
@@ -56,12 +56,15 @@ static int _gcrypt_register_callid = 0;
 static int _gcrypt_aes_mode_param = 0;
 static int _gcrypt_aes_mode = GCRY_CIPHER_MODE_ECB;
 
+int bind_gcrypt(gcrypt_api_t *api);
+
 /* clang-format off */
 static cmd_export_t cmds[] = {
 	{"gcrypt_aes_encrypt", (cmd_function)w_gcrypt_aes_encrypt, 3,
-			fixup_gcrypt_aes_encrypt, 0, ANY_ROUTE},
+			fixup_spve2_pvar, fixup_free_spve2_pvar, ANY_ROUTE},
 	{"gcrypt_aes_decrypt", (cmd_function)w_gcrypt_aes_decrypt, 3,
-			fixup_gcrypt_aes_decrypt, 0, ANY_ROUTE},
+			fixup_spve2_pvar, fixup_free_spve2_pvar, ANY_ROUTE},
+	{"bind_gcrypt", (cmd_function)bind_gcrypt, 0, 0, 0, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -263,28 +266,6 @@ static int w_gcrypt_aes_encrypt(
 /**
  *
  */
-static int fixup_gcrypt_aes_encrypt(void **param, int param_no)
-{
-	if(param_no == 1 || param_no == 2) {
-		if(fixup_spve_null(param, 1) < 0)
-			return -1;
-		return 0;
-	} else if(param_no == 3) {
-		if(fixup_pvar_null(param, 1) != 0) {
-			LM_ERR("failed to fixup result pvar\n");
-			return -1;
-		}
-		if(((pv_spec_t *)(*param))->setf == NULL) {
-			LM_ERR("result pvar is not writeble\n");
-			return -1;
-		}
-	}
-	return 0;
-}
-
-/**
- *
- */
 static int ki_gcrypt_aes_decrypt_helper(
 		sip_msg_t *msg, str *ins, str *keys, pv_spec_t *dst)
 {
@@ -425,25 +406,19 @@ static int w_gcrypt_aes_decrypt(
 /**
  *
  */
-static int fixup_gcrypt_aes_decrypt(void **param, int param_no)
+int bind_gcrypt(gcrypt_api_t *api)
 {
-	if(param_no == 1 || param_no == 2) {
-		if(fixup_spve_null(param, 1) < 0)
-			return -1;
-		return 0;
-	} else if(param_no == 3) {
-		if(fixup_pvar_null(param, 1) != 0) {
-			LM_ERR("failed to fixup result pvar\n");
-			return -1;
-		}
-		if(((pv_spec_t *)(*param))->setf == NULL) {
-			LM_ERR("result pvar is not writeble\n");
-			return -1;
-		}
+	if(!api) {
+		ERR("Invalid parameter value\n");
+		return -1;
 	}
+	api->aes128_context_init = aes128_context_init;
+	api->aes128_context_destroy = aes128_context_destroy;
+	api->aes128_encrypt = aes128_encrypt;
+	api->aes128_decrypt = aes128_decrypt;
+
 	return 0;
 }
-
 
 /**
  *

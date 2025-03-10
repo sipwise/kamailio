@@ -5,6 +5,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -41,6 +43,8 @@ int mwi_process_body(
 int dlg_process_body(
 		struct publ_info *publ, str **fin_body, int ver, str **tuple);
 int reginfo_process_body(
+		struct publ_info *publ, str **fin_body, int ver, str **tuple);
+int dfks_process_body(
 		struct publ_info *publ, str **fin_body, int ver, str **tuple);
 
 #endif
