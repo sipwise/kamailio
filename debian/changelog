@@ -1,8 +1,13 @@
-ngcp-kamailio (5.8.5-1+0~mr13.3.0.0) unstable; urgency=medium
+ngcp-kamailio (6.0.1-1+0~mr13.3.0.0) unstable; urgency=medium
 
-  * New release.
+  * MT#62041 trixie build: fixes from 'upstream'
+  * MT#62023 htable: don't crash on missing htable definition
+  * MT#61402 dialog fixes from upstream/master
+  * New upstream version 6.0.1
+  * MT#62337 remove already applied patches and refresh
+  * MT#62337 debian: remove mono package
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 28 Jan 2025 15:14:08 +0100
+ -- Victor Seva <vseva@debian.org>  Tue, 11 Mar 2025 10:00:14 +0100
 
 ngcp-kamailio (5.8.5-1+0~mr13.2.0.0) unstable; urgency=medium
 
