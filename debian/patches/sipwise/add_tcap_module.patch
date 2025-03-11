@@ -51,7 +51,7 @@ index 0000000..d1e7b4d
 +include ../../Makefile.modules
 diff --git a/src/modules/tcap/tcap_mod.c b/src/modules/tcap/tcap_mod.c
 new file mode 100644
-index 0000000..79e736d
+index 0000000..26beebb
 --- /dev/null
 +++ b/src/modules/tcap/tcap_mod.c
 @@ -0,0 +1,392 @@
@@ -104,8 +104,8 @@ index 0000000..79e736d
 +
 +
 +static param_export_t params[] = {
-+	{ "content_type",		STR_PARAM,	&content_type.s		},
-+	{ "strip_trailing_crlf",	INT_PARAM,	&strip_trailing_crlf	},
++	{ "content_type",        PARAM_STR,	&content_type.s },
++	{ "strip_trailing_crlf", PARAM_INT,	&strip_trailing_crlf },
 +	{ 0, }
 +};
 +

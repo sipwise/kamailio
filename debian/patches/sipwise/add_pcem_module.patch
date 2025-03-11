@@ -226,7 +226,7 @@ index 0000000..b93b181
 +#endif
 diff --git a/src/modules/pcem/pcem_mod.c b/src/modules/pcem/pcem_mod.c
 new file mode 100644
-index 0000000..2710b60
+index 0000000..7064015
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.c
 @@ -0,0 +1,149 @@
@@ -304,8 +304,8 @@ index 0000000..2710b60
 +
 +static param_export_t params[] = {
 +	/*{"test_str",             INT_PARAM, &test_str.s             },*/
-+	{"qos_flag", INT_PARAM, &pcem_qos_flag },
-+	{"all_flag", INT_PARAM, &pcem_all_flag },
++	{"qos_flag", PARAM_INT, &pcem_qos_flag },
++	{"all_flag", PARAM_INT, &pcem_all_flag },
 +	{0,0,0}
 +};
 +

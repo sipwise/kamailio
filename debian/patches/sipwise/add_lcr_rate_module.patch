@@ -97,7 +97,7 @@ index 0000000..9a3cee1
 +include ../../Makefile.modules
 diff --git a/src/modules/lcr_rate/lcr_rate_mod.c b/src/modules/lcr_rate/lcr_rate_mod.c
 new file mode 100644
-index 0000000..5670871
+index 0000000..7d1462f
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
 @@ -0,0 +1,517 @@
@@ -184,12 +184,12 @@ index 0000000..5670871
 +};
 +
 +static param_export_t params[] = {
-+	{"gw_uri_avp",		STR_PARAM, &gw_uri_avp_param},
-+	{"db_host",		STR_PARAM, &db_host},
-+	{"db_port",		INT_PARAM, &db_port},
-+	{"db_user",		STR_PARAM, &db_user},
-+	{"db_pass",		STR_PARAM, &db_pass},
-+	{"db_db",		STR_PARAM, &db_db},
++	{"gw_uri_avp", PARAM_STR, &gw_uri_avp_param},
++	{"db_host",    PARAM_STR, &db_host},
++	{"db_port",    PARAM_INT, &db_port},
++	{"db_user",    PARAM_STR, &db_user},
++	{"db_pass",    PARAM_STR, &db_pass},
++	{"db_db",      PARAM_STR, &db_db},
 +	{0,},
 +};
 +
