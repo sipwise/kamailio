@@ -1,0 +1,21 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Wed, 12 Mar 2025 23:09:16 +0100
+Subject: [PATCH] presence_dfks: add missing definition
+
+(cherry picked from commit fb00af35fa36120491c85d47d3e71b5c6c22a2db)
+---
+ src/modules/presence_dfks/presence_dfks.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/modules/presence_dfks/presence_dfks.c b/src/modules/presence_dfks/presence_dfks.c
+index da72109..1e67ee6 100644
+--- a/src/modules/presence_dfks/presence_dfks.c
++++ b/src/modules/presence_dfks/presence_dfks.c
+@@ -46,6 +46,7 @@ MODULE_VERSION
+ static int mod_init(void);
+ 
+ /** API structures */
++add_event_t pres_add_event;
+ sl_api_t slb;
+ presence_api_t pres;
+ pua_api_t pua;
