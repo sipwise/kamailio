@@ -97,7 +97,7 @@ index 0000000..9a3cee1
 +include ../../Makefile.modules
 diff --git a/src/modules/lcr_rate/lcr_rate_mod.c b/src/modules/lcr_rate/lcr_rate_mod.c
 new file mode 100644
-index 0000000..7d1462f
+index 0000000..aaed8c0
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
 @@ -0,0 +1,517 @@
@@ -211,7 +211,7 @@ index 0000000..7d1462f
 +{
 +	pv_spec_t avp_spec;
 +	str s;
-+	unsigned short avp_flags;
++	avp_flags_t avp_flags;
 +
 +	if(!gw_uri_avp_param || !*gw_uri_avp_param) {
 +		LM_ERR("gw_uri_avp not set\n");
@@ -475,7 +475,7 @@ index 0000000..7d1462f
 +	return ret;
 +}
 +
-+static int get_avp(unsigned short *avp_type, int_str *avp_name, char *avp_s)
++static int get_avp(avp_flags_t *avp_type, avp_name_t *avp_name, char *avp_s)
 +{
 +	pv_spec_t *avp_spec = NULL;
 +	str *avp;
@@ -549,12 +549,12 @@ index 0000000..7d1462f
 +		sip_msg_t *msg, char *uuid_s, char *avp_s, char *avp2_s)
 +{
 +	swr_profile_t *prof;
-+	unsigned short avp_type = 0;
-+	int_str avp_val;
-+	int_str avp_name;
-+	unsigned short avp2_type = 0;
-+	int_str avp2_val;
-+	int_str avp2_name;
++	avp_flags_t avp_type = 0;
++	avp_value_t avp_val;
++	avp_name_t avp_name;
++	avp_flags_t avp2_type = 0;
++	avp_value_t avp2_val;
++	avp_name_t avp2_name;
 +
 +	prof = swrate_profile_new();
 +	if(!prof)
@@ -600,9 +600,9 @@ index 0000000..7d1462f
 +		sip_msg_t *msg, char *uuid_s, char *avp_s)
 +{
 +	swr_profile_t prof;
-+	unsigned short avp_type = 0;
-+	int_str avp_val;
-+	int_str avp_name;
++	avp_flags_t avp_type = 0;
++	avp_value_t avp_val;
++	avp_name_t avp_name;
 +
 +	if(get_profile_from_uuid(&prof, msg, uuid_s))
 +		return -1;
