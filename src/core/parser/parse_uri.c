@@ -237,28 +237,30 @@ int parse_uri(char *buf, int len, struct sip_uri *uri)
 	} else                                                 \
 		goto error_bad_char
 
-#define check_host_end         \
-	case ':':                  \
-		/* found the host */   \
-		uri->host.s = s;       \
-		uri->host.len = p - s; \
-		state = URI_PORT;      \
-		s = p + 1;             \
-		break;                 \
-	case ';':                  \
-		uri->host.s = s;       \
-		uri->host.len = p - s; \
-		state = URI_PARAM;     \
-		s = p + 1;             \
-		break;                 \
-	case '?':                  \
-		uri->host.s = s;       \
-		uri->host.len = p - s; \
-		state = URI_HEADERS;   \
-		s = p + 1;             \
-		break;                 \
-	case '&':                  \
-	case '@':                  \
+#define check_host_end             \
+	case ':':                      \
+		/* found the host */       \
+		if(scheme != URN_SCH) {    \
+			uri->host.s = s;       \
+			uri->host.len = p - s; \
+			state = URI_PORT;      \
+			s = p + 1;             \
+		}                          \
+		break;                     \
+	case ';':                      \
+		uri->host.s = s;           \
+		uri->host.len = p - s;     \
+		state = URI_PARAM;         \
+		s = p + 1;                 \
+		break;                     \
+	case '?':                      \
+		uri->host.s = s;           \
+		uri->host.len = p - s;     \
+		state = URI_HEADERS;       \
+		s = p + 1;                 \
+		break;                     \
+	case '&':                      \
+	case '@':                      \
 		goto error_bad_char
 
 
@@ -493,7 +495,7 @@ int parse_uri(char *buf, int len, struct sip_uri *uri)
 					case '@': /* error no user part, or
 								* be forgiving and accept it ? */
 					default:
-						state = URI_USER;
+						state = (scheme == URN_SCH) ? URI_HOST : URI_USER;
 				}
 				break;
 			case URI_USER:
@@ -1273,7 +1275,7 @@ int parse_uri(char *buf, int len, struct sip_uri *uri)
 			uri->sip_params = uri->params;
 			if((phone2tel) && (uri->user_param_val.len == 5)
 					&& (strncmp(uri->user_param_val.s, "phone", 5) == 0)) {
-				uri->type = TEL_URI_T;
+				uri->type = uri->type == SIPS_URI_T ? TELS_URI_T : TEL_URI_T;
 				uri->flags |= URI_SIP_USER_PHONE;
 				/* move params from user into uri->params */
 				p = q_memchr(uri->user.s, ';', uri->user.len);

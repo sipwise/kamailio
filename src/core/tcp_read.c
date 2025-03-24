@@ -265,10 +265,10 @@ again:
 					}
 				}
 				LOG(cfg_get(core, core_cfg, corelog),
-						"error reading: %s (%d) ([%s]:%u ->", strerror(errno),
-						errno, ip_addr2a(&c->rcv.src_ip), c->rcv.src_port);
-				LOG(cfg_get(core, core_cfg, corelog), "-> [%s]:%u)\n",
-						ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
+						"error reading: %s (%d) ([%s]:%u -> [%s]:%u)\n",
+						strerror(errno), errno, ip_addr2xa(&c->rcv.src_ip),
+						c->rcv.src_port, ip_addr2xa(&c->rcv.dst_ip),
+						c->rcv.dst_port);
 				if(errno == ETIMEDOUT) {
 					c->event = TCP_CLOSED_TIMEOUT;
 				} else if(errno == ECONNRESET) {
@@ -280,8 +280,8 @@ again:
 			LM_DBG("EOF on connection %p (state: %u, flags: %x) - FD %d,"
 				   " bytes %d, rd-flags %x ([%s]:%u -> [%s]:%u)",
 					c, c->state, c->flags, fd, bytes_read, *flags,
-					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port,
-					ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
+					ip_addr2xa(&c->rcv.src_ip), c->rcv.src_port,
+					ip_addr2xa(&c->rcv.dst_ip), c->rcv.dst_port);
 			c->state = S_CONN_EOF;
 			*flags |= RD_CONN_EOF;
 			c->event = TCP_CLOSED_EOF;
@@ -449,9 +449,9 @@ int tcp_read_headers(struct tcp_connection *c, rd_conn_flags_t *read_flags)
 		if(bytes <= 0)
 			return bytes;
 		gettimeofday(&tvnow, NULL);
-		tvdiff = 1000000 * (tvnow.tv_sec - r->tvrstart.tv_sec)
+		tvdiff = 1000000LL * (tvnow.tv_sec - r->tvrstart.tv_sec)
 				 + (tvnow.tv_usec - r->tvrstart.tv_usec);
-		if(tvdiff >= ksr_tcp_msg_read_timeout * 1000000) {
+		if(tvdiff >= 1000000LL * ksr_tcp_msg_read_timeout) {
 			LM_ERR("message reading timeout after %lld usec\n", tvdiff);
 			r->parsed = r->buf;
 			r->content_len = 0;
@@ -1522,8 +1522,7 @@ again:
 
 		if(unlikely(bytes < 0)) {
 			LOG(cfg_get(core, core_cfg, corelog),
-					"ERROR: tcp_read_req: error reading - c: %p r: %p (%d)\n",
-					con, req, bytes);
+					"error reading - c: %p r: %p (%d)\n", con, req, bytes);
 			resp = CONN_ERROR;
 			goto end_req;
 		}

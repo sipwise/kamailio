@@ -1697,7 +1697,7 @@ inline static struct dns_hash_entry *dns_get_related(
 	LM_DBG("(%p (%.*s, %d), %d, *%p) (%d)\n", e, e->name_len, e->name, e->type,
 			type, *records, cname_chain_len);
 	if(l->prev != NULL || l->next != NULL) {
-		LM_WARN("record not alone: %p - type: %d\n", l, (int)l->type);
+		LM_DBG("record not alone: %p - type: %d\n", l, (int)l->type);
 	}
 	clist_init(l, next, prev);
 	if(type == e->type) {
@@ -2044,7 +2044,7 @@ inline static struct dns_hash_entry *dns_cache_do_request(str *name, int type)
 #endif
 end:
 	if(e != NULL && e->prev == NULL && e->next == NULL) {
-		LM_WARN("record not linked: %p - type: %d\n", e, (int)e->type);
+		LM_DBG("record not linked: %p - type: %d\n", e, (int)e->type);
 	}
 	return e;
 }
@@ -3919,7 +3919,7 @@ int dns_cache_print_entry(rpc_t *rpc, void *ctx, struct dns_hash_entry *e)
 				}
 				s.s = ((struct naptr_rdata *)(rr->rdata))->repl;
 				s.len = ((struct naptr_rdata *)(rr->rdata))->repl_len;
-				if(rpc->struct_add(sh, "S", "rr_regexp", &s) < 0) {
+				if(rpc->struct_add(sh, "S", "rr_replacement", &s) < 0) {
 					rpc->fault(ctx, 500,
 							"Internal error adding naptre rr_replacement");
 					return -1;

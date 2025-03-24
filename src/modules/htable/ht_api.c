@@ -491,9 +491,7 @@ int ht_set_cell_ex(
 						it->value.s.s[it->value.s.len] = '\0';
 
 						if(exv <= 0) {
-							if(ht->updateexpire) {
-								it->expire = now + ht->htexpire;
-							}
+							HT_UPDATE_EXPIRE(ht, it, now);
 						} else {
 							it->expire = now + exv;
 						}
@@ -509,11 +507,7 @@ int ht_set_cell_ex(
 						cell->next = it->next;
 						cell->prev = it->prev;
 						if(exv <= 0) {
-							if(ht->updateexpire) {
-								cell->expire = now + ht->htexpire;
-							} else {
-								cell->expire = it->expire;
-							}
+							HT_COPY_EXPIRE(ht, cell, now, it);
 						} else {
 							it->expire = now + exv;
 						}
@@ -530,9 +524,7 @@ int ht_set_cell_ex(
 					it->value.n = val->n;
 
 					if(exv <= 0) {
-						if(ht->updateexpire) {
-							it->expire = now + ht->htexpire;
-						}
+						HT_UPDATE_EXPIRE(ht, it, now);
 					} else {
 						it->expire = now + exv;
 					}
@@ -551,11 +543,7 @@ int ht_set_cell_ex(
 						return -1;
 					}
 					if(exv <= 0) {
-						if(ht->updateexpire) {
-							cell->expire = now + ht->htexpire;
-						} else {
-							cell->expire = it->expire;
-						}
+						HT_COPY_EXPIRE(ht, cell, now, it);
 					} else {
 						it->expire = now + exv;
 					}
@@ -573,9 +561,7 @@ int ht_set_cell_ex(
 					it->value.n = val->n;
 
 					if(exv <= 0) {
-						if(ht->updateexpire) {
-							it->expire = now + ht->htexpire;
-						}
+						HT_UPDATE_EXPIRE(ht, it, now);
 					} else {
 						it->expire = now + exv;
 					}
@@ -738,6 +724,10 @@ ht_cell_t *ht_cell_value_add(ht_t *ht, str *name, int val, ht_cell_t *old)
 			if(now > 0 && it->expire != 0 && it->expire < now) {
 				/* entry has expired */
 
+				it->expire = ht->htexpire;
+				if(it->expire) {
+					it->expire += now;
+				}
 				if(ht->flags == PV_VAL_INT) {
 					/* initval is integer, use it to create a fresh entry */
 					it->flags &= ~AVP_VAL_STR;
@@ -1537,6 +1527,7 @@ int ht_count_cells_re(str *sre, ht_t *ht, int mode)
 	str sval;
 	str tval;
 	int ival = 0;
+	time_t tnow = 0;
 
 	if(sre == NULL || sre->len <= 0 || ht == NULL)
 		return 0;
@@ -1616,11 +1607,17 @@ int ht_count_cells_re(str *sre, ht_t *ht, int mode)
 		}
 	}
 
+	tnow = time(NULL);
 	for(i = 0; i < ht->htsize; i++) {
 		/* free entries */
 		ht_slot_lock(ht, i);
 		it = ht->entries[i].first;
 		while(it) {
+			if(ht->htexpire > 0 && it->expire != 0 && it->expire < tnow) {
+				/* entry has expired, continue */
+				it = it->next;
+				continue;
+			}
 			it0 = it->next;
 			if(op == 5) {
 				if(!(it->flags & AVP_VAL_STR))

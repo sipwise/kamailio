@@ -582,21 +582,29 @@ int curl_parse_conn(void *param, cfg_parser_t *parser, unsigned int flags)
 				t.start.line, t.start.col);
 		return -1;
 	}
-	pkg_str_dup(&name, &t.val);
-	ret = cfg_get_token(&t, parser, 0);
-	if(ret < 0)
+	if(pkg_str_dup(&name, &t.val) < 0) {
 		return -1;
+	}
+	ret = cfg_get_token(&t, parser, 0);
+	if(ret < 0) {
+		pkg_free(name.s);
+		return -1;
+	}
 	if((ret > 0) || (t.type != ']')) {
 		LM_ERR("%s:%d:%d: Syntax error, ']' expected\n", parser->file,
 				t.start.line, t.start.col);
+		pkg_free(name.s);
 		return -1;
 	}
 
-	if(cfg_eat_eol(parser, flags))
+	if(cfg_eat_eol(parser, flags)) {
+		pkg_free(name.s);
 		return -1;
+	}
 
 	raw_cc = pkg_malloc(sizeof(raw_http_client_conn_t));
 	if(raw_cc == NULL) {
+		pkg_free(name.s);
 		return -1;
 	}
 	memset(raw_cc, 0, sizeof(raw_http_client_conn_t));
@@ -861,17 +869,16 @@ void curl_conn_list_fixup(void)
 {
 	curl_con_t *cc;
 	cc = _curl_con_root;
-	while (cc) {
-		if (!(timeout_mode == 1 || timeout_mode == 2)) {
+	while(cc) {
+		if(!(timeout_mode == 1 || timeout_mode == 2)) {
 			/* Timeout is disabled globally. Set timeout to 0 for all connections to reflect this. */
-			if (cc->timeout > 0) {
+			if(cc->timeout > 0) {
 				LM_WARN("curl connection [%.*s]: configured timeout is ignored "
-				"because timeouts are disabled (timeout_mode)\n",
-					cc->name.len, cc->name.s);
+						"because timeouts are disabled (timeout_mode)\n",
+						cc->name.len, cc->name.s);
 				cc->timeout = 0;
 			}
-		}
-		else if (cc->timeout == 0) {
+		} else if(cc->timeout == 0) {
 			/* Timeout is not configured for that connection.
 			 * Use as default global connection_timeout (which can be seconds or milliseconds).
 			 */

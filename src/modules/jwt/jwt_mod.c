@@ -437,6 +437,7 @@ static int ki_jwt_verify_key(
 	jwt_valid_t *jwt_valid = NULL;
 	str sparams = STR_NULL;
 	long lval = 0;
+	unsigned int jwtret = 0;
 
 	if(key == NULL || key->s == NULL || alg == NULL || alg->s == NULL
 			|| claims == NULL || claims->s == NULL || claims->len <= 0
@@ -498,12 +499,13 @@ static int ki_jwt_verify_key(
 	ret = jwt_decode(
 			&jwt, jwtval->s, (unsigned char *)kdata.s, (size_t)kdata.len);
 	if(ret != 0 || jwt == NULL) {
-		LM_ERR("failed to decode jwt value\n");
+		LM_ERR("failed to decode jwt value (ret: %d jwt: %p)\n", ret, jwt);
 		goto error;
 	}
-	if(jwt_validate(jwt, jwt_valid) != 0) {
+	if((jwtret = jwt_validate(jwt, jwt_valid)) != JWT_VALIDATION_SUCCESS) {
 		_jwt_verify_status = jwt_valid_get_status(jwt_valid);
-		LM_ERR("failed to validate jwt: %08x\n", _jwt_verify_status);
+		LM_ERR("failed to validate jwt: %08x (ret: %08x)\n", _jwt_verify_status,
+				jwtret);
 		goto error;
 	}
 

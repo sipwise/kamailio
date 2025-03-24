@@ -87,7 +87,9 @@ static int max_reconnect_attempts = 1;
 static int timeout_sec = 1;
 static int timeout_usec = 0;
 static int direct_reply_to = 0;
+#if AMQP_VERSION_MAJOR == 0 && AMQP_VERSION_MINOR < 13
 static int amqp_ssl_init_called = 0;
+#endif
 
 /* module helper functions */
 static int rabbitmq_connect(amqp_connection_state_t *conn);
@@ -570,12 +572,14 @@ static int rabbitmq_connect(amqp_connection_state_t *conn)
 	int log_ret;
 	//	amqp_rpc_reply_t reply;
 
+#if AMQP_VERSION_MAJOR == 0 && AMQP_VERSION_MINOR < 13
 	// amqp_ssl_init_called should only be called once
 	if(amqp_info.ssl && !amqp_ssl_init_called) {
 		amqp_set_initialize_ssl_library(1);
 		amqp_ssl_init_called = 1;
 		LM_DBG("AMQP SSL library initialized\n");
 	}
+#endif
 
 	// establish a new connection to RabbitMQ server
 	*conn = amqp_new_connection();
@@ -597,19 +601,22 @@ static int rabbitmq_connect(amqp_connection_state_t *conn)
 		return RABBITMQ_ERR_SOCK;
 	}
 
-	if(rmq_amqps_ca_file) {
-		if(amqp_ssl_socket_set_cacert(amqp_sock, rmq_amqps_ca_file)) {
-			LM_ERR("Failed to set CA certificate for amqps connection\n");
-			return RABBITMQ_ERR_SSL_CACERT;
+	if(amqp_info.ssl) { // only valid for amqp_ssl_socket_t
+		if(rmq_amqps_ca_file) {
+			if(amqp_ssl_socket_set_cacert(amqp_sock, rmq_amqps_ca_file)) {
+				LM_ERR("Failed to set CA certificate for amqps connection\n");
+				return RABBITMQ_ERR_SSL_CACERT;
+			}
 		}
-	}
 
 #if AMQP_VERSION_MAJOR == 0 && AMQP_VERSION_MINOR < 8
-	amqp_ssl_socket_set_verify(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
+		amqp_ssl_socket_set_verify(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
 #else
-	amqp_ssl_socket_set_verify_peer(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
-	amqp_ssl_socket_set_verify_hostname(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
+		amqp_ssl_socket_set_verify_peer(amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
+		amqp_ssl_socket_set_verify_hostname(
+				amqp_sock, (rmq_amqps_ca_file) ? 1 : 0);
 #endif
+	}
 
 	ret = amqp_socket_open(amqp_sock, amqp_info.host, amqp_info.port);
 	if(ret != AMQP_STATUS_OK) {
