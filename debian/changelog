@@ -1,8 +1,18 @@
-ngcp-kamailio (5.8.2-1+0~mr12.5.2.0) unstable; urgency=medium
+ngcp-kamailio (5.8.6-1+0~mr12.5.2.0) unstable; urgency=medium
 
-  * New release.
+  [ Victor Seva ]
+  * MT#55401 pua and pua_dialoginfo improvements
+  * MT#61110 cfgutils: allow lock_set_size > 14
+  * MT#61703 usrloc: avoid shutdown crashes on destroy
+  * MT#61651 db_redis: fix build_query_keys logic
+  * MT#62023 htable: don't crash on missing htable definition
+  * New upstream version 5.8.6
+  * MT#62419 refresh patches
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 14 Aug 2024 13:58:49 +0200
+  [ Donat Zenichev ]
+  * MT#61441 rtpengine: use to-tag for NG message when rtpp-flags
+
+ -- Victor Seva <vseva@debian.org>  Mon, 24 Mar 2025 11:53:26 +0100
 
 ngcp-kamailio (5.8.2-1+0~mr12.5.1.0) unstable; urgency=medium
 
