@@ -3,17 +3,17 @@ Date: Thu, 26 Mar 2020 10:06:46 +0100
 Subject: sca-line-seize
 
 ---
- src/modules/sca/sca.c            | 107 +++++++++++++++++++++-
+ src/modules/sca/sca.c            | 107 ++++++++++++++++++++-
  src/modules/sca/sca.h            |   6 ++
  src/modules/sca/sca_appearance.h |   2 +-
- src/modules/sca/sca_call_info.c  | 188 ++++++++++++++++++++++-----------------
+ src/modules/sca/sca_call_info.c  | 188 +++++++++++++++++++++----------------
  src/modules/sca/sca_call_info.h  |   6 +-
  src/modules/sca/sca_dialog.h     |   2 +-
- src/modules/sca/sca_subscribe.c  |  96 ++++++++++++--------
+ src/modules/sca/sca_subscribe.c  |  96 +++++++++++--------
  src/modules/sca/sca_subscribe.h  |   6 +-
- src/modules/sca/sca_util.c       | 180 +++++++++++++++++++++++--------------
+ src/modules/sca/sca_util.c       | 194 ++++++++++++++++++++++++---------------
  src/modules/sca/sca_util.h       |  18 +++-
- 10 files changed, 410 insertions(+), 201 deletions(-)
+ 10 files changed, 417 insertions(+), 208 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
 index c856a2a..0298610 100644
@@ -211,7 +211,7 @@ index bd94e14..6ce3112 100644
  enum
  {
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 2694239..08a3ecf 100644
+index ed1a47d..162054d 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -848,44 +848,46 @@ static int sca_call_info_is_line_seize_reinvite(sip_msg_t *msg,
@@ -673,7 +673,7 @@ index d308954..dee234c 100644
  int sca_dialog_build_from_tags(sca_dialog *, int, str *, str *, str *);
  int sca_dialog_create_replaces_header(sca_dialog *, str *);
 diff --git a/src/modules/sca/sca_subscribe.c b/src/modules/sca/sca_subscribe.c
-index 895141e..3a7d46f 100644
+index 9e212f0..7d68867 100644
 --- a/src/modules/sca/sca_subscribe.c
 +++ b/src/modules/sca/sca_subscribe.c
 @@ -844,8 +844,8 @@ static int sca_subscription_update_unsafe(sca_mod *scam,
@@ -867,7 +867,7 @@ index 895141e..3a7d46f 100644
  
  	// XXX should lock starting here and use unsafe methods below?
  
-@@ -1398,13 +1414,15 @@ done:
+@@ -1397,13 +1413,15 @@ done:
  	if(req_sub.rr.s != NULL) {
  		pkg_free(req_sub.rr.s);
  	}
@@ -942,59 +942,32 @@ index e61fb74..1c1f66c 100644
 -	if(parse_from_header(msg) < 0) {
 -		LM_ERR("Bad From header\n");
 -		return (-1);
-+	if(avp.s.len > 0) {
-+		_avp = search_first_avp(avp_type, avp, &val, 0);
-+		if(_avp) {
-+			result->s = val.s.s;
-+			result->len = val.s.len;
-+			return 0;
-+		}
- 	}
+-	}
 -	f = get_from(msg);
 -	if(SCA_STR_EMPTY(&f->tag_value)) {
 -		LM_ERR("Bad From header: no tag parameter\n");
-+	return -1;
-+}
-+
-+/*
-+ * caller needs to call free_to for *body
-+ */
-+int sca_parse_uri(struct to_body *body, str *uri)
-+{
-+	assert(body != NULL);
-+	assert(uri != NULL);
-+
-+	parse_to(uri->s, uri->s + uri->len + 1, body);
-+	if(body->error != PARSE_OK) {
-+		LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
- 		return (-1);
- 	}
+-		return (-1);
+-	}
 -
 -	// ensure the URI is parsed for future use
 -	if(parse_uri(f->uri.s, f->uri.len, GET_FROM_PURI(msg)) < 0) {
 -		LM_ERR("Failed to parse From URI %.*s\n", STR_FMT(&f->uri));
-+	/* ensure the URI is parsed for future use */
-+	if(parse_uri(body->uri.s, body->uri.len, &body->parsed_uri) < 0) {
-+		LM_ERR("Failed to parse URI %.*s", STR_FMT(&body->uri));
- 		return (-1);
- 	}
+-		return (-1);
+-	}
 -
 -	*from = f;
 -
- 	return (0);
- }
- 
+-	return (0);
+-}
+-
 -int sca_get_msg_to_header(sip_msg_t *msg, struct to_body **to)
-+int sca_get_msg_from_header(sip_msg_t *msg, sca_to_body_t *from)
- {
+-{
 -	struct to_body parsed_to;
 -	struct to_body *t = NULL;
 -
 -	assert(msg != NULL);
 -	assert(to != NULL);
-+	struct to_body *f;
-+	str uri = STR_NULL;
- 
+-
 -	if(SCA_HEADER_EMPTY(msg->to)) {
 -		LM_ERR("Empty To header\n");
 -		return (-1);
@@ -1006,6 +979,60 @@ index e61fb74..1c1f66c 100644
 -				&parsed_to);
 -		if(parsed_to.error != PARSE_OK) {
 -			LM_ERR("Bad To header\n");
+-			return (-1);
++	if(avp.s.len > 0) {
++		_avp = search_first_avp(avp_type, avp, &val, 0);
++		if(_avp) {
++			result->s = val.s.s;
++			result->len = val.s.len;
++			return 0;
+ 		}
+-		t = &parsed_to;
+ 	}
+-
+-	// ensure the URI is parsed for future use
+-	if(parse_uri(t->uri.s, t->uri.len, GET_TO_PURI(msg)) < 0) {
+-		LM_ERR("Failed to parse To URI %.*s\n", STR_FMT(&t->uri));
+-		return (-1);
+-	}
+-
+-	*to = t;
+-
+-	return (0);
++	return -1;
+ }
+ 
+ /*
+  * caller needs to call free_to for *body
+  */
+-int sca_build_to_body_from_uri(sip_msg_t *msg, struct to_body **body, str *uri)
++int sca_parse_uri(struct to_body *body, str *uri)
+ {
+-	assert(msg != NULL);
+ 	assert(body != NULL);
+ 	assert(uri != NULL);
+ 
+-	*body = pkg_malloc(sizeof(struct to_body));
+-	if(*body == NULL) {
+-		LM_ERR("cannot allocate pkg memory\n");
++	parse_to(uri->s, uri->s + uri->len + 1, body);
++	if(body->error != PARSE_OK) {
++		LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
+ 		return (-1);
+ 	}
++	/* ensure the URI is parsed for future use */
++	if(parse_uri(body->uri.s, body->uri.len, &body->parsed_uri) < 0) {
++		LM_ERR("Failed to parse URI %.*s", STR_FMT(&body->uri));
++		return (-1);
++	}
++	return (0);
++}
++
++int sca_get_msg_from_header(sip_msg_t *msg, sca_to_body_t *from)
++{
++	struct to_body *f;
++	str uri = STR_NULL;
++
 +	assert(from != NULL);
 +	memset(from, 0, sizeof(sca_to_body_t));
 +	if(sca_get_avp_value(from_uri_avp_type, from_uri_avp, &uri) < 0) {
@@ -1022,15 +1049,9 @@ index e61fb74..1c1f66c 100644
 +		f = get_from(msg);
 +		if(SCA_STR_EMPTY(&f->tag_value)) {
 +			LM_ERR("Bad From header: no tag parameter\n");
- 			return (-1);
- 		}
--		t = &parsed_to;
--	}
- 
--	// ensure the URI is parsed for future use
--	if(parse_uri(t->uri.s, t->uri.len, GET_TO_PURI(msg)) < 0) {
--		LM_ERR("Failed to parse To URI %.*s\n", STR_FMT(&t->uri));
--		return (-1);
++			return (-1);
++		}
++
 +		// ensure the URI is parsed for future use
 +		if(parse_uri(f->uri.s, f->uri.len, GET_FROM_PURI(msg)) < 0) {
 +			LM_ERR("Failed to parse From URI %.*s\n", STR_FMT(&f->uri));
@@ -1048,39 +1069,25 @@ index e61fb74..1c1f66c 100644
 +		}
 +		if(sca_parse_uri(from->hdr, &uri) < 0)
 +			return -1;
- 	}
- 
--	*to = t;
--
- 	return (0);
- }
- 
--/*
-- * caller needs to call free_to for *body
-- */
--int sca_build_to_body_from_uri(sip_msg_t *msg, struct to_body **body, str *uri)
-+int sca_get_msg_to_header(sip_msg_t *msg, sca_to_body_t *to)
- {
--	assert(msg != NULL);
--	assert(body != NULL);
--	assert(uri != NULL);
-+	str uri = STR_NULL;
- 
--	*body = pkg_malloc(sizeof(struct to_body));
--	if(*body == NULL) {
--		LM_ERR("cannot allocate pkg memory\n");
--		return (-1);
--	}
-+	assert(to != NULL);
-+	memset(to, 0, sizeof(sca_to_body_t));
-+	if(sca_get_avp_value(to_uri_avp_type, to_uri_avp, &uri) < 0) {
-+		assert(msg != NULL);
++	}
  
 -	parse_to(uri->s, uri->s + uri->len + 1, *body);
 -	if((*body)->error != PARSE_OK) {
 -		LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
 -		free_to(*body);
 -		return (-1);
++	return (0);
++}
++
++int sca_get_msg_to_header(sip_msg_t *msg, sca_to_body_t *to)
++{
++	str uri = STR_NULL;
++
++	assert(to != NULL);
++	memset(to, 0, sizeof(sca_to_body_t));
++	if(sca_get_avp_value(to_uri_avp_type, to_uri_avp, &uri) < 0) {
++		assert(msg != NULL);
++
 +		if(SCA_HEADER_EMPTY(msg->to)) {
 +			LM_ERR("Empty To header\n");
 +			return (-1);

@@ -29,8 +29,8 @@ This brings a list of benifits, such as:
    bencode dictionary like format, when providing flags from
    the kamailio script
 ---
- src/modules/rtpengine/rtpengine.c | 834 +++++++++++++++++++++++++++-----------
- 1 file changed, 600 insertions(+), 234 deletions(-)
+ src/modules/rtpengine/rtpengine.c | 838 +++++++++++++++++++++++++++-----------
+ 1 file changed, 602 insertions(+), 236 deletions(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
 index 561384d..84df238 100644
@@ -52,15 +52,14 @@ index 561384d..84df238 100644
  
  static int parse_flags(struct ng_flags_parse *, struct sip_msg *,
  		enum rtpe_operation *, const char *);
--
--static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
 +static int parse_viabranch_with_param(struct ng_flags_parse * ng_flags, struct sip_msg *msg,
 +		char * branch_buf, str * p_viabranch, str * dst_viabranch);
 +static int parse_viabranch(struct ng_flags_parse * ng_flags, struct sip_msg *msg,
 +		str *viabranch, char * branch_buf);
 +static int parse_from_to_tags(struct ng_flags_parse * ng_flags, enum rtpe_operation op,
 +		struct sip_msg *msg);
-+
+ 
+-static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags,
 +static int rtpengine_offer_answer(struct sip_msg *msg, void *d,
  		enum rtpe_operation op, int more);
  static int fixup_set_id(void **param, int param_no);
@@ -311,12 +310,19 @@ index 561384d..84df238 100644
 -		ng_flags.sdes = bencode_list(bencbuf);
 -		ng_flags.t38 = bencode_list(bencbuf);
 -		ng_flags.codec = bencode_dictionary(bencbuf);
--
+ 
 -		if(read_sdp_pvar != NULL) {
 -			if(read_sdp_pvar->getf(msg, &read_sdp_pvar->pvp, &pv_val) < 0) {
 -				LM_ERR("error getting pvar value <%.*s>\n",
 -						read_sdp_pvar_str.len, read_sdp_pvar_str.s);
-+
+-				goto error;
+-			} else {
+-				body = pv_val.rs;
+-			}
+-
+-		} else if((cont_type = extract_body(msg, &body, cl_field)) == -1) {
+-			LM_ERR("can't extract body from the message\n");
+-			goto error;
 +		/* create these bencode items only if parsing is local */
 +		if (parse_by_module && flags) {
 +			ng_flags.direction = bencode_list(bencbuf);
@@ -340,14 +346,8 @@ index 561384d..84df238 100644
 +
 +			} else if((cont_type = extract_body(msg, &body, cl_field)) == -1) {
 +				LM_ERR("can't extract body from the message\n");
- 				goto error;
--			} else {
--				body = pv_val.rs;
- 			}
--
--		} else if((cont_type = extract_body(msg, &body, cl_field)) == -1) {
--			LM_ERR("can't extract body from the message\n");
--			goto error;
++				goto error;
++			}
 +			if(body_intermediate.s)
 +				bencode_dictionary_add_str(ng_flags.dict, "sdp", &body_intermediate);
 +			else
@@ -458,8 +458,7 @@ index 561384d..84df238 100644
 +							: ((msg->rcv.src_ip.af == AF_INET6) ? "IP6" : "?"));
 +			bencode_list_add_string(ng_flags.received_from, ip_addr2a(&msg->rcv.src_ip));
  		}
-+	}
- 
+-
 -		ret = -1;
 -		switch(ng_flags.via) {
 -			case 1:
@@ -487,8 +486,56 @@ index 561384d..84df238 100644
 -						   branch_buf, &viabranch.len))
 -					ret = 0;
 -				break;
+-		}
+-
+-		if(ret == -1 || viabranch.len == 0) {
+-			LM_ERR("can't get Via branch/extra ID\n");
+-			goto error;
+-		}
+-		bencode_dictionary_add_str(ng_flags.dict, "via-branch", &viabranch);
+ 	}
+ 
+-	if(ng_flags.received_from && ng_flags.received_from->child) {
+-		bencode_dictionary_add(
+-				ng_flags.dict, "received-from", ng_flags.received_from);
+-	} else {
+-		//item = bencode_list(bencbuf);
+-		bencode_dictionary_add(
+-				ng_flags.dict, "received-from", ng_flags.received_from);
+-		bencode_list_add_string(ng_flags.received_from,
+-				(msg->rcv.src_ip.af == AF_INET)
+-						? "IP4"
+-						: ((msg->rcv.src_ip.af == AF_INET6) ? "IP6" : "?"));
+-		bencode_list_add_string(
+-				ng_flags.received_from, ip_addr2a(&msg->rcv.src_ip));
+-	}
+-
+-	if(op == OP_BLOCK_DTMF || op == OP_BLOCK_MEDIA || op == OP_UNBLOCK_DTMF
+-			|| op == OP_UNBLOCK_MEDIA || op == OP_START_FORWARDING
+-			|| op == OP_STOP_FORWARDING || op == OP_SILENCE_MEDIA
+-			|| op == OP_UNSILENCE_MEDIA) {
+-		if(ng_flags.directional) {
+-			bencode_dictionary_add_str(
+-					ng_flags.dict, "from-tag", &ng_flags.from_tag);
+-			if(ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
+-				bencode_dictionary_add_str(
+-						ng_flags.dict, "to-tag", &ng_flags.to_tag);
+-		}
+-	} else if((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
+-			  || (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
+-			  || (msg->first_line.type == SIP_REPLY && op == OP_ANSWER)
+-			  || ng_flags.directional) /* set if from-tag was set manually */
 +	/* bencode items which are to be added always */
-+	{
+ 	{
+-		bencode_dictionary_add_str(
+-				ng_flags.dict, "from-tag", &ng_flags.from_tag);
+-		if(ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
+-			bencode_dictionary_add_str(
+-					ng_flags.dict, "to-tag", &ng_flags.to_tag);
+-	} else {
+-		if(!ng_flags.to_tag.s || !ng_flags.to_tag.len) {
+-			LM_ERR("No to-tag present\n");
+-			goto error;
 +		/* trickle ice sdp fragment */
 +		if(cont_type == 3)
 +			bencode_list_add_string(ng_flags.flags, "fragment");
@@ -511,65 +558,20 @@ index 561384d..84df238 100644
 +				LM_ERR("can't get Via branch/extra ID\n");
 +				goto error;
 +			}
-+		}
-+		if (viabranch.s && viabranch.len) {
-+			bencode_dictionary_add_str(ng_flags.dict, "via-branch", &viabranch);
  		}
- 
--		if(ret == -1 || viabranch.len == 0) {
--			LM_ERR("can't get Via branch/extra ID\n");
-+		/* from/to tags */
-+		if (parse_from_to_tags(&ng_flags, op, msg))
- 			goto error;
--		}
--		bencode_dictionary_add_str(ng_flags.dict, "via-branch", &viabranch);
--	}
- 
--	if(ng_flags.received_from && ng_flags.received_from->child) {
--		bencode_dictionary_add(
--				ng_flags.dict, "received-from", ng_flags.received_from);
--	} else {
--		//item = bencode_list(bencbuf);
--		bencode_dictionary_add(
--				ng_flags.dict, "received-from", ng_flags.received_from);
--		bencode_list_add_string(ng_flags.received_from,
--				(msg->rcv.src_ip.af == AF_INET)
--						? "IP4"
--						: ((msg->rcv.src_ip.af == AF_INET6) ? "IP6" : "?"));
--		bencode_list_add_string(
--				ng_flags.received_from, ip_addr2a(&msg->rcv.src_ip));
--	}
-+		/* rtpengine command */
-+		bencode_dictionary_add_string(ng_flags.dict, "command", command_strings[op]);
- 
--	if(op == OP_BLOCK_DTMF || op == OP_BLOCK_MEDIA || op == OP_UNBLOCK_DTMF
--			|| op == OP_UNBLOCK_MEDIA || op == OP_START_FORWARDING
--			|| op == OP_STOP_FORWARDING || op == OP_SILENCE_MEDIA
--			|| op == OP_UNSILENCE_MEDIA) {
--		if(ng_flags.directional) {
--			bencode_dictionary_add_str(
--					ng_flags.dict, "from-tag", &ng_flags.from_tag);
--			if(ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
--				bencode_dictionary_add_str(
--						ng_flags.dict, "to-tag", &ng_flags.to_tag);
--		}
--	} else if((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
--			  || (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
--			  || (msg->first_line.type == SIP_REPLY && op == OP_ANSWER)
--			  || ng_flags.directional) /* set if from-tag was set manually */
--	{
--		bencode_dictionary_add_str(
--				ng_flags.dict, "from-tag", &ng_flags.from_tag);
--		if(ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
--			bencode_dictionary_add_str(
--					ng_flags.dict, "to-tag", &ng_flags.to_tag);
--	} else {
--		if(!ng_flags.to_tag.s || !ng_flags.to_tag.len) {
--			LM_ERR("No to-tag present\n");
--			goto error;
--		}
 -		bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.to_tag);
 -		bencode_dictionary_add_str(ng_flags.dict, "to-tag", &ng_flags.from_tag);
++		if (viabranch.s && viabranch.len) {
++			bencode_dictionary_add_str(ng_flags.dict, "via-branch", &viabranch);
++		}
++
++		/* from/to tags */
++		if (parse_from_to_tags(&ng_flags, op, msg))
++			goto error;
++
++		/* rtpengine command */
++		bencode_dictionary_add_string(ng_flags.dict, "command", command_strings[op]);
++
 +		/* sip message type */
 +		bencode_dictionary_add_string(ng_flags.dict, "sip-message-type", sip_type_strings[msg->first_line.type]);
  	}
@@ -946,14 +948,14 @@ index 561384d..84df238 100644
  static int ki_rtpengine_offer(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_offer_wrap, flags->s, 1, OP_ANY);
 +			msg, rtpengine_offer_wrap, parms, 1, OP_ANY);
 +}
 +static int ki_rtpengine_offer2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_offer_wrap, flags->s, 1, OP_ANY);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_offer_wrap, parms, 1, OP_ANY);
  }
  
@@ -968,14 +970,14 @@ index 561384d..84df238 100644
  static int ki_rtpengine_answer(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_answer_wrap, flags->s, 2, OP_ANY);
 +			msg, rtpengine_answer_wrap, parms, 2, OP_ANY);
 +}
 +static int ki_rtpengine_answer2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_answer_wrap, flags->s, 2, OP_ANY);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_answer_wrap, parms, 2, OP_ANY);
  }
  
@@ -1073,14 +1075,14 @@ index 561384d..84df238 100644
  static int ki_unblock_media(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNBLOCK_MEDIA);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNBLOCK_MEDIA);
 +}
 +static int ki_unblock_media2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNBLOCK_MEDIA);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNBLOCK_MEDIA);
  }
  
@@ -1095,16 +1097,16 @@ index 561384d..84df238 100644
  static int ki_silence_media(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
-+			msg, rtpengine_simple_wrap, parms, 1, OP_SILENCE_MEDIA);
-+}
-+static int ki_silence_media2(sip_msg_t *msg, str *flags, str *viabranch)
-+{
-+	void *parms[2] = {flags, viabranch};
  	return rtpengine_rtpp_set_wrap(
 -			msg, rtpengine_simple_wrap, flags->s, 1, OP_SILENCE_MEDIA);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_SILENCE_MEDIA);
  }
++static int ki_silence_media2(sip_msg_t *msg, str *flags, str *viabranch)
++{
++	void *parms[2] = {flags, viabranch};
++	return rtpengine_rtpp_set_wrap(
++			msg, rtpengine_simple_wrap, parms, 1, OP_SILENCE_MEDIA);
++}
 +
 +/* KI - unsilence media */
  static int ki_unsilence_media0(sip_msg_t *msg)
@@ -1117,14 +1119,14 @@ index 561384d..84df238 100644
  static int ki_unsilence_media(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNSILENCE_MEDIA);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNSILENCE_MEDIA);
 +}
 +static int ki_unsilence_media2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNSILENCE_MEDIA);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNSILENCE_MEDIA);
  }
  
@@ -1139,16 +1141,16 @@ index 561384d..84df238 100644
  static int ki_block_dtmf(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
-+			msg, rtpengine_simple_wrap, parms, 1, OP_BLOCK_DTMF);
-+}
-+static int ki_block_dtmf2(sip_msg_t *msg, str *flags, str *viabranch)
-+{
-+	void *parms[2] = {flags, viabranch};
  	return rtpengine_rtpp_set_wrap(
 -			msg, rtpengine_simple_wrap, flags->s, 1, OP_BLOCK_DTMF);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_BLOCK_DTMF);
  }
++static int ki_block_dtmf2(sip_msg_t *msg, str *flags, str *viabranch)
++{
++	void *parms[2] = {flags, viabranch};
++	return rtpengine_rtpp_set_wrap(
++			msg, rtpengine_simple_wrap, parms, 1, OP_BLOCK_DTMF);
++}
 +
 +/* KI - unblock dtmf */
  static int ki_unblock_dtmf0(sip_msg_t *msg)
@@ -1161,14 +1163,14 @@ index 561384d..84df238 100644
  static int ki_unblock_dtmf(sip_msg_t *msg, str *flags)
  {
 +	void *parms[2] = {flags, NULL};
-+	return rtpengine_rtpp_set_wrap(
+ 	return rtpengine_rtpp_set_wrap(
+-			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNBLOCK_DTMF);
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNBLOCK_DTMF);
 +}
 +static int ki_unblock_dtmf2(sip_msg_t *msg, str *flags, str *viabranch)
 +{
 +	void *parms[2] = {flags, viabranch};
- 	return rtpengine_rtpp_set_wrap(
--			msg, rtpengine_simple_wrap, flags->s, 1, OP_UNBLOCK_DTMF);
++	return rtpengine_rtpp_set_wrap(
 +			msg, rtpengine_simple_wrap, parms, 1, OP_UNBLOCK_DTMF);
  }
  

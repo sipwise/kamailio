@@ -9,7 +9,7 @@ Subject: pua: remove destroy of internal structures on mod-destroy callback
  1 file changed, 8 deletions(-)
 
 diff --git a/src/modules/pua/pua.c b/src/modules/pua/pua.c
-index e571834..5cf774e 100644
+index a53bfd8..d69578c 100644
 --- a/src/modules/pua/pua.c
 +++ b/src/modules/pua/pua.c
 @@ -296,21 +296,13 @@ static int child_init(int rank)

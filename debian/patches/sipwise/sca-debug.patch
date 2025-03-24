@@ -47,7 +47,7 @@ index fcc94c4..79f56ba 100644
  		}
  	}
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index b2aa8bb..ef481a5 100644
+index c7d2cb0..f3918e2 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -981,6 +981,8 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,

@@ -31,12 +31,7 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.8
-upstream/0001-db_mysql-switch-warn-to-dbg-for-log-messages-for-opt.patch
-upstream/0002-db_mysql-switch-warn-to-dbg-for-log-messages-for-opt.patch
-upstream/regex-remove-pcre2_free-warning.patch
-upstream/lcr-remove-pcre2_free-warning.patch
-upstream/dialplan-remove-pcre2_free-warning.patch
-upstream/htable-do-not-print-item-name-before-is-computed.patch
+#
 ## upstream master
 upstream/rtpengine_rework_rtpp_flags.patch
 upstream/cfgutils-expose-optional-second-string-key-for-lock.patch
@@ -60,12 +55,10 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
-sipwise/tls-remove-confusing-error-message-when-trying-to-pr.patch
 sipwise/cfgutils-allow-lock_set_size-14.patch
 sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
-sipwise/db_redis-stop-searching-for-keys-if-scan_key-is-set.patch
 ### active development
 #
 ### Don't just put stuff in any order
