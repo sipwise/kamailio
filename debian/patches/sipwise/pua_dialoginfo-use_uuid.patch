@@ -7,7 +7,7 @@ Subject: pua_dialoginfo: use_uuid
  1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index c8a8a6f..9d3c0f9 100644
+index d1e704f..cbb406a 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -51,6 +51,7 @@
@@ -26,15 +26,15 @@ index c8a8a6f..9d3c0f9 100644
  int include_callid = DEF_INCLUDE_CALLID;
  int include_localremote = DEF_INCLUDE_LOCALREMOTE;
  int include_tags = DEF_INCLUDE_TAGS;
-@@ -120,6 +122,7 @@ static int child_init(int rank);
- static cmd_export_t cmds[] = {{0, 0, 0, 0, 0, 0}};
+@@ -123,6 +125,7 @@ static cmd_export_t cmds[] = {
+ };
  
  static param_export_t params[] = {
-+		{"use_uuid", INT_PARAM, &use_uuid},
- 		{"include_callid", INT_PARAM, &include_callid},
- 		{"include_localremote", INT_PARAM, &include_localremote},
- 		{"include_tags", INT_PARAM, &include_tags},
-@@ -732,8 +735,16 @@ struct dlginfo_cell *get_dialog_data(struct dlg_cell *dlg, int type,
++	{"use_uuid", INT_PARAM, &use_uuid},
+ 	{"include_callid", INT_PARAM, &include_callid},
+ 	{"include_localremote", INT_PARAM, &include_localremote},
+ 	{"include_tags", INT_PARAM, &include_tags},
+@@ -733,8 +736,16 @@ struct dlginfo_cell *get_dialog_data(struct dlg_cell *dlg, int type,
  	int len;
  
  	// generate new random uuid

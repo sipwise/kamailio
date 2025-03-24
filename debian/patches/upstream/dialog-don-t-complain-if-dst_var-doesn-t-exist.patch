@@ -8,10 +8,10 @@ Change-Id: I75f9bddd7a58fea63176e63eb075d8c5379162df
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 79221a1..43752da 100644
+index 75d7833..f7511f7 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1863,7 +1863,7 @@ static int w_dlg_get_var(
+@@ -1864,7 +1864,7 @@ static int w_dlg_get_var(
  	} else {
  		pv_get_null(msg, NULL, &dst_val);
  	}

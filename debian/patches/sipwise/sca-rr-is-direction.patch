@@ -47,7 +47,7 @@ index 7a80847..3d08921 100644
  };
  typedef struct _sca_mod sca_mod;
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index a78d3c6..78cfc35 100644
+index 987ebe7..1462f10 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -1368,6 +1368,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)

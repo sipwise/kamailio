@@ -7,7 +7,7 @@ Subject: sca-fix-pickup-when-upstream-flow
  1 file changed, 30 insertions(+), 17 deletions(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 78cfc35..e28bfed 100644
+index 1462f10..6e8a408 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -953,6 +953,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,

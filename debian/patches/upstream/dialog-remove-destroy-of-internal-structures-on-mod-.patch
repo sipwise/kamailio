@@ -10,7 +10,7 @@ Subject: dialog: remove destroy of internal structures on mod-destroy
  1 file changed, 8 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 43752da..338f7f6 100644
+index f7511f7..f27cdf2 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -865,14 +865,6 @@ static void mod_destroy(void)
