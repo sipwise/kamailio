@@ -35,10 +35,12 @@ int netstring_read_fd(int fd, char **netstring)
 {
 	int i, bytes;
 	size_t len = 0;
+	size_t read_len = 0;
+	char buffer[10] = {0};
+	char *buffer2 = NULL;
+	int x;
 
 	*netstring = NULL;
-
-	char buffer[10] = {0};
 
 	/* Peek at first 10 bytes, to get length and colon */
 	bytes = recv(fd, buffer, 10, MSG_PEEK);
@@ -68,8 +70,8 @@ int netstring_read_fd(int fd, char **netstring)
 		return NETSTRING_ERROR_NO_COLON;
 
 	/* Read the whole string from the buffer */
-	size_t read_len = i + len + 1;
-	char *buffer2 = pkg_malloc(read_len);
+	read_len = i + len + 1;
+	buffer2 = pkg_malloc(read_len);
 	if(!buffer2) {
 		LM_ERR("Out of memory!");
 		return -1;
@@ -77,16 +79,18 @@ int netstring_read_fd(int fd, char **netstring)
 	bytes = recv(fd, buffer2, read_len, 0);
 
 	/* Make sure we got the whole netstring */
-	if(read_len > bytes)
+	if(read_len > bytes) {
+		pkg_free(buffer2);
 		return NETSTRING_ERROR_TOO_SHORT;
+	}
 
 	/* Test for the trailing comma */
-	if(buffer2[read_len - 1] != ',')
+	if(buffer2[read_len - 1] != ',') {
+		pkg_free(buffer2);
 		return NETSTRING_ERROR_NO_COMMA;
+	}
 
 	buffer2[read_len - 1] = '\0';
-
-	int x;
 
 	for(x = 0; x <= read_len - i - 1; x++) {
 		buffer2[x] = buffer2[x + i];

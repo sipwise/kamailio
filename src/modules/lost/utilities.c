@@ -906,9 +906,9 @@ p_lost_loc_t lost_parse_pidf(str pidf, str urn)
 
 	if(doc == NULL) {
 		LM_WARN("invalid xml (pidf-lo): [%.*s]\n", pidf.len, pidf.s);
-	doc = xmlReadMemory(pidf.s, pidf.len, 0, NULL,
-			XML_PARSE_NOBLANKS | XML_PARSE_NONET |
-			XML_PARSE_NOCDATA | XML_PARSE_RECOVER);
+		doc = xmlReadMemory(pidf.s, pidf.len, 0, NULL,
+				XML_PARSE_NOBLANKS | XML_PARSE_NONET | XML_PARSE_NOCDATA
+						| XML_PARSE_RECOVER);
 		if(doc == NULL) {
 			LM_ERR("xml (pidf-lo) recovery failed on: [%.*s]\n", pidf.len,
 					pidf.s);
@@ -1007,7 +1007,7 @@ int lost_check_3d(xmlNodePtr node)
 
 /*
  * lost_parse_geo(node, loc)
- * parses locationResponse (pos|circle) and writes 
+ * parses locationResponse (pos|circle) and writes
  * results to location object
  */
 int lost_parse_geo(xmlNodePtr node, p_lost_loc_t loc)
@@ -1047,7 +1047,7 @@ int lost_parse_geo(xmlNodePtr node, p_lost_loc_t loc)
 	if(loc->latitude == NULL)
 		goto err;
 
-	snprintf(loc->latitude, len, "%s", (char *)bufLat);
+	snprintf(loc->latitude, len + 1, "%s", (char *)bufLat);
 
 	/* logitude */
 	len = strlen((char *)bufLon);
@@ -1057,7 +1057,7 @@ int lost_parse_geo(xmlNodePtr node, p_lost_loc_t loc)
 		goto err;
 	}
 
-	snprintf(loc->longitude, len, "%s", (char *)bufLon);
+	snprintf(loc->longitude, len + 1, "%s", (char *)bufLon);
 
 	/* altitude */
 	if(scan == 3) {
@@ -1070,14 +1070,14 @@ int lost_parse_geo(xmlNodePtr node, p_lost_loc_t loc)
 			pkg_free(loc->longitude);
 			goto err;
 		}
-		
-		snprintf(loc->altitude, len, "%s", (char *)bufAlt);
+
+		snprintf(loc->altitude, len + 1, "%s", (char *)bufAlt);
 	}
 
 	/* geolocation */
 	len = strlen((char *)bufLat) + strlen((char *)bufLon) + 1;
 	if((scan == 3) && (lost_geoloc_3d == 1)) {
-		len += strlen((char *)bufAlt);
+		len += strlen((char *)bufAlt) + 1;
 	}
 	loc->geodetic = (char *)pkg_malloc(len + 1);
 	if(loc->geodetic == NULL) {
@@ -1089,9 +1089,11 @@ int lost_parse_geo(xmlNodePtr node, p_lost_loc_t loc)
 	}
 	if((scan == 3) && (lost_geoloc_3d == 1)) {
 		s_profile = LOST_PRO_GEO3D;
-		snprintf(loc->geodetic, len, "%s %s %s", (char *)bufLat, (char *)bufLon, (char *)bufAlt);
+		snprintf(loc->geodetic, len + 1, "%s %s %s", (char *)bufLat,
+				(char *)bufLon, (char *)bufAlt);
 	} else {
-		snprintf(loc->geodetic, len, "%s %s", (char *)bufLat, (char *)bufLon);
+		snprintf(loc->geodetic, len + 1, "%s %s", (char *)bufLat,
+				(char *)bufLon);
 	}
 
 	/* find <radius> element */
@@ -1115,7 +1117,7 @@ err:
 
 /*
  * lost_xpath_location(doc, path, loc)
- * performs xpath expression on locationResponse and writes 
+ * performs xpath expression on locationResponse and writes
  * results (location-info child element) to location object
  */
 int lost_xpath_location(xmlDocPtr doc, char *path, p_lost_loc_t loc)
@@ -1185,7 +1187,7 @@ int lost_xpath_location(xmlDocPtr doc, char *path, p_lost_loc_t loc)
 						cname = BAD_CAST cur->name;
 						if(xmlStrcasecmp(cname, s_point) == 0) {
 							if((lost_check_3d(cur) == 1)
-								&& (lost_geoloc_3d == 1)) {
+									&& (lost_geoloc_3d == 1)) {
 								s_profile = LOST_PRO_GEO3D;
 								selgeo = i;
 								break;
@@ -1202,15 +1204,15 @@ int lost_xpath_location(xmlDocPtr doc, char *path, p_lost_loc_t loc)
 							break;
 						}
 						if((xmlStrcasecmp(cname, s_polygon) == 0)
-							|| (xmlStrcasecmp(cname, s_ellipse) == 0)
-							|| (xmlStrcasecmp(cname, s_arcband) == 0)) {
+								|| (xmlStrcasecmp(cname, s_ellipse) == 0)
+								|| (xmlStrcasecmp(cname, s_arcband) == 0)) {
 							s_profile = LOST_PRO_GEO2D;
 							selgeo = i;
 							break;
 						}
 						if((xmlStrcasecmp(cname, s_sphere) == 0)
-							|| (xmlStrcasecmp(cname, s_ellipsoid) == 0)
-							|| (xmlStrcasecmp(cname, s_prism) == 0)) {
+								|| (xmlStrcasecmp(cname, s_ellipsoid) == 0)
+								|| (xmlStrcasecmp(cname, s_prism) == 0)) {
 							if(lost_geoloc_3d == 1) {
 								s_profile = LOST_PRO_GEO3D;
 								selgeo = i;
@@ -1417,7 +1419,6 @@ char *lost_held_post_request(int *lgth, long rtime, char *type)
 	xmlNodePtr ptrLocationRequest = NULL;
 	xmlNodePtr ptrLocationType = NULL;
 
-	xmlKeepBlanksDefault(1);
 	*lgth = 0;
 
 	/*
@@ -1515,7 +1516,6 @@ char *lost_held_location_request(p_lost_held_t held, int *lgth)
 	xmlNodePtr ptrLocationType = NULL;
 	xmlNodePtr ptrDevice = NULL;
 
-	xmlKeepBlanksDefault(1);
 	*lgth = 0;
 
 	/*
@@ -1667,8 +1667,6 @@ char *lost_find_service_request(p_lost_loc_t loc, p_lost_list_t path, int *lgth)
 	xmlNodePtr ptrRadius = NULL;
 	xmlNodePtr ptrNode = NULL;
 	xmlNodePtr ptrPath = NULL;
-
-	xmlKeepBlanksDefault(1);
 
 	*lgth = 0;
 

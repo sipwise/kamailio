@@ -809,6 +809,7 @@ int ipsec_create(struct sip_msg *m, udomain_t *d, int _cflags)
 	pcontact_t *pcontact = NULL;
 	struct pcontact_info ci;
 	int ret = IPSEC_CMD_FAIL; // FAIL by default
+	int fun_ret_c;			  // Used to store return codes of some functions
 	tm_cell_t *t = NULL;
 	sip_msg_t *req = NULL;
 	security_t *req_sec_params = NULL;
@@ -893,19 +894,20 @@ int ipsec_create(struct sip_msg *m, udomain_t *d, int _cflags)
 	}
 
 	if(update_contact_ipsec_params(s, m, old_s) != 0) {
+		LM_ERR("Could not update ipsec params in contact.\n");
 		goto cleanup;
 	}
 
-	if(create_ipsec_tunnel(&req->rcv.src_ip, s) != 0) {
-		goto cleanup;
-	}
-
-	if(ul.update_pcontact(d, &ci, pcontact) != 0) {
-		LM_ERR("Error updating contact\n");
+	fun_ret_c = create_ipsec_tunnel(&req->rcv.src_ip, s);
+	if(fun_ret_c != 0) {
+		LM_ERR("IPSEC tunnel creation failed.\n");
 		goto cleanup;
 	}
 
 	if(ci.via_port == SIP_PORT) {
+		if(req_sec_params != NULL) {
+			pcontact->security_temp->data.ipsec = s;
+		}
 		// Update temp security parameters
 		if(ul.update_temp_security(d, pcontact->security_temp->type,
 				   pcontact->security_temp, pcontact)
@@ -914,12 +916,21 @@ int ipsec_create(struct sip_msg *m, udomain_t *d, int _cflags)
 		}
 	}
 
-
-	if(add_supported_secagree_header(m) != 0) {
+	if(ul.update_pcontact(d, &ci, pcontact) != 0) {
+		LM_ERR("Error updating contact\n");
 		goto cleanup;
 	}
 
-	if(add_security_server_header(m, s) != 0) {
+	fun_ret_c = add_supported_secagree_header(m);
+	if(fun_ret_c != 0) {
+		LM_ERR("Could not add secagree header. Failed with code: %d\n",
+				fun_ret_c);
+		goto cleanup;
+	}
+
+	fun_ret_c = add_security_server_header(m, s);
+	if(fun_ret_c != 0) {
+		LM_ERR("Could not add security server header. Code: %d\n", fun_ret_c);
 		goto cleanup;
 	}
 

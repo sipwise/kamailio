@@ -3779,11 +3779,15 @@ int ds_is_active_uri(sip_msg_t *msg, int group, str *uri)
 		for(j = 0; j < list->nr; j++) {
 			if(!ds_skip_dst(list->dlist[j].flags)) {
 				if(uri == NULL || uri->s == NULL || uri->len <= 0) {
+					LM_DBG("one destination active: %d %.*s\n", group,
+							list->dlist[j].uri.len, list->dlist[j].uri.s);
 					return 1;
 				}
 				if((list->dlist[j].uri.len == uri->len)
 						&& (memcmp(list->dlist[j].uri.s, uri->s, uri->len)
 								== 0)) {
+					LM_DBG("destination active: %d %.*s\n", group,
+							list->dlist[j].uri.len, list->dlist[j].uri.s);
 					return 1;
 				}
 			}
@@ -3841,14 +3845,14 @@ static void ds_options_callback(
 		}
 	}
 
-	/* Check if in the meantime someone disabled probing of the target through RPC, MI or reload */
+	/* Check if in the meantime someone disabled probing of the target
+	 * through RPC or reload */
 	if(ds_probing_mode == DS_PROBE_ONLYFLAGGED
 			&& !(ds_get_state(group, &uri) & DS_PROBING_DST)) {
 		return;
 	}
 
 	/* ps->code contains the result-code of the request.
-	 *
 	 * We accept both a "200 OK" or the configured reply as a valid response */
 	if((ps->code >= 200 && ps->code <= 299)
 			|| ds_ping_check_rplcode(ps->code)) {
@@ -3859,7 +3863,7 @@ static void ds_options_callback(
 						&& (ds_get_state(group, &uri) & DS_PROBING_DST)))
 			state |= DS_PROBING_DST;
 
-		/* Check if in the meantime someone disabled the target through RPC or MI */
+		/* Check if in the meantime someone disabled the target through RPC */
 		if(!(ds_get_state(group, &uri) & DS_DISABLED_DST)
 				&& ds_update_state(fmsg, group, &uri, state, &rctx) != 0) {
 			LM_ERR("Setting the state failed (%.*s, group %d)\n", uri.len,
@@ -3869,7 +3873,7 @@ static void ds_options_callback(
 		state = DS_TRYING_DST;
 		if(ds_probing_mode != DS_PROBE_NONE)
 			state |= DS_PROBING_DST;
-		/* Check if in the meantime someone disabled the target through RPC or MI */
+		/* Check if in the meantime someone disabled the target through RPC */
 		if(!(ds_get_state(group, &uri) & DS_DISABLED_DST)
 				&& ds_update_state(fmsg, group, &uri, state, &rctx) != 0) {
 			LM_ERR("Setting the probing state failed (%.*s, group %d)\n",

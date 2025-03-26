@@ -1288,7 +1288,7 @@ inline static int find_listening_sock_info(
 			if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (void *)&optval,
 					   sizeof(optval))
 					== -1) {
-				LM_ERR("setsockopt SO_REUSEADDR %s\n", strerror(errno));
+				LM_NOTICE("setsockopt SO_REUSEADDR [%s]\n", strerror(errno));
 				/* continue, not critical */
 			}
 #endif
@@ -1297,19 +1297,19 @@ inline static int find_listening_sock_info(
 			if(setsockopt(s, SOL_SOCKET, SO_REUSEPORT, (void *)&optval,
 					   sizeof(optval))
 					== -1) {
-				LM_ERR("setsockopt SO_REUSEPORT %s\n", strerror(errno));
+				LM_NOTICE("setsockopt SO_REUSEPORT [%s]\n", strerror(errno));
 				/* continue, not critical */
 			}
 #endif
 			if(unlikely(bind(s, &si->su.s, sockaddru_len(si->su)) != 0)) {
-				LM_WARN("binding to source address %s failed: %s [%d]\n",
+				LM_DBG("binding to source address %s failed: [%s] [%d]\n",
 						su2a(&si->su, sizeof(si->su)), strerror(errno), errno);
 				return -1;
 			}
 		}
 	} else {
 		if(unlikely(bind(s, &(*from)->s, sockaddru_len(**from)) != 0)) {
-			LM_WARN("binding to source address %s failed: %s [%d]\n",
+			LM_DBG("binding to source address %s failed: [%s] [%d]\n",
 					su2a(&si->su, sizeof(si->su)), strerror(errno), errno);
 			return -1;
 		}
@@ -1330,6 +1330,7 @@ inline static int tcp_do_connect(union sockaddr_union *server,
 	union sockaddr_union my_name;
 	socklen_t my_name_len;
 	struct ip_addr ip;
+	unsigned short port;
 #ifdef TCP_ASYNC
 	int n;
 #endif /* TCP_ASYNC */
@@ -1435,14 +1436,19 @@ inline static int tcp_do_connect(union sockaddr_union *server,
 	from = &my_name; /* update from with the real "from" address */
 	su2ip_addr(&ip, &my_name);
 find_socket:
+#ifdef SO_REUSEPORT
+	port = cfg_get(tcp, tcp_cfg, reuse_port) ? su_getport(from) : 0;
+#else
+	port = 0;
+#endif
 #ifdef USE_TLS
 	if(unlikely(type == PROTO_TLS)) {
-		*res_si = find_si(&ip, 0, PROTO_TLS);
+		*res_si = find_si(&ip, port, PROTO_TLS);
 	} else {
-		*res_si = find_si(&ip, 0, PROTO_TCP);
+		*res_si = find_si(&ip, port, PROTO_TCP);
 	}
 #else
-	*res_si = find_si(&ip, 0, PROTO_TCP);
+	*res_si = find_si(&ip, port, PROTO_TCP);
 #endif
 
 	if(unlikely(*res_si == 0)) {
@@ -3145,6 +3151,13 @@ int tcp_init(struct socket_info *sock_info)
 #endif
 
 	addr = &sock_info->su;
+	if((addr->s.sa_family == AF_INET6)
+			&& (sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_SKIP)
+			&& IN6_IS_ADDR_LINKLOCAL(&addr->sin6.sin6_addr)) {
+		LM_DBG("skip binding on %s (bind mode: %d)\n", sock_info->address_str.s,
+				sr_bind_ipv6_link_local);
+		return 0;
+	}
 	/* sock_info->proto=PROTO_TCP; */
 	if(init_su(addr, &sock_info->address, sock_info->port_no) < 0) {
 		LM_ERR("could no init sockaddr_union\n");
@@ -3212,8 +3225,9 @@ int tcp_init(struct socket_info *sock_info)
 			LM_WARN("setsockopt v6 tos: %s (%d)\n", strerror(errno), tos);
 			/* continue since this is not critical */
 		}
-		if(sr_bind_ipv6_link_local != 0) {
-			LM_INFO("setting scope of %s\n", sock_info->address_str.s);
+		if(sr_bind_ipv6_link_local & KSR_IPV6_LINK_LOCAL_BIND) {
+			LM_INFO("setting scope of %s (bind mode: %d)\n",
+					sock_info->address_str.s, sr_bind_ipv6_link_local);
 			addr->sin6.sin6_scope_id =
 					ipv6_get_netif_scope(sock_info->address_str.s);
 		}
@@ -3276,9 +3290,15 @@ int tcp_init(struct socket_info *sock_info)
 	}
 #endif
 	if(bind(sock_info->socket, &addr->s, sockaddru_len(*addr)) == -1) {
-		LM_ERR("bind(%x, %p, %d) on %s:%d : %s\n", sock_info->socket, &addr->s,
-				(unsigned)sockaddru_len(*addr), sock_info->address_str.s,
-				sock_info->port_no, strerror(errno));
+		LM_ERR("bind(%x, %p, %d) on [%s]:%d : (%d / %s)\n", sock_info->socket,
+				&addr->s, (unsigned)sockaddru_len(*addr),
+				sock_info->address_str.s, sock_info->port_no, errno,
+				strerror(errno));
+		if(addr->s.sa_family == AF_INET6) {
+			LM_ERR("might be caused by using a link local address, is "
+				   "'bind_ipv6_link_local' set (now: %d)?\n",
+					sr_bind_ipv6_link_local);
+		}
 		goto error;
 	}
 	if(listen(sock_info->socket, TCP_LISTEN_BACKLOG) == -1) {
