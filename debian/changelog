@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.6-1+0~mr12.5.1.7) unstable; urgency=medium
+
+  * New upstream version 5.8.6
+  * MT#62419 refresh patches
+
+ -- Victor Seva <vseva@debian.org>  Wed, 26 Mar 2025 13:28:10 +0100
+
 ngcp-kamailio (5.8.2-1+0~mr12.5.1.7) unstable; urgency=medium
 
   [ Victor Seva ]
