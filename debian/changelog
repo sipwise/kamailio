@@ -1,3 +1,12 @@
+ngcp-kamailio (6.0.1-1+0~mr13.4.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [387078e] MT#62337 update PARAM definition for our modules
+  * [069eaac] MT#62337 presence_dfks: fix missing definition
+  * [2666f63] MT#62041 lcr_rate: coherent use of defined types for avp flags, name and value
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 10 Apr 2025 08:27:06 +0200
+
 ngcp-kamailio (6.0.1-1+0~mr13.3.0.0) unstable; urgency=medium
 
   * MT#62041 trixie build: fixes from 'upstream'
