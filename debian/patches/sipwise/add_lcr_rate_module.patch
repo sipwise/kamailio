@@ -12,11 +12,9 @@ Subject: add_lcr_rate_module
  create mode 100644 src/modules/lcr_rate/Makefile
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
-diff --git a/src/Makefile.groups b/src/Makefile.groups
-index fae0dbd..f54d81d 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -109,6 +109,9 @@ mod_list_sctp=sctp
+@@ -109,6 +109,9 @@
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -26,7 +24,7 @@ index fae0dbd..f54d81d 100644
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -287,8 +290,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
+@@ -287,8 +290,8 @@
  			   $(mod_list_microhttpd) \
  			   $(mod_list_nghttp2) \
  			   $(mod_list_gcrypt) \
@@ -37,7 +35,7 @@ index fae0dbd..f54d81d 100644
  
  
  ### --- Groups defined for source code compilation ###
-@@ -345,6 +348,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
+@@ -345,6 +348,8 @@
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
@@ -46,11 +44,9 @@ index fae0dbd..f54d81d 100644
  
  ### --- Groups defined for pacKaging ###
  
-diff --git a/src/core/mod_fix.c b/src/core/mod_fix.c
-index 767c6a4..d0f1841 100644
 --- a/src/core/mod_fix.c
 +++ b/src/core/mod_fix.c
-@@ -598,6 +598,7 @@ int fixup_free_igp_spve(void **param, int param_no)
+@@ -598,6 +598,7 @@
  FIXUP_F_SPVE_T(spve_spve, 1, 2, 2, 0)
  FIXUP_F_SPVE_T(spve_uint, 1, 2, 1, FPARAM_INT)
  FIXUP_F_SPVE_T(spve_str, 1, 2, 1, FPARAM_STR)
@@ -58,7 +54,7 @@ index 767c6a4..d0f1841 100644
  FIXUP_F_SPVE_T(spve_null, 1, 1, 1, 0)
  
  /** get the corresp. fixup_free* function.
-@@ -644,6 +645,8 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
+@@ -644,6 +645,8 @@
  		return 0;
  	if(f == fixup_spve_str)
  		return fixup_free_spve_str;
@@ -67,11 +63,9 @@ index 767c6a4..d0f1841 100644
  	return 0;
  }
  
-diff --git a/src/core/mod_fix.h b/src/core/mod_fix.h
-index 6ec0280..26968a7 100644
 --- a/src/core/mod_fix.h
 +++ b/src/core/mod_fix.h
-@@ -138,6 +138,8 @@ int fixup_spve_uint(void **param, int param_no);
+@@ -138,6 +138,8 @@
  int fixup_free_spve_uint(void **param, int param_no);
  int fixup_spve_str(void **param, int param_no);
  int fixup_free_spve_str(void **param, int param_no);
@@ -80,9 +74,6 @@ index 6ec0280..26968a7 100644
  
  int fixup_spve_all(void **param, int param_no);
  int fixup_free_spve_all(void **param, int param_no);
-diff --git a/src/modules/lcr_rate/Makefile b/src/modules/lcr_rate/Makefile
-new file mode 100644
-index 0000000..9a3cee1
 --- /dev/null
 +++ b/src/modules/lcr_rate/Makefile
 @@ -0,0 +1,9 @@
@@ -95,9 +86,6 @@ index 0000000..9a3cee1
 +LIBS+=-lswrate
 +
 +include ../../Makefile.modules
-diff --git a/src/modules/lcr_rate/lcr_rate_mod.c b/src/modules/lcr_rate/lcr_rate_mod.c
-new file mode 100644
-index 0000000..aaed8c0
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
 @@ -0,0 +1,517 @@
@@ -184,12 +172,12 @@ index 0000000..aaed8c0
 +};
 +
 +static param_export_t params[] = {
-+	{"gw_uri_avp", PARAM_STR, &gw_uri_avp_param},
-+	{"db_host",    PARAM_STR, &db_host},
-+	{"db_port",    PARAM_INT, &db_port},
-+	{"db_user",    PARAM_STR, &db_user},
-+	{"db_pass",    PARAM_STR, &db_pass},
-+	{"db_db",      PARAM_STR, &db_db},
++	{"gw_uri_avp", PARAM_STRING, &gw_uri_avp_param},
++	{"db_host",    PARAM_STRING, &db_host},
++	{"db_port",    PARAM_INT,    &db_port},
++	{"db_user",    PARAM_STRING, &db_user},
++	{"db_pass",    PARAM_STRING, &db_pass},
++	{"db_db",      PARAM_STRING, &db_db},
 +	{0,},
 +};
 +
