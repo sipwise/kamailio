@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.5-1+0~mr12.3.1.8) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [3575f8f] MT#62911 permissions: don't allow reloads in the middle of a reload
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 27 May 2025 15:22:39 +0200
+
 ngcp-kamailio (5.7.5-1+0~mr12.3.1.7) unstable; urgency=medium
 
   [ Victor Seva ]
