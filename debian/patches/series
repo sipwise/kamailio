@@ -45,7 +45,7 @@ sipwise/http_client-add-method-parameter-to-http_connect.patch
 sipwise/lost-add-method-parameter-to-http_connect-calls.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 ### active development
-#
+sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
