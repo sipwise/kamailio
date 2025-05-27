@@ -52,7 +52,7 @@ sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
 ### active development
 sipwise/permissions_add_register_allow_with_port_check.patch
-#
+sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
