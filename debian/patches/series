@@ -29,6 +29,7 @@ sipwise/sca-add-pai_avp-parameter.patch
 #
 ## 6.0 branch
 upstream/presence_dfks-add-missing-definition.patch
+upstream/sca-reserve-subscription.rr.s-separately-since-it-co.patch
 ## upstream master
 #
 ### relevant for upstream
