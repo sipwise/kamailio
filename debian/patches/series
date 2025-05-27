@@ -60,7 +60,7 @@ sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 ### active development
-#
+sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
