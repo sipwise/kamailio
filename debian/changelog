@@ -1,3 +1,11 @@
+ngcp-kamailio (6.0.1-1+0~mr13.3.1.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [56aabd0] MT#62911 permissions: don't allow reloads in the middle of a reload
+  * [f936e63] MT#62845 sca: fix coredump on update
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 27 May 2025 15:21:48 +0200
+
 ngcp-kamailio (6.0.1-1+0~mr13.3.1.2) unstable; urgency=medium
 
   [ Richard Fuchs ]
