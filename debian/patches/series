@@ -60,6 +60,7 @@ sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
 sipwise/cfgutils-allow-lock_set_size-14.patch
+sipwise/presence_offline_cleanup.patch
 ### active development
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 ### Don't just put stuff in any order
