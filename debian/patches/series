@@ -47,6 +47,7 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/presence_vqr.patch
 sipwise/dialog-dlg_get_ttag.patch
 sipwise/app_lua_sr-support-second-str-for-cfgutils-lock.patch
+sipwise/presence_offline_cleanup.patch
 ### active development
 sipwise/permissions_add_register_allow_with_port_check.patch
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
