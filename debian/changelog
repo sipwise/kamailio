@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.1-1+0~mr12.4.1.6) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [78d767b] MT#62931 Append marking for removal to etag in presentity table
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 06 Jun 2025 10:48:07 +0200
+
 ngcp-kamailio (5.8.1-1+0~mr12.4.1.5) unstable; urgency=medium
 
   [ Victor Seva ]
