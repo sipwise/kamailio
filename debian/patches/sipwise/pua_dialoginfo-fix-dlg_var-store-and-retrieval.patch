@@ -6,8 +6,8 @@ Subject: pua_dialoginfo: fix dlg_var store and retrieval
 * store values as comma separate strings
 * alloc string values always for str_list
 ---
- src/modules/pua_dialoginfo/pua_dialoginfo.c | 203 +++++++++++++++++++---------
- 1 file changed, 137 insertions(+), 66 deletions(-)
+ src/modules/pua_dialoginfo/pua_dialoginfo.c | 205 +++++++++++++++++++---------
+ 1 file changed, 138 insertions(+), 67 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 index 6efcdc0..089586d 100644
@@ -29,7 +29,7 @@ index 6efcdc0..089586d 100644
  	struct str_list *list_first = 0;
  	struct str_list *list_current = 0;
  	struct search_state st;
-@@ -606,33 +606,122 @@ struct str_list *get_str_list(unsigned short avp_flags, int_str avp_name)
+@@ -606,41 +606,129 @@ struct str_list *get_str_list(unsigned short avp_flags, int_str avp_name)
  	}
  
  	do {
@@ -62,16 +62,19 @@ index 6efcdc0..089586d 100644
 +			free_str_list_all(list_first);
 +			return NULL;
  		}
-+		list_current->s.len = avp_value.s.len;
-+	} while(search_next_avp(&st, &avp_value));
- 
+-
 -		memset(list_current, 0, len);
-+	return list_first;
-+}
- 
+-
 -		list_current->s.s = (char *)list_current + sizeof(struct str_list);
--		list_current->s.len = avp_value.s.len;
+ 		list_current->s.len = avp_value.s.len;
 -		memcpy(list_current->s.s, avp_value.s.s, avp_value.s.len);
+-
+-
+ 	} while(search_next_avp(&st, &avp_value));
+ 
+ 	return list_first;
+ }
+ 
 +/**
 + * @brief set dlg_var value from str_list as comma separated values
 + *
@@ -86,11 +89,10 @@ index 6efcdc0..089586d 100644
 +	struct str_list *it = lst;
 +	int num = -1;
 +	int res;
- 
++
 +	if(!lst)
 +		return -1;
- 
--	} while(search_next_avp(&st, &avp_value));
++
 +	while(it) {
 +		buf.len += it->s.len + ++num;
 +		it = it->next;
@@ -109,8 +111,7 @@ index 6efcdc0..089586d 100644
 +	}
 +	res = dlg_api.set_dlg_var(dlg, key, &buf);
 +	pkg_free(buf.s);
- 
--	return list_first;
++
 +	return res;
 +}
 +
@@ -164,10 +165,10 @@ index 6efcdc0..089586d 100644
 +	} while(sep);
 +
 +	return 0;
- }
- 
++}
++
  struct dlginfo_cell *get_dialog_data(struct dlg_cell *dlg, int type,
-@@ -640,7 +729,6 @@ struct dlginfo_cell *get_dialog_data(struct dlg_cell *dlg, int type,
+ 		int disable_caller_publish, int disable_callee_publish)
  {
  	struct dlginfo_cell *dlginfo;
  	int len;
