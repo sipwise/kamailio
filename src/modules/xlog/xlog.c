@@ -883,6 +883,7 @@ int ki_xlog_ex(sip_msg_t *msg, str *lfacility, int llevel, str *lmsg)
 	int lf = xlog_facility;
 	pv_elem_t *xmodel = NULL;
 	str txt = {0, 0};
+	char *_xlog_prefix_val = _xlog_prefix;
 
 	if(!is_printable(llevel))
 		return 1;
@@ -898,6 +899,18 @@ int ki_xlog_ex(sip_msg_t *msg, str *lfacility, int llevel, str *lmsg)
 		return -1;
 	}
 
+	if(_xlog_prefix_mode) {
+		str _xlog_prefix_str;
+		_xlog_prefix_str.s = _xlog_prefix_buf;
+		_xlog_prefix_str.len = buf_size;
+		if(pv_printf(msg, _xlog_prefix_pvs, _xlog_prefix_str.s,
+				   &_xlog_prefix_str.len)
+						== 0
+				&& _xlog_prefix_str.len > 0) {
+			_xlog_prefix_val = _xlog_prefix_buf;
+		}
+	}
+
 	if(lfacility != NULL) {
 		lfacility->s[lfacility->len] = '\0';
 		lf = str2facility(lfacility->s);
@@ -907,8 +920,7 @@ int ki_xlog_ex(sip_msg_t *msg, str *lfacility, int llevel, str *lmsg)
 			lf = xlog_facility;
 		}
 	}
-	LOG_FN(lf, llevel, _xlog_prefix, "%.*s", txt.len, txt.s);
-	;
+	LOG_FN(lf, llevel, _xlog_prefix_val, "%.*s", txt.len, txt.s);
 	pv_elem_free_all(xmodel);
 	return 1;
 }
@@ -921,10 +933,12 @@ int ki_xlog_get_level(str *slevel)
 		llevel = L_ALERT;
 	} else if(slevel->len == 5 && strncasecmp(slevel->s, "l_bug", 5) == 0) {
 		llevel = L_BUG;
+	} else if(slevel->len == 7 && strncasecmp(slevel->s, "l_crit0", 7) == 0) {
+		llevel = L_CRIT;
 	} else if(slevel->len == 7 && strncasecmp(slevel->s, "l_crit2", 7) == 0) {
 		llevel = L_CRIT2;
 	} else if(slevel->len == 6 && strncasecmp(slevel->s, "l_crit", 6) == 0) {
-		llevel = L_CRIT;
+		llevel = L_CRIT2;
 	} else if(slevel->len == 5 && strncasecmp(slevel->s, "l_err", 5) == 0) {
 		llevel = L_ERR;
 	} else if(slevel->len == 6 && strncasecmp(slevel->s, "l_warn", 6) == 0) {
@@ -986,7 +1000,7 @@ int ki_xalert(sip_msg_t *msg, str *lmsg)
 
 int ki_xcrit(sip_msg_t *msg, str *lmsg)
 {
-	return ki_xlog_ex(msg, NULL, L_CRIT, lmsg);
+	return ki_xlog_ex(msg, NULL, L_CRIT2, lmsg);
 }
 
 /**
