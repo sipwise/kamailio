@@ -1,3 +1,17 @@
+ngcp-kamailio (6.0.1-1+0~mr13.5.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [84e2565] MT#62704 fix PARAM_STR vs PARAM_STRING
+
+  [ Victor Seva ]
+  * [998899a] MT#62911 permissions: don't allow reloads in the middle of a reload
+  * [c970a3b] MT#62845 sca: fix coredump on update
+
+  [ Alessio Garzi ]
+  * [77dff8f] MT#62931 Append marking for removal to etag in presentity table
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 20 Jun 2025 10:43:01 +0200
+
 ngcp-kamailio (6.0.1-1+0~mr13.4.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
