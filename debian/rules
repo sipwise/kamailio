@@ -138,6 +138,8 @@ BUILD_MODULES   := $(addprefix build_,   $(PACKAGE_GROUPS) $(EXTRA_GROUPS))
 INSTALL_MODULES := $(addprefix install_, $(PACKAGE_GROUPS))
 INSTALL_EXTRA   := $(addprefix install_, $(EXTRA_GROUPS))
 
+CC_EXTRA_OPTS += -DTLS_WR_DEBUG -DTLS_RD_DEBUG -DTLS_BIO_DEBUG
+
 .PHONY: $(BUILD_MODULES) $(INSTALL_MODULES) $(INSTALL_EXTRA)
 test_build_all-stamp: configure-stamp
 	$(MAKE) all quiet=verbose
