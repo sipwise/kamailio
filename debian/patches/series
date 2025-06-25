@@ -64,3 +64,4 @@ sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/add_check_avp_name.patch
