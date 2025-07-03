@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.1-1+0~mr13.4.1.1) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [d7cfe65] MT#55283 enable TLS debugging
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 03 Jul 2025 12:15:19 +0200
+
 ngcp-kamailio (6.0.1-1+0~mr13.4.1.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
