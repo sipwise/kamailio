@@ -26,10 +26,6 @@ sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
-#
-## 6.0 branch
-upstream/presence_dfks-add-missing-definition.patch
-upstream/sca-reserve-subscription.rr.s-separately-since-it-co.patch
 ## upstream master
 #
 ### relevant for upstream
@@ -48,6 +44,7 @@ sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 sipwise/presence_offline_cleanup.patch
 ### active development
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
+sipwise/add_check_avp_name.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
@@ -64,4 +61,4 @@ sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
-sipwise/add_check_avp_name.patch
+

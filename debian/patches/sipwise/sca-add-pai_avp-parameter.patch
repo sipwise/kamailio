@@ -59,10 +59,10 @@ index f57dcd6..18049cd 100644
  typedef struct _sca_config sca_config;
  
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 0152847..37bed99 100644
+index 8aaca65..fdaba18 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1145,20 +1145,33 @@ static int sca_call_info_insert_asserted_identity(
+@@ -1146,20 +1146,33 @@ static int sca_call_info_insert_asserted_identity(
  	str aor = STR_NULL;
  	str hdr = STR_NULL;
  	int len;
@@ -102,7 +102,7 @@ index 0152847..37bed99 100644
  #define SCA_P_ASSERTED_IDENTITY_HDR_PREFIX "P-Asserted-Identity: "
  #define SCA_P_ASSERTED_IDENTITY_HDR_PREFIX_LEN strlen("P-Asserted-Identity: ")
  
-@@ -1204,7 +1217,7 @@ static int sca_call_info_insert_asserted_identity(
+@@ -1205,7 +1218,7 @@ static int sca_call_info_insert_asserted_identity(
  	rc = 1;
  
  done:

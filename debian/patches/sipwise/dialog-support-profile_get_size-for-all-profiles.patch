@@ -111,10 +111,10 @@ index 209c4ea..fd71c30 100644
  /*!
   * \brief Search a dialog profile in the global list
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 4a522cd..ee6933c 100644
+index 2653f15..4486405 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
-@@ -3067,6 +3067,28 @@ dlg_set_state("early");
+@@ -3070,6 +3070,28 @@ dlg_set_state("early");
  		</programlisting>
  		</section>
  

@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Mon, 7 Jul 2025 16:31:45 +0200
+Subject: add_check_avp_name
+
+---
+ src/core/usr_avp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/core/usr_avp.c b/src/core/usr_avp.c
+index d189669..aafe7e7 100644
 --- a/src/core/usr_avp.c
 +++ b/src/core/usr_avp.c
-@@ -391,6 +391,10 @@ static inline int match_by_id(avp_t *avp
+@@ -391,6 +391,10 @@ static inline int match_by_id(avp_t *avp, avp_id_t id)
  static inline int match_by_name(avp_t *avp, avp_id_t id, str *name)
  {
  	str *avp_name;

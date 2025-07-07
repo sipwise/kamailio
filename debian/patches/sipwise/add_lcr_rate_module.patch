@@ -12,9 +12,11 @@ Subject: add_lcr_rate_module
  create mode 100644 src/modules/lcr_rate/Makefile
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index fae0dbd..f54d81d 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -109,6 +109,9 @@
+@@ -109,6 +109,9 @@ mod_list_sctp=sctp
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -24,7 +26,7 @@ Subject: add_lcr_rate_module
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -287,8 +290,8 @@
+@@ -287,8 +290,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
  			   $(mod_list_microhttpd) \
  			   $(mod_list_nghttp2) \
  			   $(mod_list_gcrypt) \
@@ -35,7 +37,7 @@ Subject: add_lcr_rate_module
  
  
  ### --- Groups defined for source code compilation ###
-@@ -345,6 +348,8 @@
+@@ -345,6 +348,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
@@ -44,9 +46,11 @@ Subject: add_lcr_rate_module
  
  ### --- Groups defined for pacKaging ###
  
+diff --git a/src/core/mod_fix.c b/src/core/mod_fix.c
+index 767c6a4..d0f1841 100644
 --- a/src/core/mod_fix.c
 +++ b/src/core/mod_fix.c
-@@ -598,6 +598,7 @@
+@@ -598,6 +598,7 @@ int fixup_free_igp_spve(void **param, int param_no)
  FIXUP_F_SPVE_T(spve_spve, 1, 2, 2, 0)
  FIXUP_F_SPVE_T(spve_uint, 1, 2, 1, FPARAM_INT)
  FIXUP_F_SPVE_T(spve_str, 1, 2, 1, FPARAM_STR)
@@ -54,7 +58,7 @@ Subject: add_lcr_rate_module
  FIXUP_F_SPVE_T(spve_null, 1, 1, 1, 0)
  
  /** get the corresp. fixup_free* function.
-@@ -644,6 +645,8 @@
+@@ -644,6 +645,8 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
  		return 0;
  	if(f == fixup_spve_str)
  		return fixup_free_spve_str;
@@ -63,9 +67,11 @@ Subject: add_lcr_rate_module
  	return 0;
  }
  
+diff --git a/src/core/mod_fix.h b/src/core/mod_fix.h
+index 6ec0280..26968a7 100644
 --- a/src/core/mod_fix.h
 +++ b/src/core/mod_fix.h
-@@ -138,6 +138,8 @@
+@@ -138,6 +138,8 @@ int fixup_spve_uint(void **param, int param_no);
  int fixup_free_spve_uint(void **param, int param_no);
  int fixup_spve_str(void **param, int param_no);
  int fixup_free_spve_str(void **param, int param_no);
@@ -74,6 +80,9 @@ Subject: add_lcr_rate_module
  
  int fixup_spve_all(void **param, int param_no);
  int fixup_free_spve_all(void **param, int param_no);
+diff --git a/src/modules/lcr_rate/Makefile b/src/modules/lcr_rate/Makefile
+new file mode 100644
+index 0000000..9a3cee1
 --- /dev/null
 +++ b/src/modules/lcr_rate/Makefile
 @@ -0,0 +1,9 @@
@@ -86,6 +95,9 @@ Subject: add_lcr_rate_module
 +LIBS+=-lswrate
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/lcr_rate/lcr_rate_mod.c b/src/modules/lcr_rate/lcr_rate_mod.c
+new file mode 100644
+index 0000000..7c32acf
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
 @@ -0,0 +1,517 @@

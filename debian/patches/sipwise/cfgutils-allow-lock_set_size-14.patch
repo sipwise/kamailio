@@ -7,7 +7,7 @@ Subject: cfgutils: allow lock_set_size > 14
  1 file changed, 52 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/cfgutils/cfgutils.c b/src/modules/cfgutils/cfgutils.c
-index fd0a5e5..ececa12 100644
+index 2d3809e..1b42d1e 100644
 --- a/src/modules/cfgutils/cfgutils.c
 +++ b/src/modules/cfgutils/cfgutils.c
 @@ -4,6 +4,7 @@

@@ -7,19 +7,18 @@ Subject: lost: add method parameter to http_connect() calls
  1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/lost/functions.c b/src/modules/lost/functions.c
-index 96886db..b57adf5 100644
+index 278f5ea69..e84904798 100644
 --- a/src/modules/lost/functions.c
 +++ b/src/modules/lost/functions.c
-@@ -190,7 +190,7 @@ int lost_held_function(struct sip_msg *_m, char *_con, char *_pidf, char *_url,
- 	str geo = STR_NULL; /* return value geolocation uri */
- 	str res = STR_NULL; /* return value pidf */
- 	str err = STR_NULL; /* return value error */
--
+@@ -192,6 +192,7 @@ int lost_held_function(struct sip_msg *_
+ 	str res = STR_NULL;	 /* return value pidf */
+ 	str err = STR_NULL;	 /* return value error */
+ 
 +	str method = str_init("POST");
  	str url = STR_NULL;
  	str did = STR_NULL;
  	str que = STR_NULL;
-@@ -294,7 +294,7 @@ int lost_held_function(struct sip_msg *_m, char *_con, char *_pidf, char *_url,
+@@ -295,7 +296,7 @@ int lost_held_function(struct sip_msg *_
  		LM_DBG("using connection [%.*s]\n", con.len, con.s);
  
  		/* send via connection */
@@ -28,7 +27,7 @@ index 96886db..b57adf5 100644
  	} else {
  		/* we have no connection ... do a NAPTR lookup */
  		if(lost_parse_host(did.s, &host, &flag) > 0) {
-@@ -821,6 +821,7 @@ int lost_function(struct sip_msg *_m, char *_con, char *_uri, char *_name,
+@@ -814,6 +815,7 @@ int lost_function(struct sip_msg *_m, ch
  	str err = STR_NULL;	 /* return value error */
  
  	str tmp = STR_NULL;
@@ -36,7 +35,7 @@ index 96886db..b57adf5 100644
  	str url = STR_NULL;
  	str urn = STR_NULL;
  	str req = STR_NULL;
-@@ -1095,7 +1096,7 @@ int lost_function(struct sip_msg *_m, char *_con, char *_uri, char *_name,
+@@ -1088,7 +1090,7 @@ int lost_function(struct sip_msg *_m, ch
  		pkg_free(urlrep); /* clean up */
  		urlrep = NULL;
  	} else {

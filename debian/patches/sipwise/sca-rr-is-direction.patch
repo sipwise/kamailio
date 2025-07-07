@@ -47,10 +47,10 @@ index f1f8bf1..f57dcd6 100644
  };
  typedef struct _sca_mod sca_mod;
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 3d54711..aec5493 100644
+index 0bf57b6..fc9d039 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1369,6 +1369,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1370,6 +1370,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  {
  	sca_appearance *app;
  	sca_to_body_t from, to;
@@ -58,7 +58,7 @@ index 3d54711..aec5493 100644
  	int slot_idx = -1;
  	int state = SCA_APPEARANCE_STATE_IDLE;
  
-@@ -1385,13 +1386,19 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1386,13 +1387,19 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  	}
  
  	if(sca_uri_lock_if_shared_appearance(sca, from_aor, &slot_idx)) {
@@ -81,7 +81,7 @@ index 3d54711..aec5493 100644
  			goto done;
  		}
  
-@@ -1436,11 +1443,15 @@ done:
+@@ -1437,11 +1444,15 @@ done:
  /* XXX needs extract routines */
  void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
  {
@@ -98,7 +98,7 @@ index 3d54711..aec5493 100644
  
  	memset(&to, 0, sizeof(to));
  
-@@ -1471,8 +1482,18 @@ void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
+@@ -1472,8 +1483,18 @@ void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
  	}
  
  	// on ACK, ensure SCA callee state is promoted to ACTIVE.
@@ -119,7 +119,7 @@ index 3d54711..aec5493 100644
  	if(app && app->state == SCA_APPEARANCE_STATE_ACTIVE_PENDING) {
  		LM_DBG("promoting %.*s appearance-index %d to active\n",
  				STR_FMT(&to_aor), app->index);
-@@ -1494,6 +1515,9 @@ done:
+@@ -1495,6 +1516,9 @@ done:
  	if(from_aor.s != NULL) {
  		pkg_free(from_aor.s);
  	}
@@ -129,7 +129,7 @@ index 3d54711..aec5493 100644
  	if(to.flags & SCA_UTIL_FLAG_TO_BODY_ALLOC) {
  		free_to(to.hdr);
  	}
-@@ -1558,6 +1582,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1559,6 +1583,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  	sca_appearance *app = NULL;
  	int slot_idx = -1;
  	int rc = -1;
@@ -137,7 +137,7 @@ index 3d54711..aec5493 100644
  
  	if(msg->first_line.type == SIP_REQUEST) {
  		if(SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
-@@ -1575,14 +1600,20 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1576,14 +1601,20 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  			}
  			if(app == NULL) {
  				// try to find it by tags
@@ -161,7 +161,7 @@ index 3d54711..aec5493 100644
  				goto done;
  			}
  
-@@ -1623,8 +1654,14 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
+@@ -1624,8 +1655,14 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  				goto done;
  			}
  

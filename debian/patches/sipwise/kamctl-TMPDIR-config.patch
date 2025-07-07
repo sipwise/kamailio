@@ -13,7 +13,7 @@ Subject: kamctl: TMPDIR config
  5 files changed, 23 insertions(+), 13 deletions(-)
 
 diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
-index f9a7d92..ddf5a9d 100755
+index 63a221c..8d5d7c8 100755
 --- a/utils/kamctl/kamctl
 +++ b/utils/kamctl/kamctl
 @@ -80,6 +80,10 @@ if [ -z "$STARTUP_CONFIG_FILE" ]; then
@@ -99,7 +99,7 @@ index f7408b5..478864a 100644
  	trap "rm $path;  clear; echo monitor ^C-ed; exit 1" 2
  	attempt=0
 diff --git a/utils/kamctl/kamdbctl b/utils/kamctl/kamdbctl
-index d5713f1..d876c2c 100755
+index a0ececd..4648364 100755
 --- a/utils/kamctl/kamdbctl
 +++ b/utils/kamctl/kamdbctl
 @@ -303,7 +303,7 @@ case $1 in

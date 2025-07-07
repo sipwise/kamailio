@@ -10,9 +10,11 @@ Subject: add_tcap_module
  create mode 100644 src/modules/tcap/Makefile
  create mode 100644 src/modules/tcap/tcap_mod.c
 
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index f54d81d..6242bb7 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -208,6 +208,9 @@
+@@ -208,6 +208,9 @@ mod_list_erlang=erlang
  # - modules depending on systemd library
  mod_list_systemd=log_systemd systemdops
  
@@ -22,7 +24,7 @@ Subject: add_tcap_module
  # - modules depending on libnsq (+libev libevbuffsock libcurl libjson-c) library
  mod_list_nsq=nsq
  
-@@ -351,6 +354,9 @@
+@@ -351,6 +354,9 @@ module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all
  # pkg lcrrate module
  module_group_klcrrate=$(mod_list_lcrrate)
  
@@ -32,6 +34,9 @@ Subject: add_tcap_module
  ### --- Groups defined for pacKaging ###
  
  # Standard modules in main pkg
+diff --git a/src/modules/tcap/Makefile b/src/modules/tcap/Makefile
+new file mode 100644
+index 0000000..d1e7b4d
 --- /dev/null
 +++ b/src/modules/tcap/Makefile
 @@ -0,0 +1,9 @@
@@ -44,6 +49,9 @@ Subject: add_tcap_module
 +LIBS+=-ltcap
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/tcap/tcap_mod.c b/src/modules/tcap/tcap_mod.c
+new file mode 100644
+index 0000000..c0a726b
 --- /dev/null
 +++ b/src/modules/tcap/tcap_mod.c
 @@ -0,0 +1,392 @@
