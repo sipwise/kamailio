@@ -1,3 +1,12 @@
+ngcp-kamailio (6.0.2-1+0~mr13.5.0.0) unstable; urgency=medium
+
+  * MT#55283 enable TLS debugging
+  * MT#63079 Add check for avp name initialization
+  * New upstream version 6.0.2
+  * MT#63077 Remove already applied upstream patches and refresh old ones
+
+ -- donat <dzenichev@sipwise.com>  Mon, 07 Jul 2025 17:35:25 +0200
+
 ngcp-kamailio (6.0.1-1+0~mr13.5.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
