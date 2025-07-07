@@ -1030,7 +1030,7 @@ int check_freq_interval(tmrec_t *_trp, ac_tm_t *_atp)
 						   ? REC_MATCH
 						   : REC_NOMATCH;
 		case FREQ_MONTHLY:
-			_t0 = (_atp->t.tm_year - _trp->ts.tm_year) * 12 + _atp->t.tm_mon
+			_t0 = 12ULL * (_atp->t.tm_year - _trp->ts.tm_year) + _atp->t.tm_mon
 				  - _trp->ts.tm_mon;
 			return (_t0 % _trp->interval == 0) ? REC_MATCH : REC_NOMATCH;
 		case FREQ_YEARLY:
@@ -1104,6 +1104,7 @@ int check_min_unit(tmrec_t *_trp, ac_tm_t *_atp, tr_res_t *_tsw)
 int check_byxxx(tmrec_t *_trp, ac_tm_t *_atp)
 {
 	int i;
+	int v;
 	ac_maxval_t *_amp = NULL;
 	if(!_trp || !_atp)
 		return REC_ERR;
@@ -1117,9 +1118,12 @@ int check_byxxx(tmrec_t *_trp, ac_tm_t *_atp)
 
 	if(_trp->bymonth) {
 		for(i = 0; i < _trp->bymonth->nr; i++) {
-			if(_atp->t.tm_mon
-					== (_trp->bymonth->xxx[i] * _trp->bymonth->req[i] + 12)
-							   % 12)
+			if(_trp->bymonth->req[i] < 0) {
+				v = 12 - _trp->bymonth->xxx[i];
+			} else {
+				v = _trp->bymonth->xxx[i] - 1;
+			}
+			if(_atp->t.tm_mon == v)
 				break;
 		}
 		if(i >= _trp->bymonth->nr)

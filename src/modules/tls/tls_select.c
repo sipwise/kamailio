@@ -129,14 +129,14 @@ struct tcp_connection *get_cur_connection(struct sip_msg *msg)
 	if(_tls_pv_con != 0)
 		return _tls_pv_con;
 
-	if(msg->rcv.proto != PROTO_TLS) {
+	if(msg->rcv.proto != PROTO_TLS && msg->rcv.proto != PROTO_WSS) {
 		ERR("Transport protocol is not TLS (bug in config)\n");
 		return 0;
 	}
 
 	c = tcpconn_get(msg->rcv.proto_reserved1, 0, 0, 0,
 			cfg_get(tls, tls_cfg, con_lifetime));
-	if(c && c->type != PROTO_TLS) {
+	if(c && c->type != PROTO_TLS && msg->rcv.proto != PROTO_WSS) {
 		ERR("Connection found but is not TLS\n");
 		tcpconn_put(c);
 		return 0;
@@ -1415,8 +1415,6 @@ static int get_alt_count(long *res, int local, int type, sip_msg_t *msg)
 	tcpconn_put(c);
 	return 0;
 err:
-	if(names)
-		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
 	if(!local)
 		X509_free(cert);
 	tcpconn_put(c);

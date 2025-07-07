@@ -376,7 +376,8 @@ error:
  * 		DLG_CALLER_LEG (0): caller
  * 		DLG_CALLEE_LEG (1): callee
  */
-static inline int send_bye(struct dlg_cell *cell, int dir, str *hdrs)
+static inline int send_bye(
+		struct dlg_cell *cell, int dir, str *hdrs, int enforce)
 {
 	uac_req_t uac_r;
 	dlg_t *dialog_info;
@@ -386,16 +387,15 @@ static inline int send_bye(struct dlg_cell *cell, int dir, str *hdrs)
 	str lhdrs;
 
 	/* dialog is already in deleted state, nothing to do */
-	if(cell->state == DLG_STATE_DELETED) {
+	if(cell->state == DLG_STATE_DELETED && enforce == 0) {
 		LM_WARN("dlg [%u:%u] with callid %.*s already in deleted state, BYE "
 				"not sent.\n",
 				cell->h_entry, cell->h_id, cell->callid.len, cell->callid.s);
-		return 0;
+		return 1;
 	}
 
 	/* Send Cancel or final response for non-confirmed dialogs */
-	if(cell->state != DLG_STATE_CONFIRMED_NA
-			&& cell->state != DLG_STATE_CONFIRMED) {
+	if(cell->state < DLG_STATE_CONFIRMED_NA) {
 		if(cell->t) {
 			if(dir == DLG_CALLER_LEG) {
 				if(d_tmb.t_reply(cell->t->uas.request, bye_early_code,
@@ -407,7 +407,7 @@ static inline int send_bye(struct dlg_cell *cell, int dir, str *hdrs)
 				LM_DBG("\"%d %.*s\" sent to caller\n", bye_early_code,
 						bye_early_reason.len, bye_early_reason.s);
 			} else {
-				d_tmb.cancel_all_uacs(cell->t, 0);
+				d_tmb.cancel_all_uacs(cell->t, F_CANCEL_LOCAL);
 				LM_DBG("CANCEL sent to callee(s)\n");
 			}
 			return 0;
@@ -425,10 +425,9 @@ static inline int send_bye(struct dlg_cell *cell, int dir, str *hdrs)
 		goto err;
 	}
 
-	/* safety bump of cseq if prack was involved in call setup */
-	if(cell->iflags & DLG_IFLAG_PRACK) {
-		dialog_info->loc_seq.value += 80;
-	}
+	/* safety bump of cseq for callee side if prack was involved in call setup
+	 * or keepalives were sent to caller side */
+	dialog_info->loc_seq.value += 100;
 
 	LM_DBG("sending BYE to %s\n",
 			(dir == DLG_CALLER_LEG) ? "caller" : "callee");
@@ -494,7 +493,12 @@ dlg_t *build_dlg_t_early(
 		goto error;
 	}
 
-	if(msg == NULL || msg->first_line.type != SIP_REPLY) {
+	if(msg == NULL) {
+		LM_ERR("no sip message\n");
+		goto error;
+	}
+
+	if(msg->first_line.type != SIP_REPLY) {
 		if(!cell->t) {
 			LM_ERR("no transaction associated\n");
 			goto error;
@@ -784,10 +788,13 @@ int dlg_send_ka(dlg_cell_t *dlg, int dir)
 
 	/* tm increases cseq value, decrease it no to make it invalid
 	 * - dialog is ended on timeout (408) or C/L does not exist (481) */
-	if(di->loc_seq.value > 1)
+	if(di->loc_seq.value > 1) {
 		di->loc_seq.value -= 2;
-	else
+		di->loc_seq.is_set = DLG_SEQ_VALSET;
+	} else {
 		di->loc_seq.value = 0;
+		di->loc_seq.is_set = DLG_SEQ_VALNEW;
+	}
 
 	LM_DBG("sending OPTIONS to %s\n",
 			(dir == DLG_CALLER_LEG) ? "caller" : "callee");
@@ -843,7 +850,7 @@ int dlg_bye(struct dlg_cell *dlg, str *hdrs, int side)
 		LM_ERR("failed to build dlg headers\n");
 		return -1;
 	}
-	ret = send_bye(dlg, side, &all_hdrs);
+	ret = send_bye(dlg, side, &all_hdrs, 0);
 	pkg_free(all_hdrs.s);
 
 	dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
@@ -864,8 +871,10 @@ int dlg_bye_all(struct dlg_cell *dlg, str *hdrs)
 		return -1;
 	}
 
-	ret = send_bye(dlg, DLG_CALLER_LEG, &all_hdrs);
-	ret |= send_bye(dlg, DLG_CALLEE_LEG, &all_hdrs);
+	ret = send_bye(dlg, DLG_CALLER_LEG, &all_hdrs, 0);
+	if(ret == 0) {
+		ret |= send_bye(dlg, DLG_CALLEE_LEG, &all_hdrs, 1);
+	}
 
 	pkg_free(all_hdrs.s);
 

@@ -330,12 +330,9 @@ int extract_candidate(str *body, sdp_stream_cell_t *stream)
 
 	fl = space - start;
 
-	start = space + 1;
 	len = len - (space - start + 1);
-	if(start + len > body->s + body->len) {
-		LM_ERR("no component in `a=candidate'\n");
-		return -1;
-	}
+	start = space + 1;
+
 	space = memchr(start, 32, len);
 	if(space == NULL) {
 		LM_ERR("no component in `a=candidate'\n");
@@ -735,7 +732,12 @@ int extract_sess_version(str *oline, str *sess_version)
 		}
 
 		i++;
-	} while(len < oline->len && i < 3);
+	} while((cp < oline->s + oline->len) && i < 3);
+
+	if(cp == NULL || cp0 == NULL || cp >= oline->s + oline->len) {
+		LM_ERR("broken o= line - version field not found\n");
+		return -1;
+	}
 
 	len = cp - cp0 - 1;
 	LM_DBG("end %d: >%.*s<\n", len, len, cp0);
