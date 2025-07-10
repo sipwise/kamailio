@@ -3,7 +3,8 @@ Source: http://www.kamailio.org/pub/kamailio/
 Upstream-Name: Kamailio
 Upstream-Contact: sr-dev@lists.sip-router.org
 
-Files: *
+Files:
+ *
 Copyright:
  2001-2003 FhG Fokus
  2006-2010 iptelorg GmbH
@@ -13,85 +14,185 @@ Comment:
  On Debian systems, the full text of the GNU General Public License version 2
  can be found in the file `/usr/share/common-licenses/GPL-2'.
 
-Files: debian/*
-Copyright: 2013-2023 Sipwise GmbH, Austria
-           2012, Victor Seva <linuxmaniac@torreviejawireless.org>
-           2009, 2010, 2011, Daniel-Constantin Mierla <miconda@gmail.com>
-           2010, Jon Bonilla <manwe@aholab.ehu.es>
-           2009, Jonas Bergler <jonas.bergler@staff.snap.net.nz>
-           2009, Henning Westerholt <henning.westerholt@1und1.de>
-           2007, Julien BLACHE <jblache@debian.org>
+Files:
+ debian/*
+Copyright:
+ 2013-2025 Sipwise GmbH, Austria
+ 2012 Victor Seva <linuxmaniac@torreviejawireless.org>
+ 2009, 2010, 2011 Daniel-Constantin Mierla <miconda@gmail.com>
+ 2010 Jon Bonilla <manwe@aholab.ehu.es>
+ 2009 Jonas Bergler <jonas.bergler@staff.snap.net.nz>
+ 2009 Henning Westerholt <henning.westerholt@1und1.de>
+ 2007 Julien BLACHE <jblache@debian.org>
 License: GPL-2+
 Comment:
  On Debian systems, the full text of the GNU General Public License version 2
  can be found in the file `/usr/share/common-licenses/GPL-2'.
 
-Files: atomic/* atomic_ops.* basex.* bit_*.c char_msg_val.h compiler_opt.h
- core_stats.h counters.* endianness.* futexlock.h hashes.h io_wait.*
- kstats_types.h lib/kcore/kstats_wrapper.* lock_ops.c lock_ops_init.h
- lvalue.* mem/ll_malloc.* mem/memdbg.h mem/sf_malloc.* mi/*.h mod_fix.*
- modules/tm/rpc_uac.* modules/counters/counters.c modules/tls/sbufq.h
- modules/tls/tls_bio.* modules/tls/tls_cfg.* modules/tls/tls_cfg.h
- modules/tls/tls_ct_wrq.* modules/tls/tls_ct_q.h modules/tls/tls_domain.*
- modules/tls/tls_server.h modules/tls/tls_locking.* modules/tls/tls_rpc.*
- modules/tls/tls_server.c modules/malloc_test/malloc_test.c modules/blst/blst.c
- parser/case_p_* parser/case_reas.h pvapi.h pv_core.* rand/fastrand.* raw_*
- rpc_lookup.* rvalue.* sctp_* ser_time.h shm_init.* sip_msg_clone.* sock_ut.*
- sr_compat.* str_hash.h switch.* tcp_ev.h tcp_int_send.h tcp_options.*
- tcp_read.h tcp_stats.* timer_proc.* tls_hooks.* tls_hooks_init.h ver.*
-Copyright: 2006-2010 iptelorg GmbH
+Files:
+ atomic/*
+ atomic_ops.*
+ basex.*
+ bit_*.c
+ char_msg_val.h
+ compiler_opt.h
+ core_stats.h
+ counters.*
+ endianness.*
+ futexlock.h
+ hashes.h
+ io_wait.*
+ kstats_types.h
+ lib/kcore/kstats_wrapper.*
+ lock_ops.c
+ lock_ops_init.h
+ lvalue.*
+ mem/ll_malloc.*
+ mem/memdbg.h
+ mem/sf_malloc.*
+ mi/*.h
+ mod_fix.*
+ modules/blst/blst.c
+ modules/counters/counters.c
+ modules/malloc_test/malloc_test.c
+ modules/tls/sbufq.h
+ modules/tls/tls_bio.*
+ modules/tls/tls_cfg.*
+ modules/tls/tls_cfg.h
+ modules/tls/tls_ct_q.h
+ modules/tls/tls_ct_wrq.*
+ modules/tls/tls_domain.*
+ modules/tls/tls_locking.*
+ modules/tls/tls_rpc.*
+ modules/tls/tls_server.c
+ modules/tls/tls_server.h
+ modules/tm/rpc_uac.*
+ parser/case_p_*
+ parser/case_reas.h
+ pv_core.*
+ pvapi.h
+ rand/fastrand.*
+ raw_*
+ rpc_lookup.*
+ rvalue.*
+ sctp_*
+ ser_time.h
+ shm_init.*
+ sip_msg_clone.*
+ sock_ut.*
+ sr_compat.*
+ str_hash.h
+ switch.*
+ tcp_ev.h
+ tcp_int_send.h
+ tcp_options.*
+ tcp_read.h
+ tcp_stats.*
+ timer_proc.*
+ tls_hooks.*
+ tls_hooks_init.h
+ ver.*
+Copyright:
+ 2006-2010 iptelorg GmbH
 License: ISC
 
-Files: daemonize.* fastlock.h lock_ops.h mem/mem.* mem/f_malloc.h
- mem/meminfo.h mem/memtest.c mem/shm_mem.c mem/q_malloc.h mem/q_malloc.c
- mem/shm_mem.h mem/f_malloc.c modules/tls/tls_rpc.c modules/tls/tls_server.c
- modules/tls/tls_domain.c modules/tls/tls_domain.h modules/tls/tls_server.h
- modules/tls/tls_rpc.h pt.c pt.h sched_yield.h ut.c ut.h
-Copyright: 2001-2003 FhG Fokus
+Files:
+ daemonize.*
+ fastlock.h
+ lock_ops.h
+ mem/mem.*
+ mem/f_malloc.h
+ mem/meminfo.h
+ mem/memtest.c
+ mem/shm_mem.c
+ mem/q_malloc.h
+ mem/q_malloc.c
+ mem/shm_mem.h
+ mem/f_malloc.c
+ modules/tls/tls_rpc.c
+ modules/tls/tls_server.c
+ modules/tls/tls_domain.c
+ modules/tls/tls_domain.h
+ modules/tls/tls_server.h
+ modules/tls/tls_rpc.h
+ pt.c
+ pt.h
+ sched_yield.h
+ ut.c
+ ut.h
+Copyright:
+ 2001-2003 FhG Fokus
 License: ISC
 
-Files: events.* modules/topoh/*
-Copyright: 2009 SIP-Router.org
+Files:
+ events.*
+ modules/topoh/*
+Copyright:
+ 2009 SIP-Router.org
 License: ISC
 
-Files: modules/mi_rpc/mi_rpc_mod.c modules_k/pv/pv_xavp.*
- modules_k/usrloc/ul_rpc.* ppcfg.* xavp.*
-Copyright: 2009-2010 Daniel-Constantin Mierla (asipto.com)
+Files:
+ modules/mi_rpc/mi_rpc_mod.c
+ modules_k/pv/pv_xavp.*
+ modules_k/usrloc/ul_rpc.*
+ ppcfg.*
+ xavp.*
+Copyright:
+ 2009-2010 Daniel-Constantin Mierla (asipto.com)
 License: ISC
 
-Files: lib/srutils/srjson.*
-Copyright: 2009 Dave Gamble
+Files:
+ lib/srutils/srjson.*
+Copyright:
+ 2009 Dave Gamble
 License: Expat
 
-Files: obsolete/jabber_k/tree234.*
-Copyright: 1999, 2000, 2001, Simon Tatham
+Files:
+ obsolete/jabber_k/tree234.*
+Copyright:
+ 1999, 2000, 2001 Simon Tatham
 License: Expat
 
-Files: modules_k/xmpp/xsnprintf.c obsolete/jabber_s/xsnprintf.c obsolete/jabber_k/xsnprintf.c
-Copyright: 1995-1998, The Apache Group
+Files:
+ modules_k/xmpp/xsnprintf.c
+ obsolete/jabber_s/xsnprintf.c
+ obsolete/jabber_k/xsnprintf.c
+Copyright:
+ 1995-1998 The Apache Group
 License: Apache-1.0
 
-Files: modules_k/mi_xmlrpc/abyss*
-Copyright: 2000, Moez Mahfoudh <mmoez@bigfoot.com>
+Files:
+ modules_k/mi_xmlrpc/abyss*
+Copyright:
+ 2000 Moez Mahfoudh <mmoez@bigfoot.com>
 License: BSD-3-clause
 
-Files: list.h
-Copyright: 1991, 1993 The Regents of the University of California
+Files:
+ list.h
+Copyright:
+ 1991, 1993 The Regents of the University of California
 License: BSD-3-clause
 
-Files: modules/tm/t_serial.*
-Copyright: 2008 Juha Heinanen
+Files:
+ modules/tm/t_serial.*
+Copyright:
+ 2008 Juha Heinanen
 License: BSD-2-clause
 
-Files: parser/sdp/sdp.* parser/sdp/sdp_helpr_funcs.* parser/sdp/sdp_cloner.h
+Files:
+ parser/sdp/sdp.*
+ parser/sdp/sdp_helpr_funcs.*
+ parser/sdp/sdp_cloner.h
 Copyright:
  2008-2009 SOMA Networks, INC.
  2010 VoIP Embedded, Inc
 License: BSD-2-clause
 
-Files: modules/tls/fixed_c_zlib.h
-Copyright:1998-2005 The OpenSSL Project
-Comment: file copied from OpenSSL 0.9.8, refers to OpenSSL License. Note that
+Files:
+ modules/tls/fixed_c_zlib.h
+Copyright:
+ 1998-2005 The OpenSSL Project
+Comment: File copied from OpenSSL 0.9.8, refers to OpenSSL License. Note that
  this code will not build by default in the Debian packaging.
 License: OpenSSL
  Redistribution and use in source and binary forms, with or without
@@ -138,8 +239,11 @@ License: OpenSSL
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Files: md5.* md5utils.c
-Copyright: 1991-2, RSA Data Security, Inc
+Files:
+ md5.*
+ md5utils.c
+Copyright:
+ 1991-2 RSA Data Security, Inc
 Comment: Note that md5.c and md5.h have been replaced in the patches
  plum_md5*.patch .
  .
@@ -169,16 +273,20 @@ License: RSA-MD5
  These notices must be retained in any copies of any part of this
  documentation and/or software.
 
-Files: mem/dl_*
-Copyright: n/a
+Files:
+ mem/dl_*
+Copyright:
+ n/a
 License: public-domain
  This is a version (aka dlmalloc) of malloc/free/realloc written by
  Doug Lea and released to the public domain, as explained at
  http://creativecommons.org/licenses/publicdomain.  Send questions,
  comments, complaints, performance data, etc to dl@cs.oswego.edu
 
-Files: rand/isaac/*
-Copyright: n/a
+Files:
+ rand/isaac/*
+Copyright:
+ n/a
 License: public-domain
  By Bob Jenkins.  My random number generator, ISAAC.  Public Domain.
 
