@@ -85,12 +85,17 @@
 #define DS_DNS_MODE_TIMER  (1<<2)
 #define DS_DNS_MODE_QSRV   (1<<3)
 
+#define DS_STATE_MODE_SET  1
+#define DS_STATE_MODE_FUNC (1<<1)
+
 /* clang-format on */
 typedef struct ds_rctx
 {
 	int flags;
 	int code;
 	str reason;
+	str uri;
+	int setid;
 } ds_rctx_t;
 
 extern str ds_db_url;
@@ -154,12 +159,14 @@ int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode);
 int ds_update_dst(struct sip_msg *msg, int upos, int mode);
 int ds_add_dst(int group, str *address, int flags, int priority, str *attrs);
 int ds_remove_dst(int group, str *address);
-int ds_update_state(
-		sip_msg_t *msg, int group, str *address, int state, ds_rctx_t *rctx);
+int ds_update_state(sip_msg_t *msg, int group, str *address, int state,
+		int mode, ds_rctx_t *rctx);
 int ds_reinit_state(int group, str *address, int state);
 int ds_reinit_state_all(int group, int state);
 int ds_reinit_duid_state(int group, str *vduid, int state);
-int ds_mark_dst(struct sip_msg *msg, int mode);
+int ds_mark_dst(struct sip_msg *msg, int state);
+int ds_mark_dst_mode(struct sip_msg *msg, int state, int mode);
+int ds_mark_addr(sip_msg_t *msg, int state, int group, str *uri, int mode);
 int ds_print_list(FILE *fout);
 int ds_log_sets(void);
 int ds_list_exist(int set);
@@ -248,7 +255,7 @@ typedef struct _ds_dest {
 	struct ip_addr ip_address; 	/*!< IP of the address */
 	unsigned short int port; 	/*!< port of the URI */
 	unsigned short int proto; 	/*!< protocol of the URI */
-	int message_count;
+	int probing_count;
 	struct timeval dnstime;
 	ds_ocdata_t ocdata;	/*!< overload control attributes */
 	struct _ds_dest *next;
