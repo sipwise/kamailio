@@ -147,6 +147,7 @@ str ds_attrs_pvname   = STR_NULL;
 pv_spec_t ds_attrs_pv;
 
 str ds_event_callback = STR_NULL;
+int ds_event_callback_mode = 0;
 str ds_db_extra_attrs = STR_NULL;
 param_t *ds_db_extra_attrs_list = NULL;
 
@@ -376,7 +377,20 @@ static int mod_init(void)
 		LM_ERR("Fail to declare the configuration\n");
 		return -1;
 	}
-
+	/* if the ping-keepalive-timer is enabled the tm-api needs to be loaded */
+	if(ds_ping_interval > 0) {
+		if(load_tm_api(&tmb) == -1) {
+			LM_ERR("could not load the TM-functions - disable DS ping\n");
+			return -1;
+		}
+		if(ds_timer_mode == 1) {
+			if(sr_wtimer_add(ds_check_timer, NULL, ds_ping_interval) < 0)
+				return -1;
+		} else {
+			if(register_timer(ds_check_timer, NULL, ds_ping_interval) < 0)
+				return -1;
+		}
+	}
 	/* Initialize the counter */
 	ds_ping_reply_codes = (int **)shm_malloc(sizeof(unsigned int *));
 	if(!(ds_ping_reply_codes)) {
@@ -507,26 +521,6 @@ static int mod_init(void)
 		}
 	}
 
-	/* Only, if the Probing-Timer is enabled the TM-API needs to be loaded: */
-	if(ds_ping_interval > 0) {
-		/*****************************************************
-		 * TM-Bindings
-		 *****************************************************/
-		if(load_tm_api(&tmb) == -1) {
-			LM_ERR("could not load the TM-functions - disable DS ping\n");
-			return -1;
-		}
-		/*****************************************************
-		 * Register the PING-Timer
-		 *****************************************************/
-		if(ds_timer_mode == 1) {
-			if(sr_wtimer_add(ds_check_timer, NULL, ds_ping_interval) < 0)
-				return -1;
-		} else {
-			if(register_timer(ds_check_timer, NULL, ds_ping_interval) < 0)
-				return -1;
-		}
-	}
 	if(ds_latency_estimator_alpha_i > 0
 			&& ds_latency_estimator_alpha_i < 1000) {
 		ds_latency_estimator_alpha = ds_latency_estimator_alpha_i / 1000.0f;
@@ -926,7 +920,7 @@ static int ki_ds_mark_dst(sip_msg_t *msg)
 	if(ds_probing_mode == DS_PROBE_ALL)
 		state |= DS_PROBING_DST;
 
-	return ds_mark_dst(msg, state);
+	return ds_mark_dst_mode(msg, state, DS_STATE_MODE_SET | DS_STATE_MODE_FUNC);
 }
 
 /**
@@ -954,7 +948,7 @@ static int ki_ds_mark_dst_state(sip_msg_t *msg, str *sval)
 		return -1;
 	}
 
-	return ds_mark_dst(msg, state);
+	return ds_mark_dst_mode(msg, state, DS_STATE_MODE_SET | DS_STATE_MODE_FUNC);
 }
 
 /**
@@ -1325,6 +1319,13 @@ static int pv_get_dsv(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			return pv_get_null(msg, param, res);
 		case 2:
 			return pv_get_sintval(msg, param, res, rctx->flags);
+		case 3:
+			if(rctx->uri.s != NULL && rctx->uri.len > 0) {
+				return pv_get_strval(msg, param, res, &rctx->uri);
+			}
+			return pv_get_null(msg, param, res);
+		case 4:
+			return pv_get_sintval(msg, param, res, rctx->setid);
 		default:
 			return pv_get_null(msg, param, res);
 	}
@@ -1339,6 +1340,12 @@ static int pv_parse_dsv(pv_spec_p sp, str *in)
 		return -1;
 
 	switch(in->len) {
+		case 3:
+			if(strncmp(in->s, "uri", 3) == 0)
+				sp->pvp.pvn.u.isname.name.n = 3;
+			else
+				goto error;
+			break;
 		case 4:
 			if(strncmp(in->s, "code", 4) == 0)
 				sp->pvp.pvn.u.isname.name.n = 0;
@@ -1348,6 +1355,10 @@ static int pv_parse_dsv(pv_spec_p sp, str *in)
 		case 5:
 			if(strncmp(in->s, "flags", 5) == 0)
 				sp->pvp.pvn.u.isname.name.n = 2;
+			else if(strncmp(in->s, "setid", 5) == 0)
+				sp->pvp.pvn.u.isname.name.n = 4;
+			else if(strncmp(in->s, "group", 5) == 0)
+				sp->pvp.pvn.u.isname.name.n = 4;
 			else
 				goto error;
 			break;
@@ -1982,12 +1993,13 @@ int ds_rpc_print_set(
 				rpc->fault(ctx, 500, "Internal error creating dest struct");
 				return -1;
 			}
-			if(rpc->struct_add(wh, "SSdddSSSjj", "BODY",
+			if(rpc->struct_add(wh, "SSddddSSSjj", "BODY",
 					   &(node->dlist[j].attrs.body), "DUID",
 					   (node->dlist[j].attrs.duid.s)
 							   ? &(node->dlist[j].attrs.duid)
 							   : &data,
-					   "MAXLOAD", node->dlist[j].attrs.maxload, "WEIGHT",
+					   "PROBING_COUNT", node->dlist[j].probing_count, "MAXLOAD",
+					   node->dlist[j].attrs.maxload, "WEIGHT",
 					   node->dlist[j].attrs.weight, "RWEIGHT",
 					   node->dlist[j].attrs.rweight, "SOCKET",
 					   (node->dlist[j].attrs.socket.s)

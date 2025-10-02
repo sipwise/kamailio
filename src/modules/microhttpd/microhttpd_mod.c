@@ -205,6 +205,13 @@ int pv_parse_mhttpd_name(pv_spec_p sp, str *in)
 {
 	if(sp == NULL || in == NULL || in->len <= 0)
 		return -1;
+
+	if(in->len > 2 && in->s[1] == ':' && (in->s[0] == 'h' || in->s[0] == 'H')) {
+		sp->pvp.pvn.type = PV_NAME_INTSTR;
+		sp->pvp.pvn.u.isname.type = PVT_HDR;
+		sp->pvp.pvn.u.isname.name.s = *in;
+		return 0;
+	}
 	switch(in->len) {
 		case 3:
 			if(strncasecmp(in->s, "url", 3) == 0) {
@@ -244,13 +251,6 @@ int pv_parse_mhttpd_name(pv_spec_p sp, str *in)
 			}
 			break;
 		default:
-			if(in->len > 2 && in->s[1] == ':'
-					&& (in->s[0] == 'h' || in->s[0] == 'H')) {
-				sp->pvp.pvn.type = PV_NAME_INTSTR;
-				sp->pvp.pvn.u.isname.type = PVT_HDR;
-				sp->pvp.pvn.u.isname.name.s = *in;
-				return 0;
-			}
 			goto error;
 	}
 	sp->pvp.pvn.type = PV_NAME_INTSTR;
@@ -270,6 +270,7 @@ int pv_get_mhttpd(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 {
 	struct sockaddr *srcaddr = NULL;
 	const char *hdrval = NULL;
+	char hname[256];
 
 	if(param == NULL) {
 		return -1;
@@ -278,8 +279,16 @@ int pv_get_mhttpd(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		return pv_get_null(msg, param, res);
 	}
 	if(param->pvn.u.isname.type == PVT_HDR) {
-		hdrval = MHD_lookup_connection_value(_ksr_mhttpd_ctx.connection,
-				MHD_HEADER_KIND, param->pvn.u.isname.name.s.s + 2);
+		if(param->pvn.u.isname.name.s.len >= 256) {
+			LM_ERR("header name too long: %d\n",
+					param->pvn.u.isname.name.s.len);
+			return pv_get_null(msg, param, res);
+		}
+		memcpy(hname, param->pvn.u.isname.name.s.s + 2,
+				param->pvn.u.isname.name.s.len - 2);
+		hname[param->pvn.u.isname.name.s.len - 2] = '\0';
+		hdrval = MHD_lookup_connection_value(
+				_ksr_mhttpd_ctx.connection, MHD_HEADER_KIND, hname);
 		if(hdrval == NULL) {
 			return pv_get_null(msg, param, res);
 		}
@@ -535,14 +544,10 @@ static enum MHD_Result ksr_microhttpd_request(void *cls,
 	if(_ksr_mhttpd_ctx.data.s != NULL) {
 		free(_ksr_mhttpd_ctx.data.s);
 	}
+	_ksr_mhttpd_ctx.data.s = NULL;
+	_ksr_mhttpd_ctx.data.len = 0;
 	if(cstream->data.len > 0) {
-		if(_ksr_mhttpd_ctx.data.s != NULL) {
-			free(_ksr_mhttpd_ctx.data.s);
-		}
 		_ksr_mhttpd_ctx.data = cstream->data;
-	} else {
-		_ksr_mhttpd_ctx.data.s = NULL;
-		_ksr_mhttpd_ctx.data.len = 0;
 	}
 	free(cstream);
 	_ksr_mhttpd_ctx.cinfo = MHD_get_connection_info(

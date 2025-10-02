@@ -629,14 +629,15 @@ static inline int lumps_len(
 				if(recv_af == AF_INET6)                                      \
 					new_len += 2;                                            \
 			} else {                                                         \
-				LM_CRIT("rcv ip - null bind_address\n");                     \
+				LM_CRIT("null bind_address (SUBST_RCV_IP/%p/%p)\n",          \
+						msg->rcv.bind_address, recv_address_str);            \
 			};                                                               \
 			break;                                                           \
 		case SUBST_RCV_PORT:                                                 \
 			if(STR_WITHVAL(recv_port_str)) {                                 \
 				new_len += recv_port_str->len;                               \
 			} else {                                                         \
-				LM_CRIT(" rcv port - null bind_address\n");                  \
+				LM_CRIT("rcv port - null bind_address (SUBST_RCV_PORT)\n");  \
 			};                                                               \
 			break;                                                           \
 		case SUBST_RCV_PROTO:                                                \
@@ -666,7 +667,7 @@ static inline int lumps_len(
 								msg->rcv.bind_address->proto);               \
 				}                                                            \
 			} else {                                                         \
-				LM_CRIT("null bind_address\n");                              \
+				LM_CRIT("null bind_address (SUBST_RCV_PROTO)\n");            \
 			};                                                               \
 			break;                                                           \
 		case SUBST_RCV_ALL:                                                  \
@@ -707,7 +708,7 @@ static inline int lumps_len(
 						new_len += TRANSPORT_PARAM_LEN + 4;                  \
 						break;                                               \
 					default:                                                 \
-						LM_CRIT("unknown proto %d\n",                        \
+						LM_CRIT("unknown proto %d (SUBST_RCV_ALL)\n",        \
 								msg->rcv.bind_address->proto);               \
 				}                                                            \
 				if((subst_l)->u.subst == SUBST_RCV_ALL_EX                    \
@@ -717,7 +718,7 @@ static inline int lumps_len(
 				}                                                            \
 				RCVCOMP_LUMP_LEN                                             \
 			} else {                                                         \
-				LM_CRIT("null bind_address\n");                              \
+				LM_CRIT("null bind_address (SUBST_RCV_ALL)\n");              \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_IP:                                                   \
@@ -726,14 +727,14 @@ static inline int lumps_len(
 				if(send_af == AF_INET6 && send_address_str->s[0] != '[')     \
 					new_len += 2;                                            \
 			} else {                                                         \
-				LM_CRIT("null send_sock\n");                                 \
+				LM_CRIT("null send_sock (SUBST_SND_IP)\n");                  \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_PORT:                                                 \
 			if(STR_WITHVAL(send_port_str)) {                                 \
 				new_len += send_port_str->len;                               \
 			} else {                                                         \
-				LM_CRIT("null send sock port\n");                            \
+				LM_CRIT("null send sock port (SUBST_SND_PORT)\n");           \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_PROTO:                                                \
@@ -759,10 +760,11 @@ static inline int lumps_len(
 						new_len += 4;                                        \
 						break;                                               \
 					default:                                                 \
-						LM_CRIT("unknown proto %d\n", send_sock->proto);     \
+						LM_CRIT("unknown proto %d (SUBST_SND_PROTO)\n",      \
+								send_sock->proto);                           \
 				}                                                            \
 			} else {                                                         \
-				LM_CRIT("null send_sock\n");                                 \
+				LM_CRIT("null send_sock (SUBST_SND_PROTO)\n");               \
 			};                                                               \
 			break;                                                           \
 		case SUBST_SND_ALL:                                                  \
@@ -803,7 +805,8 @@ static inline int lumps_len(
 						new_len += TRANSPORT_PARAM_LEN + 4;                  \
 						break;                                               \
 					default:                                                 \
-						LM_CRIT("unknown proto %d\n", send_sock->proto);     \
+						LM_CRIT("unknown proto %d (SUBST_SND_ALL)\n",        \
+								send_sock->proto);                           \
 				}                                                            \
 				if((subst_l)->u.subst == SUBST_SND_ALL_EX                    \
 						&& send_sock->sockname.len > 0) {                    \
@@ -811,7 +814,7 @@ static inline int lumps_len(
 				}                                                            \
 				SENDCOMP_LUMP_LEN                                            \
 			} else {                                                         \
-				LM_CRIT("null send_sock\n");                                 \
+				LM_CRIT("null send_sock (SUBST_SND_ALL)\n");                 \
 			};                                                               \
 			break;                                                           \
 		case SUBST_NOP: /* do nothing */                                     \
@@ -2918,7 +2921,7 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 #endif /* USE_COMP */
 	int port;
 	int proto;
-	struct ip_addr ip;
+	struct ip_addr ip = {0};
 	union sockaddr_union *from = NULL;
 	union sockaddr_union local_addr;
 	struct tcp_connection *con = NULL;
@@ -3064,8 +3067,8 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 
 		if(con == NULL) {
 			LM_WARN("TCP/TLS connection (id: %d) for WebSocket could not be "
-					"found\n",
-					send_info->id);
+					"found - likely it is gone (dst: [%s]:%d)\n",
+					send_info->id, (port) ? ip_addr2a(&ip) : "", port);
 			pkg_free(line_buf);
 			return 0;
 		}
