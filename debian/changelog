@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.3-1+0~mr13.5.1.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [95442ba] New upstream version 6.0.3
+
+ -- Donat <dzenichev@sipwise.com>  Thu, 02 Oct 2025 09:05:03 +0200
+
 ngcp-kamailio (6.0.2-1+0~mr13.5.1.0) unstable; urgency=medium
 
   [ Fabricio Santolin da Silva ]
