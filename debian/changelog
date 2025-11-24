@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.3-1+0~mr14.1.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [fefe519] MT#55283 rtpengine: always set "flags"
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 24 Nov 2025 16:55:26 +0100
+
 ngcp-kamailio (6.0.3-1+0~mr14.0.0.0) unstable; urgency=medium
 
   * New upstream version 6.0.3
