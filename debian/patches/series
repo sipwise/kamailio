@@ -44,6 +44,7 @@ sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 sipwise/presence_offline_cleanup.patch
 ### active development
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
+sipwise/db_redis_protect_length_overflow.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
