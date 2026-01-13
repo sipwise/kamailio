@@ -69,10 +69,10 @@ if(NOT PERL_TYPEMAP)
       ERROR_VARIABLE PERL_LIBPATH_ERROR # error of the command if any
       OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE
     )
-    message(WARNING "PERL_LIBPATH: ${PERL_LIBPATH}")
+    message(STATUS "PERL_LIBPATH: ${PERL_LIBPATH}")
   endif()
   set(PERL_TYPEMAP ${PERL_LIBPATH}/ExtUtils/typemap)
-  message(WARNING "PERL_TYPEMAP: ${PERL_TYPEMAP}")
+  message(STATUS "PERL_TYPEMAP: ${PERL_TYPEMAP}")
 endif()
 
 set(PERL_PODFILES ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.xs)
@@ -84,9 +84,8 @@ list(APPEND PERL_PODFILES ${PERL_PODFILES_PM})
 # and we don't want to change them.
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.c
-  COMMAND
-    xsubpp -typemap ${PERL_TYPEMAP} -typemap ${CMAKE_CURRENT_SOURCE_DIR}/typemap
-    kamailioxs.xs > ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.c
+  COMMAND xsubpp -typemap ${PERL_TYPEMAP} -typemap ${CMAKE_CURRENT_SOURCE_DIR}/typemap kamailioxs.xs
+          > ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.c
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating kamailioxs.c"
   VERBATIM
@@ -96,8 +95,7 @@ add_custom_command(
 target_sources(${module_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.c)
 # Add the flag option only for the generated file
 set_source_files_properties(
-  ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.c PROPERTIES COMPILE_OPTIONS
-                                                      -Wno-unused
+  ${CMAKE_CURRENT_SOURCE_DIR}/kamailioxs.c PROPERTIES COMPILE_OPTIONS -Wno-unused
 )
 
 # Doc target
@@ -108,18 +106,17 @@ add_custom_target(perlpod)
 # Requires libpod-2-docbook-perl packages
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/app_perl_pod.sgml
-  COMMAND cat ${PERL_PODFILES} | pod2docbook --doctype=chapter --title='Kamailio
-          Perl API' --no-header - ${CMAKE_CURRENT_BINARY_DIR}/app_perl_pod.sgml
+  COMMAND cat ${PERL_PODFILES} | pod2docbook --doctype=chapter --title='Kamailio Perl API'
+          --no-header - ${CMAKE_CURRENT_BINARY_DIR}/app_perl_pod.sgml
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating app_perl_pod.sgml"
 )
 
-add_custom_target(
-  ${module_name}_pod.sgml
-  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/app_perl_pod.sgml
-)
+add_custom_target(${module_name}_pod.sgml DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/app_perl_pod.sgml)
 
 # Install nessecary files
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/perl
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/${MAIN_NAME}
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/perl
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/${MAIN_NAME}
+  COMPONENT ${group_name}
 )

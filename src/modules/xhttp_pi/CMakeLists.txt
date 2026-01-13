@@ -26,10 +26,12 @@ install(
             PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
     endif()
 "
-  COMPONENT xhttp_pi-cfg)
+  COMPONENT ${group_name}
+)
 
+# TODO: component does not exist. fix this
 add_custom_target(
   xhttp_pi-install-cfg
   COMMENT "Installing pi_framework.xml"
-  COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component
-          xhttp_pi-cfg)
+  COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component xhttp_pi-cfg
+)
