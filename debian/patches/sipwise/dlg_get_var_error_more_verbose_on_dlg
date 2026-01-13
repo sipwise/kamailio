@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Tue, 13 Jan 2026 11:14:36 +0100
+Subject: dlg_get_var_error_more_verbose_on_dlg
+
+---
+ src/modules/dialog/dialog.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index 4b681b2..3a9bd3c 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1955,7 +1955,8 @@ static int w_dlg_get_var(
+@@ -1979,7 +1979,8 @@ static int w_dlg_get_var(
  		pv_get_null(msg, NULL, &dst_val);
  	}
  	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
@@ -10,7 +20,7 @@
  		if(val)
  			goto error;
  		else
-@@ -1966,7 +1967,8 @@ static int w_dlg_get_var(
+@@ -1990,7 +1991,8 @@ static int w_dlg_get_var(
  error:
  	pv_get_null(msg, NULL, &dst_val);
  	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
