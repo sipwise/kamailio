@@ -557,9 +557,9 @@ static int auth_check_hdr_md5_noupdate(
  * @brief do WWW-Digest authentication with password taken from cfg var
  */
 int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
-		int hftype, str *method)
+		int hftype, hdr_field_t **hdr, str *method)
 {
-	struct hdr_field *h;
+	struct hdr_field *h = NULL;
 	auth_body_t *cred;
 	auth_cfg_result_t ret;
 	auth_result_t rauth;
@@ -573,7 +573,7 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
 	ret = AUTH_ERROR;
 
 #ifdef USE_NC
-	if(nc_enabled && (flags & 32))
+	if(nc_enabled && (flags & AUTH_FLAG_NOINVNC))
 		check_auth_hdr = auth_check_hdr_md5_noupdate;
 #endif
 
@@ -617,7 +617,7 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
 	cred = (auth_body_t *)h->parsed;
 
 	/* compute HA1 if needed */
-	if((flags & 1) == 0) {
+	if((flags & AUTH_FLAG_PASSWDHA1) == 0) {
 		/* Plaintext password is stored in PV, calculate HA1 */
 		calc_HA1(
 				HA_MD5, &cred->digest.username.whole, realm, passwd, 0, 0, ha1);
@@ -647,7 +647,7 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
 
 #ifdef USE_NC
 	/* On success we need to update the nonce if flag 32 is set */
-	if(nc_enabled && ret == AUTH_OK && (flags & 32)) {
+	if(nc_enabled && ret == AUTH_OK && (flags & AUTH_FLAG_NOINVNC)) {
 		if(check_nonce(cred, &secret1, &secret2, msg, 1) < 0) {
 			LM_ERR("check_nonce failed after post_auth");
 			ret = AUTH_ERROR;
@@ -656,13 +656,16 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
 #endif
 
 end:
+	if(hdr != NULL) {
+		*hdr = h;
+	}
 	if(ret < 0) {
 		/* check if required to add challenge header as avp */
 		if(!(flags & 14))
 			return ret;
-		if(flags & 8) {
+		if(flags & AUTH_FLAG_HDRQOPAUTHINT) {
 			qop = &auth_qauthint;
-		} else if(flags & 4) {
+		} else if(flags & AUTH_FLAG_HDRQOPAUTH) {
 			qop = &auth_qauth;
 		}
 		if(get_challenge_hf(msg, (cred ? cred->stale : 0), realm, NULL,
@@ -692,7 +695,7 @@ end:
 static int ki_pv_proxy_authenticate(
 		sip_msg_t *msg, str *realm, str *passwd, int flags)
 {
-	return pv_authenticate(msg, realm, passwd, flags, HDR_PROXYAUTH_T,
+	return pv_authenticate(msg, realm, passwd, flags, HDR_PROXYAUTH_T, NULL,
 			&msg->first_line.u.request.method);
 }
 
@@ -731,7 +734,7 @@ static int pv_proxy_authenticate(
 		goto error;
 	}
 	return pv_authenticate(msg, &srealm, &spasswd, vflags, HDR_PROXYAUTH_T,
-			&msg->first_line.u.request.method);
+			NULL, &msg->first_line.u.request.method);
 
 error:
 	return AUTH_ERROR;
@@ -743,7 +746,7 @@ error:
 static int ki_pv_www_authenticate(
 		sip_msg_t *msg, str *realm, str *passwd, int flags)
 {
-	return pv_authenticate(msg, realm, passwd, flags, HDR_AUTHORIZATION_T,
+	return pv_authenticate(msg, realm, passwd, flags, HDR_AUTHORIZATION_T, NULL,
 			&msg->first_line.u.request.method);
 }
 
@@ -754,7 +757,7 @@ static int ki_pv_www_authenticate_method(
 		sip_msg_t *msg, str *realm, str *passwd, int flags, str *method)
 {
 	return pv_authenticate(
-			msg, realm, passwd, flags, HDR_AUTHORIZATION_T, method);
+			msg, realm, passwd, flags, HDR_AUTHORIZATION_T, NULL, method);
 }
 
 /**
@@ -792,7 +795,7 @@ static int pv_www_authenticate(
 		goto error;
 	}
 	return pv_authenticate(msg, &srealm, &spasswd, vflags, HDR_AUTHORIZATION_T,
-			&msg->first_line.u.request.method);
+			NULL, &msg->first_line.u.request.method);
 
 error:
 	return AUTH_ERROR;
@@ -841,8 +844,8 @@ static int pv_www_authenticate2(struct sip_msg *msg, char *realm, char *passwd,
 		goto error;
 	}
 
-	return pv_authenticate(
-			msg, &srealm, &spasswd, vflags, HDR_AUTHORIZATION_T, &smethod);
+	return pv_authenticate(msg, &srealm, &spasswd, vflags, HDR_AUTHORIZATION_T,
+			NULL, &smethod);
 
 error:
 	return AUTH_ERROR;
@@ -861,15 +864,14 @@ static int pv_auth_check(
 	sip_uri_t *furi = NULL;
 	str suser;
 
-	if(msg->REQ_METHOD == METHOD_REGISTER)
+	if(msg->REQ_METHOD == METHOD_REGISTER) {
 		ret = pv_authenticate(msg, srealm, spasswd, vflags, HDR_AUTHORIZATION_T,
-				&msg->first_line.u.request.method);
-	else
+				&hdr, &msg->first_line.u.request.method);
+	} else {
 		ret = pv_authenticate(msg, srealm, spasswd, vflags, HDR_PROXYAUTH_T,
-				&msg->first_line.u.request.method);
-
+				&hdr, &msg->first_line.u.request.method);
+	}
 	if(ret == AUTH_OK && (vchecks & AUTH_CHECK_ID_F)) {
-		hdr = (msg->proxy_auth == 0) ? msg->authorization : msg->proxy_auth;
 		if(hdr == NULL) {
 			if(msg->REQ_METHOD & (METHOD_ACK | METHOD_CANCEL | METHOD_PRACK)) {
 				return AUTH_OK;
