@@ -671,11 +671,12 @@ static inline int t_uac_prepare(
 #ifdef DIALOG_CALLBACKS
 	run_trans_dlg_callbacks(uac_r->dialog, new_cell, request);
 #endif /* DIALOG_CALLBACKS */
-	if(dst_req)
+	if(dst_req != NULL) {
 		*dst_req = request;
-	if(dst_cell)
+	}
+	if(dst_cell != NULL) {
 		*dst_cell = new_cell;
-	else if(is_ack && dst_req == 0) {
+	} else if(is_ack && dst_req == NULL) {
 		free_cell(new_cell);
 	}
 
@@ -749,6 +750,7 @@ static inline int send_prepared_request_impl(
 	struct ua_client *uac;
 	struct ip_addr ip; /* logging */
 	int ret;
+	int osnd;
 
 	t = request->my_T;
 	uac = &t->uac[branch];
@@ -765,9 +767,11 @@ static inline int send_prepared_request_impl(
 	LM_DBG("uac: %p  branch: %d  to %s:%d\n", uac, branch, ip_addr2a(&ip),
 			su_getport(&uac->request.dst.to));
 
-	if(run_onsend(p_msg, &uac->request.dst, uac->request.buffer,
-			   uac->request.buffer_len)
-			== 0) {
+	osnd = run_onsend(p_msg, &uac->request.dst, uac->request.buffer,
+			uac->request.buffer_len);
+	t_uas_request_clean_parsed(t);
+
+	if(osnd == 0) {
 		uac->last_received = _tm_reply_408_code;
 		su2ip_addr(&ip, &uac->request.dst.to);
 		LM_DBG("onsend_route dropped msg. to %s:%d (%d)\n", ip_addr2a(&ip),
