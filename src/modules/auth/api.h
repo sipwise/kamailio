@@ -61,6 +61,22 @@ typedef enum auth_cfg_result
 #define AUTH_CHECK_SKIPFWD_F 1 << 1
 
 /**
+ * flags to control auth functions
+ */
+/* password parameter is HA1 format */
+#define AUTH_FLAG_PASSWDHA1 1
+/* challenge header with no qop and add it to avp */
+#define AUTH_FLAG_HDRQOPNONE 2
+/* challenge header with qop=auth and add it to avp */
+#define AUTH_FLAG_HDRQOPAUTH 4
+/* challenge header with qop=auth-int and add it to avp */
+#define AUTH_FLAG_HDRQOPAUTHINT 8
+/* challenge header with stale=true */
+#define AUTH_FLAG_CLGSTALE 16
+/* do not invalidate nc on authentication failure */
+#define AUTH_FLAG_NOINVNC 32
+
+/**
  * return codes to auth API functions
  */
 typedef enum auth_result
@@ -119,9 +135,9 @@ int auth_challenge_hftype(
 		struct sip_msg *msg, str *realm, int flags, int hftype);
 
 typedef int (*pv_authenticate_f)(struct sip_msg *msg, str *realm, str *passwd,
-		int flags, int hftype, str *method);
+		int flags, int hftype, hdr_field_t **hdr, str *method);
 int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
-		int hftype, str *method);
+		int hftype, hdr_field_t **hdr, str *method);
 
 typedef int (*consume_credentials_f)(struct sip_msg *msg);
 int consume_credentials(struct sip_msg *msg);

@@ -115,7 +115,10 @@
 #define TCP_PASS_NEW_CONNECTION_ON_DATA /* don't pass a new connection
 										   immediately to a child, wait for
 										   some data on it first */
+#ifndef TCP_LISTEN_BACKLOG
 #define TCP_LISTEN_BACKLOG 1024
+#endif
+
 #define SEND_FD_QUEUE /* queue send fd requests on EAGAIN, instead of sending
 							them immediately */
 #define TCP_CHILD_NON_BLOCKING
@@ -4416,8 +4419,11 @@ inline static int send2child(struct tcp_connection *tcpconn)
 	   even replaced by another one with the same number) so it
 	   must not be sent to a reader anymore */
 	if(unlikely(tcpconn->state == S_CONN_BAD
-				|| (tcpconn->flags & F_CONN_FD_CLOSED)))
+				|| (tcpconn->flags & F_CONN_FD_CLOSED))) {
+		tcp_children[idx].busy--;
+		tcp_children[idx].n_reqs--;
 		return -1;
+	}
 #ifdef SEND_FD_QUEUE
 	/* if queue full, try to queue the io */
 	if(unlikely(send_fd(tcp_children[idx].unix_sock, &tcpconn, sizeof(tcpconn),
@@ -4432,11 +4438,15 @@ inline static int send2child(struct tcp_connection *tcpconn)
 					   &send2child_q, tcp_children[idx].unix_sock, tcpconn)
 					!= 0) {
 				LM_ERR("queue send op. failed\n");
+				tcp_children[idx].busy--;
+				tcp_children[idx].n_reqs--;
 				return -1;
 			}
 		} else {
 			LM_ERR("send_fd failed for %p (flags 0x%0x), fd %d\n", tcpconn,
 					tcpconn->flags, tcpconn->s);
+			tcp_children[idx].busy--;
+			tcp_children[idx].n_reqs--;
 			return -1;
 		}
 	}
@@ -4446,6 +4456,8 @@ inline static int send2child(struct tcp_connection *tcpconn)
 				<= 0)) {
 		LM_ERR("send_fd failed for %p (flags 0x%0x), fd %d\n", tcpconn,
 				tcpconn->flags, tcpconn->s);
+		tcp_children[idx].busy--;
+		tcp_children[idx].n_reqs--;
 		return -1;
 	}
 #endif
