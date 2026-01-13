@@ -191,10 +191,15 @@ static int metric_generate(
 			(uint64_t)ts);
 
 	/* Print metric name. */
-	if(prom_body_name_printf(ctx, "%.*s%.*s_%.*s%s", xhttp_prom_beginning.len,
-			   xhttp_prom_beginning.s, group->len, group->s, name->len, name->s,
-			   xhttp_prom_tags_braces)
+	if(prom_body_name_printf(ctx, "%.*s%.*s_%.*s", xhttp_prom_beginning.len,
+			   xhttp_prom_beginning.s, group->len, group->s, name->len, name->s)
 			== -1) {
+		LM_ERR("Fail to print\n");
+		return -1;
+	}
+
+	/* xhttp_prom_tags_braces is not sanitized any more because UTF-8 characters are allowed */
+	if(prom_body_printf(ctx, "%s", xhttp_prom_tags_braces) == -1) {
 		LM_ERR("Fail to print\n");
 		return -1;
 	}
@@ -296,7 +301,7 @@ static int prom_metric_pkgmem_print(prom_ctx_t *ctx)
 			goto error;
 		}
 		if(prom_body_printf(ctx,
-				   "%.*spkgmem_total_size{pid=\"%u\", rank=\"%d\" "
+				   "%.*spkgmem_total_size{pid=\"%u\", rank=\"%d\", "
 				   "desc=\"%s\"%s} %lu %" PRIu64 "\n",
 				   xhttp_prom_beginning.len, xhttp_prom_beginning.s,
 				   pkg_proc_stats[i].pid, pkg_proc_stats[i].rank, pt[i].desc,
