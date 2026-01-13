@@ -1,3 +1,12 @@
+ngcp-kamailio (6.0.5-1+0~mr14.1.0.0) unstable; urgency=medium
+
+  * [bde62f6] New upstream version 6.0.5
+  * [6a1af6b] MT#62899 Update packaging for Debian trixie
+  * [c1876f6] MT#63826 db_redis: add string key length protection
+  * [3b93153] MT#64231 Remove already applied upstream patches and refresh old
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Tue, 13 Jan 2026 10:15:29 +0100
+
 ngcp-kamailio (6.0.3-1+0~mr14.1.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
