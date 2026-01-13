@@ -7,10 +7,10 @@ Subject: no_INSTALL_file
  1 file changed, 2 deletions(-)
 
 diff --git a/src/Makefile b/src/Makefile
-index 4ba6625..edad3d2 100644
+index 744b1e1..a4be4cc 100644
 --- a/src/Makefile
 +++ b/src/Makefile
-@@ -859,8 +859,6 @@ install-modules-all: install-every-module install-every-module-doc
+@@ -860,8 +860,6 @@ install-modules-all: install-every-module install-every-module-doc
  
  
  install-doc: $(doc_prefix)/$(doc_dir) install-every-module-doc
