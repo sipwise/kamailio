@@ -9,7 +9,7 @@ Subject: dialog: dlg_get_ttag()
  3 files changed, 211 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index d74a36e..980ef3c 100644
+index 3394ece..4b681b2 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -56,6 +56,7 @@
@@ -39,7 +39,7 @@ index d74a36e..980ef3c 100644
  	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  1,fixup_igp_null,
  			0, ANY_ROUTE },
  	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  3,fixup_igp_all,
-@@ -2066,6 +2072,121 @@ static int fixup_dlg_set_var_free(void **param, int param_no)
+@@ -2090,6 +2096,121 @@ static int fixup_dlg_set_var_free(void **param, int param_no)
  	return -1;
  }
  
@@ -161,7 +161,7 @@ index d74a36e..980ef3c 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2657,6 +2778,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2681,6 +2802,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
@@ -264,10 +264,10 @@ index a37adee..a382ad5 100644
  /*!
   * \brief Search dialog that corresponds to CallId, From Tag and To Tag
 diff --git a/src/modules/dialog/dlg_hash.h b/src/modules/dialog/dlg_hash.h
-index 5d19841..a0a919f 100644
+index 20b0371..b847753 100644
 --- a/src/modules/dialog/dlg_hash.h
 +++ b/src/modules/dialog/dlg_hash.h
-@@ -396,6 +396,19 @@ dlg_cell_t *dlg_get_by_iuid(dlg_iuid_t *diuid);
+@@ -399,6 +399,19 @@ dlg_cell_t *dlg_get_by_iuid(dlg_iuid_t *diuid);
   */
  dlg_cell_t *get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir);
  

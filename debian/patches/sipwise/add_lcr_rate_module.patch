@@ -47,7 +47,7 @@ index fae0dbd..f54d81d 100644
  ### --- Groups defined for pacKaging ###
  
 diff --git a/src/core/mod_fix.c b/src/core/mod_fix.c
-index 767c6a4..d0f1841 100644
+index 900c982..0757a5f 100644
 --- a/src/core/mod_fix.c
 +++ b/src/core/mod_fix.c
 @@ -598,6 +598,7 @@ int fixup_free_igp_spve(void **param, int param_no)
@@ -68,7 +68,7 @@ index 767c6a4..d0f1841 100644
  }
  
 diff --git a/src/core/mod_fix.h b/src/core/mod_fix.h
-index 6ec0280..26968a7 100644
+index f0e6f0e..cb7182d 100644
 --- a/src/core/mod_fix.h
 +++ b/src/core/mod_fix.h
 @@ -138,6 +138,8 @@ int fixup_spve_uint(void **param, int param_no);
