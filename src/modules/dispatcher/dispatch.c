@@ -3144,8 +3144,8 @@ static inline void latency_stats_update(
 		latency_stats->estimate = latency_stats->average;
 	} else {
 		latency_stats->estimate =
-				latency_stats->estimate * ds_latency_estimator_alpha
-				+ latency * (1 - ds_latency_estimator_alpha);
+				latency * ds_latency_estimator_alpha
+				+ latency_stats->estimate * (1 - ds_latency_estimator_alpha);
 	}
 }
 
@@ -3332,7 +3332,7 @@ int ds_get_state(int group, str *address)
 }
 
 /**
- * Update destionation's state
+ * Update destination's state
  */
 int ds_update_state(sip_msg_t *msg, int group, str *address, int state,
 		int mode, ds_rctx_t *rctx)

@@ -24,16 +24,16 @@ License: GPL-2+
  License version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
 
 
-Files: src/code/atomic/* src/code/atomic_ops.* src/code/basex.* src/code/bit_*.c
- src/code/char_msg_val.h src/code/compiler_opt.h src/code/core_stats.h src/code/counters.*
- src/code/endianness.* src/code/futexlock.h src/code/hashes.h src/code/io_wait.*
+Files: src/core/atomic/* src/core/atomic_ops.* src/core/basex.* src/core/bit_*.c
+ src/core/char_msg_val.h src/core/compiler_opt.h src/core/core_stats.h src/core/counters.*
+ src/core/endianness.* src/core/futexlock.h src/core/hashes.h src/core/io_wait.*
  src/core/lock_ops.c src/core/lock_ops_init.h src/core/lvalue.* src/core/mem/ll_malloc.*
  src/core/mem/memdbg.h src/core/mem/sf_malloc.* src/core/mod_fix.* src/modules/tm/rpc_uac.*
  src/modules/counters/counters.c src/modules/tls/sbufq.h
  src/modules/tls/tls_bio.* src/modules/tls/tls_cfg.* src/modules/tls/tls_cfg.h
  src/modules/tls/tls_ct_wrq.* src/modules/tls/tls_ct_q.h src/modules/tls/tls_domain.*
  src/modules/tls/tls_server.* src/modules/tls/tls_locking.* src/modules/tls/tls_rpc.*
- src/modules/malloc_test/malloc_test.c src/modules/blst/blst.c
+ src/modules/misctest/misctest_mod.c src/modules/blst/blst.c
  src/core/parser/case_p_* src/core/parser/case_reas.h src/core/pvapi.h
  src/core/pv_core.* src/core/rand/fastrand.* src/core/raw_*
  src/core/rpc_lookup.* src/core/rvalue.* src/core/sctp_* src/core/ser_time.h
@@ -47,16 +47,16 @@ License: ISC
 
 Files: src/modules/tls/tls_select.* src/modules/tls/tls_dump_vf.*
 Copyright: 2005-2010 iptelorg GmbH
-License: GPL-2 + OpenSSL exception
+License: GPL-2+ with OpenSSL exception
 
 Files: src/modules/websocket/* src/modules/outbound/* src/modules/auth_ephemeral/*
 Copyright: 2012-2013 Crocodile RCS Ltd
-License: GPL-2 + OpenSSL exception
+License: GPL-2+ with OpenSSL exception
 
 Files: src/core/daemonize.* src/core/fastlock.h src/core/lock_ops.h
  src/core/mem/mem.* src/core/mem/f_malloc.h
- src/core/mem/meminfo.h src/core/mem/memtest.c src/core/mem/shm_mem.c
- src/core/mem/q_malloc.* src/core/mem/shm_mem.h
+ src/core/mem/meminfo.h src/core/mem/memtest.c
+ src/core/mem/q_malloc.*
  src/core/mem/f_malloc.c src/core/pt.* src/core/sched_yield.h src/core/ut.*
 Copyright: 2001-2003 FhG Fokus
 License: ISC
@@ -112,7 +112,7 @@ License: Apache-1.0
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Files: src/code/list.h
+Files: src/core/list.h
 Copyright: 1991, 1993 The Regents of the University of California
 License: BSD-3-clause
 
@@ -233,7 +233,7 @@ License: ISC
  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-Files: src/lib/srutils/srjson.*
+Files: src/core/utils/srjson.*
 Copyright: 2009 Dave Gamble
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -254,7 +254,7 @@ License: MIT
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 
-License: GPL-2 + OpenSSL exception
+License: GPL-2+ with OpenSSL exception
  On Debian systems, the full text of the GNU General Public
  License version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
  * Exception: permission to copy, modify, propagate, and distribute a work
