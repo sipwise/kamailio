@@ -3763,24 +3763,43 @@ static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf,
 }
 
 /**
+ * @brief Snapshot entry for lock-free ping iteration
+ */
+struct rtpe_ping_snapshot_entry {
+	struct rtpp_set *set;
+	struct rtpp_node *node;
+};
+
+/**
 * @brief Timer function to check the status of rtpengine nodes.
 * Check every node in the set and if it is not responding,
 * mark it as disabled.
+*
+* Uses snapshot approach to minimize lock contention:
+* 1. Briefly hold locks to build snapshot of (set, node) pairs
+* 2. Release all locks
+* 3. Ping nodes without holding any locks (can take seconds per node)
  */
 static void rtpengine_ping_check_timer(unsigned int ticks, void *param)
 {
 	struct rtpp_set *rtpp_list;
 	struct rtpp_node *crt_rtpp;
-	int err = 0;
-	int ret;
-	int rtpp_disabled = 0;
+	struct rtpe_ping_snapshot_entry *snapshot = NULL;
+	int snapshot_count = 0;
+	int snapshot_capacity = 0;
+	int i;
 
 	/* No need to test them while building */
 	if(build_rtpp_socks(1, 0)) {
 		return;
 	}
-	/* Most of this is from rtpengine_rpc_iterate functions maybe split? */
+
 	LM_DBG("Pinging all enabled rtpengines...\n");
+
+	/*
+	 * Phase 1: Build snapshot while holding locks (fast, ~1-5ms)
+	 * Nodes are never freed during runtime, so pointers remain valid.
+	 */
 	lock_get(rtpp_set_list->rset_head_lock);
 	for(rtpp_list = rtpp_set_list->rset_first; rtpp_list != NULL;
 			rtpp_list = rtpp_list->rset_next) {
@@ -3796,19 +3815,63 @@ static void rtpengine_ping_check_timer(unsigned int ticks, void *param)
 				continue;
 			}
 
-			/* Ping all available nodes */
-			ret = rtpengine_iter_cb_ping(crt_rtpp, rtpp_list, &rtpp_disabled);
-			if(ret) {
-				err = 1;
-				break;
+			/* Grow snapshot array if needed */
+			if(snapshot_count >= snapshot_capacity) {
+				int new_capacity = snapshot_capacity ? snapshot_capacity * 2 : 32;
+				struct rtpe_ping_snapshot_entry *new_snapshot;
+				new_snapshot = pkg_reallocxf(snapshot,
+						new_capacity * sizeof(struct rtpe_ping_snapshot_entry));
+				if(!new_snapshot) {
+					LM_ERR("out of pkg memory for ping snapshot\n");
+					lock_release(rtpp_list->rset_lock);
+					goto cleanup;
+				}
+				snapshot = new_snapshot;
+				snapshot_capacity = new_capacity;
 			}
+
+			snapshot[snapshot_count].set = rtpp_list;
+			snapshot[snapshot_count].node = crt_rtpp;
+			snapshot_count++;
 		}
 		lock_release(rtpp_list->rset_lock);
-
-		if(err)
-			break;
 	}
 	lock_release(rtpp_set_list->rset_head_lock);
+
+	/*
+	 * Phase 2: Ping all nodes without holding any locks (slow, can take 100s of seconds)
+	 * After each ping, briefly acquire rset_lock to update node state.
+	 */
+	for(i = 0; i < snapshot_count; i++) {
+		int ping_result;
+		struct rtpp_node *node = snapshot[i].node;
+		struct rtpp_set *set = snapshot[i].set;
+
+		/* Perform ping without holding any locks (network I/O) */
+		ping_result = rtpp_test_ping(node);
+
+		/* Take the set lock briefly to update node state */
+		lock_get(set->rset_lock);
+
+		if(ping_result < 0) {
+			node->rn_recheck_ticks =
+					get_ticks()
+					+ cfg_get(rtpengine, rtpengine_cfg, rtpengine_disable_tout);
+			node->rn_disabled = 1;
+		}
+		/* if ping success, enable the rtpp and reset ticks, ONLY IF was not disabled manually */
+		else if(node->rn_recheck_ticks != RTPENGINE_MAX_RECHECK_TICKS) {
+			node->rn_recheck_ticks = RTPENGINE_MIN_RECHECK_TICKS;
+			node->rn_disabled = 0;
+		}
+
+		lock_release(set->rset_lock);
+	}
+
+cleanup:
+	if(snapshot) {
+		pkg_free(snapshot);
+	}
 }
 
 /**
