@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.5-1+0~mr14.2.0.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [743265a] MT#63826 db_redis: revert support of NULL values
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 05 Feb 2026 10:22:12 +0100
+
 ngcp-kamailio (6.0.5-1+0~mr14.1.0.0) unstable; urgency=medium
 
   * [bde62f6] New upstream version 6.0.5
