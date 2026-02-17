@@ -1,3 +1,9 @@
+ngcp-kamailio (6.0.5-1+0~mr14.1.1.1) unstable; urgency=medium
+
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 17 Feb 2026 09:09:32 +0100
+
 ngcp-kamailio (6.0.5-1+0~mr14.1.1.0) unstable; urgency=medium
 
   [ Donat Zenichev ]
