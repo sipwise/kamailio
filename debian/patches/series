@@ -32,6 +32,7 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
+upstream/core_tcp_read_check_for_first_msrp_line.patch
 #
 ## upstream master
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
