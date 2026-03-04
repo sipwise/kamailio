@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.2-1+0~mr10.5.3.3) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [bb394c3] MT#64562 core: tcp read - checks for MSRP first line
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 04 Mar 2026 11:30:30 +0100
+
 ngcp-kamailio (5.6.2-1+0~mr10.5.3.2) unstable; urgency=medium
 
   [ Victor Seva ]
