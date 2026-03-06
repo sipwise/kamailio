@@ -1,4 +1,4 @@
-ngcp-kamailio (6.0.5-1+0~mr13.5.1.3) unstable; urgency=medium
+ngcp-kamailio (6.0.6-1+0~mr13.5.1.3) unstable; urgency=medium
 
   [ Richard Fuchs ]
   * [4b7b571] MT#55283 add "directional" flag to list (removed)
