@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Fri, 6 Mar 2026 10:37:29 +0100
+Subject: db_redis_support_null_key_values
+
+---
+ src/modules/db_redis/redis_table.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_table.c b/src/modules/db_redis/redis_table.c
+index 2100884..09b1225 100644
 --- a/src/modules/db_redis/redis_table.c
 +++ b/src/modules/db_redis/redis_table.c
-@@ -32,11 +32,6 @@ int db_redis_key_add_string(redis_key_t
+@@ -32,11 +32,6 @@ int db_redis_key_add_string(redis_key_t **list, const char *entry, size_t len)
  {
  	redis_key_t *k;
  
@@ -12,7 +22,7 @@
  	if (db_redis_max_key_len > 0 && len > db_redis_max_key_len) {
  		LM_ERR("Too big length for key being added: allowed '%u' / given '%zu'\n",
  				db_redis_max_key_len, len);
-@@ -56,8 +51,14 @@ int db_redis_key_add_string(redis_key_t
+@@ -56,8 +51,14 @@ int db_redis_key_add_string(redis_key_t **list, const char *entry, size_t len)
  		goto err;
  	}
  

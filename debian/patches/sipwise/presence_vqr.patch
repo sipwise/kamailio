@@ -25,10 +25,10 @@ Subject: presence_vqr
  create mode 100644 src/modules/presence_vqr/presence_vqr.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 6242bb7..ed8b1c6 100644
+index faeb6ff..5320c96 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -115,7 +115,7 @@ mod_list_lcrrate=lcr_rate
+@@ -116,7 +116,7 @@ mod_list_lcrrate=lcr_rate
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \

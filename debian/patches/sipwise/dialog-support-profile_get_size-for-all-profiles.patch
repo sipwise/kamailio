@@ -76,7 +76,7 @@ index 9ccb073..3394ece 100644
  				RET_ARRAY},
  		{"dlg.bridge_dlg", rpc_dlg_bridge, rpc_dlg_bridge_doc, 0},
 diff --git a/src/modules/dialog/dlg_profile.c b/src/modules/dialog/dlg_profile.c
-index 9fc1a97..76aa768 100644
+index 80fac2d..a2ec325 100644
 --- a/src/modules/dialog/dlg_profile.c
 +++ b/src/modules/dialog/dlg_profile.c
 @@ -129,6 +129,14 @@ int add_profile_definitions(char *profiledef, unsigned int has_value)
