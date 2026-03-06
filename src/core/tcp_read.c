@@ -859,7 +859,16 @@ int tcp_read_headers(struct tcp_connection *c, rd_conn_flags_t *read_flags)
 					case '7':
 					case '8':
 					case '9':
-						r->content_len = r->content_len * 10 + (*p - '0');
+						if(r->content_len >= INT_MAX / 10) {
+							LM_ERR("large Content-Length header value %d in"
+								   " state %d\n",
+									r->content_len, r->state);
+							r->content_len = 0;
+							r->error = TCP_REQ_BAD_LEN;
+							r->state = H_SKIP; /* skip now */
+						} else {
+							r->content_len = r->content_len * 10 + (*p - '0');
+						}
 						break;
 					case '\r':
 					case ' ':
@@ -1042,11 +1051,31 @@ int tcp_read_headers(struct tcp_connection *c, rd_conn_flags_t *read_flags)
 					/* locate transaction id in first line
 					 * -- first line exists, that's why we are here */
 					mfline = q_memchr(r->start, '\n', r->pos - r->start);
-					mtransid.s = q_memchr(
-							r->start + 5 /* 'MSRP ' */, ' ', mfline - r->start);
+					if(mfline == NULL || mfline - r->start < 8) {
+						r->error = TCP_READ_ERROR;
+						r->state = H_SKIP; /* skip now */
+						goto skip;
+					}
+					mtransid.s = q_memchr(r->start + 5 /* 'MSRP ' */, ' ',
+							mfline - r->start - 5);
+					if(mtransid.s == NULL) {
+						r->error = TCP_READ_ERROR;
+						r->state = H_SKIP; /* skip now */
+						goto skip;
+					}
 					mtransid.len = mtransid.s - r->start - 5;
+					if(mtransid.len <= 0) {
+						r->error = TCP_READ_ERROR;
+						r->state = H_SKIP; /* skip now */
+						goto skip;
+					}
 					mtransid.s = r->start + 5;
 					trim(&mtransid);
+					if(mtransid.len <= 0) {
+						r->error = TCP_READ_ERROR;
+						r->state = H_SKIP; /* skip now */
+						goto skip;
+					}
 					if(memcmp(mtransid.s,
 							   p - 1 /*\r*/ - 1 /* '+'|'#'|'$' */
 									   - mtransid.len,
