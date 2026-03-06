@@ -13,10 +13,10 @@ Subject: add_lcr_rate_module
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index fae0dbd..f54d81d 100644
+index 6ccd7db..4ee6fb6 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -109,6 +109,9 @@ mod_list_sctp=sctp
+@@ -110,6 +110,9 @@ mod_list_sctp=sctp
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -26,7 +26,7 @@ index fae0dbd..f54d81d 100644
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -287,8 +290,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
+@@ -288,8 +291,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
  			   $(mod_list_microhttpd) \
  			   $(mod_list_nghttp2) \
  			   $(mod_list_gcrypt) \
@@ -37,7 +37,7 @@ index fae0dbd..f54d81d 100644
  
  
  ### --- Groups defined for source code compilation ###
-@@ -345,6 +348,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
+@@ -346,6 +349,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
