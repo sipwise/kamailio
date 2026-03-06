@@ -104,6 +104,8 @@ set(MOD_LIST_EXTRA
     dlgs
     sworker
     influxdbc
+    pvtpl
+    siprepo
 )
 
 # * common modules depending on database
@@ -292,6 +294,7 @@ set(MOD_LIST_IMS
     ims_isc
     ims_icscf
     ims_qos
+    ims_qos_npn
     ims_registrar_pcscf
     ims_registrar_scscf
     ims_usrloc_pcscf
@@ -545,7 +548,7 @@ set(MODULE_GROUP_KMEMCACHED ${MOD_LIST_MEMCACHED})
 set(MODULE_GROUP_KTLS_BASIC ${MOD_LIST_TLSDEPS})
 
 # pkg tls module with curl
-if(KTLS_INCLUDE_TLSA)
+if(DEFINED ENV{KTLS_INCLUDE_TLSA})
   set(MODULE_GROUP_KTLS ${MOD_LIST_TLSDEPS} ${MOD_LIST_TLSA})
 else()
   set(MODULE_GROUP_KTLS ${MOD_LIST_TLSDEPS})
@@ -706,6 +709,7 @@ set(MODULE_GROUP_PACKAGE_GROUPS
     KMEMCACHED
     KTLS_BASIC
     KTLS
+    KTLSA
     KTLS_WOLFSSL
     KWEBSOCKET
     KPRESENCE
