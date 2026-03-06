@@ -1,5 +1,16 @@
 ngcp-kamailio (6.0.5-1+0~mr13.5.1.3) unstable; urgency=medium
 
+  [ Richard Fuchs ]
+  * [4b7b571] MT#55283 add "directional" flag to list (removed)
+
+  [ Donat Zenichev ]
+  * [0b7367d] New upstream version 6.0.6
+  * [08d97e3] MT#64611 Remove already applied upstream patches and refresh old ones
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Fri, 06 Mar 2026 10:29:42 +0100
+
+ngcp-kamailio (6.0.5-1+0~mr13.5.1.3) unstable; urgency=medium
+
   [ Donat Zenichev ]
   * [4c88efa] MT#63826 db_redis: add string key length protection
   * [ef090b6] MT#63826 db_redis: revert support of NULL values
