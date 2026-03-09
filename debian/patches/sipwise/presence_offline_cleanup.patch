@@ -7,10 +7,10 @@ Subject: presence: fix presentity_offline_cleanup
  1 file changed, 54 insertions(+), 36 deletions(-)
 
 diff --git a/src/modules/presence/presentity.c b/src/modules/presence/presentity.c
-index ac3f734..644c9b7 100644
+index ae1b6c6..003b9e1 100644
 --- a/src/modules/presence/presentity.c
 +++ b/src/modules/presence/presentity.c
-@@ -2273,6 +2273,8 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
+@@ -2278,6 +2278,8 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
  	str *cur_body = NULL, *new_body = NULL;
  	db_query_f query_fn = pa_dbf.query_lock ? pa_dbf.query_lock : pa_dbf.query;
  
@@ -19,7 +19,7 @@ index ac3f734..644c9b7 100644
  	if(pres->event->agg_nbody == NULL) {
  		/* Nothing clever to do here... just delete */
  		if(delete_presentity(pres, NULL) < 0) {
-@@ -2359,6 +2361,8 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
+@@ -2364,6 +2366,8 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
  		goto done;
  	}
  
@@ -28,7 +28,7 @@ index ac3f734..644c9b7 100644
  	row = RES_ROWS(result);
  	value = ROW_VALUES(row);
  
-@@ -2378,7 +2382,25 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
+@@ -2383,7 +2387,25 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
  	update_cols[n_update_cols] = &str_etag_col;
  	update_vals[n_update_cols].type = DB1_STR;
  	update_vals[n_update_cols].nul = 0;
@@ -55,7 +55,7 @@ index ac3f734..644c9b7 100644
  	n_update_cols++;
  
  	update_cols[n_update_cols] = &str_expires_col;
-@@ -2398,9 +2420,13 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
+@@ -2403,9 +2425,13 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
  			   n_query_cols, n_update_cols)
  			< 0) {
  		LM_ERR("unsuccessful sql update operation");
@@ -69,7 +69,7 @@ index ac3f734..644c9b7 100644
  	if(pa_dbf.affected_rows)
  		ret = pa_dbf.affected_rows(pa_db);
  	else
-@@ -2510,12 +2536,13 @@ int delete_presentity(presentity_t *pres, str *ruid)
+@@ -2515,12 +2541,13 @@ int delete_presentity(presentity_t *pres, str *ruid)
  	}
  }
  
@@ -85,8 +85,8 @@ index ac3f734..644c9b7 100644
 +	static char query[QUERY_LEN];
  
  	if(pa_db == NULL) {
- 		LM_ERR("no database connection setup\n");
-@@ -2526,45 +2553,36 @@ int delete_offline_presentities(str *pres_uri, pres_ev_t *event)
+ 		LM_ERR("no database connection set up\n");
+@@ -2531,45 +2558,36 @@ int delete_offline_presentities(str *pres_uri, pres_ev_t *event)
  		LM_ERR("failed to parse presentity uri\n");
  		goto error;
  	}

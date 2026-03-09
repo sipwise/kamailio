@@ -7,10 +7,10 @@ Subject: dlg_get_var_error_more_verbose_on_dlg
  1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 4b681b2..3a9bd3c 100644
+index a2f0f8d..a35dd11 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1979,7 +1979,8 @@ static int w_dlg_get_var(
+@@ -2158,7 +2158,8 @@ static int w_dlg_get_var(
  		pv_get_null(msg, NULL, &dst_val);
  	}
  	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
@@ -20,7 +20,7 @@ index 4b681b2..3a9bd3c 100644
  		if(val)
  			goto error;
  		else
-@@ -1990,7 +1991,8 @@ static int w_dlg_get_var(
+@@ -2169,7 +2170,8 @@ static int w_dlg_get_var(
  error:
  	pv_get_null(msg, NULL, &dst_val);
  	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {

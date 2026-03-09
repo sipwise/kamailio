@@ -5,15 +5,14 @@ Subject: kamctl: TMPDIR config
 * allow choose where to store temporal files
 * use g+w for temporal fifo file
 ---
- utils/kamctl/kamctl               |  8 ++++++--
- utils/kamctl/kamctl.rpcfifo       | 14 ++++++++++----
- utils/kamctl/kamdbctl             |  2 +-
- utils/kamctl/kamdbctl.db_berkeley | 10 +++++-----
- utils/kamctl/kamdbctl.oracle      |  2 +-
- 5 files changed, 23 insertions(+), 13 deletions(-)
+ utils/kamctl/kamctl               |   8 +-
+ utils/kamctl/kamctl.rpcfifo       |  14 +-
+ utils/kamctl/kamdbctl             |   2 +-
+ utils/kamctl/kamdbctl.oracle      |   2 +-
+ 5 files changed, 637 insertions(+), 8 deletions(-)
 
 diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
-index 63a221c..8d5d7c8 100755
+index e0a339c..92c5343 100755
 --- a/utils/kamctl/kamctl
 +++ b/utils/kamctl/kamctl
 @@ -80,6 +80,10 @@ if [ -z "$STARTUP_CONFIG_FILE" ]; then
@@ -27,7 +26,7 @@ index 63a221c..8d5d7c8 100755
  ##### ------------------------------------------------ #####
  ### load base functions
  #
-@@ -2977,7 +2981,7 @@ kamailio_trap() {
+@@ -2971,7 +2975,7 @@ kamailio_trap() {
  		exit
  	fi
  	DATE=`/bin/date +%Y%m%d_%H%M%S`
@@ -36,7 +35,7 @@ index 63a221c..8d5d7c8 100755
  	minfo "Trap file: $LOG_FILE"
  	ctl_cmd_run core.psx > $LOG_FILE
  	echo -n "Trapping Kamailio with gdb: "
-@@ -3004,7 +3008,7 @@ kamailio_pstrap() {
+@@ -2998,7 +3002,7 @@ kamailio_pstrap() {
  		exit
  	fi
  	DATE=`/bin/date +%Y%m%d_%H%M%S`
@@ -99,10 +98,10 @@ index f7408b5..478864a 100644
  	trap "rm $path;  clear; echo monitor ^C-ed; exit 1" 2
  	attempt=0
 diff --git a/utils/kamctl/kamdbctl b/utils/kamctl/kamdbctl
-index a0ececd..4648364 100755
+index 9c490f8..c7d6fc8 100755
 --- a/utils/kamctl/kamdbctl
 +++ b/utils/kamctl/kamdbctl
-@@ -303,7 +303,7 @@ case $1 in
+@@ -294,7 +294,7 @@ case $1 in
  			cp $DB_PATH $1
  			exit $?
  		fi
@@ -111,34 +110,6 @@ index a0ececd..4648364 100755
  		kamailio_dump $DBNAME $tmp_file
  		ret=$?
  		if [ "$ret" -ne 0 ]; then
-diff --git a/utils/kamctl/kamdbctl.db_berkeley b/utils/kamctl/kamdbctl.db_berkeley
-index 666122a..457e40c 100644
---- a/utils/kamctl/kamdbctl.db_berkeley
-+++ b/utils/kamctl/kamdbctl.db_berkeley
-@@ -436,10 +436,10 @@ kamailio_append()  # parms: <db> <newdata> [DB_PATH]
- 
- #####
- # newappend process is:
--# 1. create a new temp DBENV in /tmp/sc-<processID>
--# 2. appends contents of newdata to /tmp/sc-<processID>/db
--# 3. move /tmp/sc-<processID>/db over to DB_PATH/db.new
--# 4. delete temp DBENV dir /tmp/sc-<processID>
-+# 1. create a new temp DBENV in ${TMPDIR}/sc-<processID>
-+# 2. appends contents of newdata to ${TMPDIR}/sc-<processID>/db
-+# 3. move ${TMPDIR}/sc-<processID>/db over to DB_PATH/db.new
-+# 4. delete temp DBENV dir ${TMPDIR}/sc-<processID>
- #
- kamailio_newappend()  # parms: <db> <newdata> [DB_PATH]
- {
-@@ -453,7 +453,7 @@ kamailio_newappend()  # parms: <db> <newdata> [DB_PATH]
- 	if [ -f $DBNEW ] ; then
- 		rm $DBNEW
- 	fi
--	TMPENV=/tmp/sc-$$
-+	TMPENV=${TMPDIR}/sc-$$
- 	kamailio_create $TMPENV
- 	cd $OLDPWD
- 	$LOAD_CMD -T -t hash -f $2 -h $TMPENV $1
 diff --git a/utils/kamctl/kamdbctl.oracle b/utils/kamctl/kamdbctl.oracle
 index e6de52f..f1b95c5 100644
 --- a/utils/kamctl/kamdbctl.oracle
