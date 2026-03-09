@@ -104,11 +104,14 @@ extern int tcp_disable;
 extern enum poll_types tcp_poll_method;
 extern int tcp_max_connections; /* maximum tcp connections, hard limit */
 extern int tls_max_connections; /* maximum tls connections, hard limit */
+extern int ksr_tcp_listen_backlog;
 #endif
 extern int ksr_tcp_accept_hep3;
 extern int ksr_tcp_accept_haproxy;
+extern int ksr_tcp_accept_protocols;
 extern int ksr_tcp_script_mode;
 #ifdef USE_TLS
+extern int tls_connection_match_domain;
 extern int tls_disable;
 extern unsigned short tls_port_no;
 #define KSR_TLS_THREADS_MNONE 0 /* no set of set thread-local variables */
@@ -248,10 +251,13 @@ extern int ksr_local_rport;
 extern int ksr_rpc_exec_delta;
 
 extern int ksr_udp_receiver_mode;
+extern int ksr_msg_clone_extra_size;
+extern int ksr_msg_apply_changes_mode;
 extern int ksr_msg_recv_max_size;
 extern int ksr_tcp_msg_read_timeout;
 extern int ksr_tcp_msg_data_timeout;
 extern int ksr_tcp_accept_iplimit;
+extern int ksr_tcp_main_threads;
 extern int ksr_tcp_check_timer;
 
 #ifdef USE_DNS_CACHE

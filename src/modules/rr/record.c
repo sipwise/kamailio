@@ -189,6 +189,7 @@ static inline struct lump *insert_rr_param_lump(
 		pkg_free(s1);
 		return 0;
 	}
+	LUMP_SET_FLAG(rrp_l, LUMPFLAG_RR);
 	return rrp_l;
 }
 
@@ -253,16 +254,6 @@ static inline int build_rr(struct lump *_l, struct lump *_l2, str *user,
 	memcpy(prefix, rr_prefix, rr_prefix_len);
 	if(user->len) {
 		memcpy(prefix + rr_prefix_len, user->s, user->len);
-#ifdef ENABLE_USER_CHECK
-		/* don't add the ignored user into a RR */
-		if(i_user.len && i_user.len == user->len
-				&& !strncmp(i_user.s, user->s, i_user.len)) {
-			if(prefix[rr_prefix_len] == 'x')
-				prefix[rr_prefix_len] = 'y';
-			else
-				prefix[rr_prefix_len] = 'x';
-		}
-#endif
 		prefix[rr_prefix_len + user->len] = '@';
 	}
 
@@ -290,6 +281,7 @@ static inline int build_rr(struct lump *_l, struct lump *_l2, str *user,
 
 	if(!(_l = insert_new_lump_after(_l, prefix, prefix_len, 0)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 	prefix = 0;
 	rr_lump_type =
 			(_inbound) ? (rr_sockname_mode ? SUBST_RCV_ALL_EX : SUBST_RCV_ALL)
@@ -297,13 +289,16 @@ static inline int build_rr(struct lump *_l, struct lump *_l2, str *user,
 	_l = insert_subst_lump_after(_l, rr_lump_type, 0);
 	if(_l == 0)
 		goto lump_err;
+	LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 	if(enable_double_rr) {
 		if(!(_l = insert_cond_lump_after(_l,
 					 (enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS,
 					 0)))
 			goto lump_err;
+		LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 		if(!(_l = insert_new_lump_after(_l, r2, RR_R2_LEN, 0)))
 			goto lump_err;
+		LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 		r2 = 0;
 	} else {
 		pkg_free(r2);
@@ -312,14 +307,17 @@ static inline int build_rr(struct lump *_l, struct lump *_l2, str *user,
 	_l2 = insert_new_lump_before(_l2, suffix, suffix_len, HDR_RECORDROUTE_T);
 	if(_l2 == 0)
 		goto lump_err;
+	LUMP_SET_FLAG(_l2, LUMPFLAG_RR);
 	if(rr_param_buf.len) {
 		_l2 = insert_rr_param_lump(_l2, rr_param_buf.s, rr_param_buf.len);
 		if(_l2 == 0)
 			goto lump_err;
+		LUMP_SET_FLAG(_l2, LUMPFLAG_RR);
 	}
 	suffix = 0;
 	if(!(_l2 = insert_new_lump_before(_l2, term, RR_TERM_LEN, 0)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l2, LUMPFLAG_RR);
 	term = 0;
 	return 0;
 
@@ -458,6 +456,8 @@ int record_route(struct sip_msg *_m, str *params)
 			ret = -5;
 			goto error;
 		}
+		LUMP_SET_FLAG(l, LUMPFLAG_RR);
+		LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 		l = insert_cond_lump_after(l,
 				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS, 0);
 		l2 = insert_cond_lump_before(l2,
@@ -467,6 +467,8 @@ int record_route(struct sip_msg *_m, str *params)
 			ret = -6;
 			goto error;
 		}
+		LUMP_SET_FLAG(l, LUMPFLAG_RR);
+		LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 		if(build_rr(l, l2, &user, tag, params, OUTBOUND, sips) < 0) {
 			LM_ERR("failed to insert outbound Record-Route\n");
 			ret = -7;
@@ -481,6 +483,8 @@ int record_route(struct sip_msg *_m, str *params)
 		ret = -3;
 		goto error;
 	}
+	LUMP_SET_FLAG(l, LUMPFLAG_RR);
+	LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 
 	if(build_rr(l, l2, &user, tag, params, INBOUND, sips) < 0) {
 		LM_ERR("failed to insert inbound Record-Route\n");
@@ -579,6 +583,8 @@ int record_route_preset(struct sip_msg *_m, str *_data)
 		ret = -3;
 		goto error;
 	}
+	LUMP_SET_FLAG(l, LUMPFLAG_RR);
+	LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 
 	hdr.len = rr_prefix_len;
 	if(user.len)
@@ -651,7 +657,7 @@ int record_route_preset(struct sip_msg *_m, str *_data)
 
 	memcpy(term.s, RR_TERM, RR_TERM_LEN);
 
-	if(!insert_new_lump_after(l, hdr.s, hdr.len, 0)) {
+	if(!(l = insert_new_lump_after(l, hdr.s, hdr.len, 0))) {
 		LM_ERR("failed to insert new lump\n");
 		pkg_free(hdr.s);
 		pkg_free(suffix.s);
@@ -659,6 +665,7 @@ int record_route_preset(struct sip_msg *_m, str *_data)
 		ret = -5;
 		goto error;
 	}
+	LUMP_SET_FLAG(l, LUMPFLAG_RR);
 
 	l2 = insert_new_lump_before(l2, suffix.s, suffix.len, HDR_RECORDROUTE_T);
 	if(l2 == NULL) {
@@ -667,11 +674,13 @@ int record_route_preset(struct sip_msg *_m, str *_data)
 		ret = -6;
 		goto error;
 	}
+	LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 	if(!(l2 = insert_new_lump_before(l2, term.s, term.len, 0))) {
 		pkg_free(term.s);
 		ret = -7;
 		goto error;
 	}
+	LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 
 	LM_DBG("inserted preset record route\n");
 	ret = 1;
@@ -785,22 +794,28 @@ static inline int build_advertised_rr(struct lump *_l, struct lump *_l2,
 		LM_ERR("failed to insert new lump\n");
 		goto lump_err;
 	}
+	LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 	hdr = NULL;
 	if(!(_l = insert_cond_lump_after(_l,
 				 (enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_PROTO, 0)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 	if(!(_l = insert_new_lump_after(_l, trans, RR_TRANS_LEN, 0)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 	if(!(_l = insert_subst_lump_after(
 				 _l, _inbound ? SUBST_RCV_PROTO : SUBST_SND_PROTO, 0)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 	if(enable_double_rr) {
 		if(!(_l = insert_cond_lump_after(_l,
 					 (enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS,
 					 0)))
 			goto lump_err;
+		LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 		if(!(_l = insert_new_lump_after(_l, r2, RR_R2_LEN, 0)))
 			goto lump_err;
+		LUMP_SET_FLAG(_l, LUMPFLAG_RR);
 		r2 = 0;
 	} else {
 		pkg_free(r2);
@@ -809,13 +824,16 @@ static inline int build_advertised_rr(struct lump *_l, struct lump *_l2,
 	if(!(_l2 = insert_new_lump_before(
 				 _l2, suffix, suffix_len, HDR_RECORDROUTE_T)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l2, LUMPFLAG_RR);
 	suffix = NULL;
 	if(rr_param_buf.len) {
 		if(!(_l2 = insert_rr_param_lump(_l2, rr_param_buf.s, rr_param_buf.len)))
 			goto lump_err;
+		LUMP_SET_FLAG(_l2, LUMPFLAG_RR);
 	}
 	if(!(_l2 = insert_new_lump_before(_l2, term, RR_TERM_LEN, 0)))
 		goto lump_err;
+	LUMP_SET_FLAG(_l2, LUMPFLAG_RR);
 	return 1;
 lump_err:
 	if(hdr)
@@ -902,6 +920,8 @@ int record_route_advertised_address(struct sip_msg *_m, str *_data)
 			ret = -3;
 			goto error;
 		}
+		LUMP_SET_FLAG(l, LUMPFLAG_RR);
+		LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 		l = insert_cond_lump_after(
 				l, (enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_PROTO, 0);
 		l2 = insert_cond_lump_before(l2,
@@ -911,6 +931,8 @@ int record_route_advertised_address(struct sip_msg *_m, str *_data)
 			ret = -4;
 			goto error;
 		}
+		LUMP_SET_FLAG(l, LUMPFLAG_RR);
+		LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 		if(build_advertised_rr(l, l2, _data, &user, tag, OUTBOUND, sips) < 0) {
 			LM_ERR("failed to insert outbound Record-Route\n");
 			ret = -5;
@@ -925,6 +947,8 @@ int record_route_advertised_address(struct sip_msg *_m, str *_data)
 		ret = -6;
 		goto error;
 	}
+	LUMP_SET_FLAG(l, LUMPFLAG_RR);
+	LUMP_SET_FLAG(l2, LUMPFLAG_RR);
 
 	if(build_advertised_rr(l, l2, _data, &user, tag, INBOUND, sips) < 0) {
 		LM_ERR("failed to insert outbound Record-Route\n");

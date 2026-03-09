@@ -55,7 +55,7 @@ static void free_str_list(struct str_list *l);
 static void free_sec_info(secf_info_p info);
 void secf_free_data(secf_data_p secf_fdata);
 static void mod_destroy(void);
-static int sf_check_sqli(str *val);
+static int sf_check_sqli(str *val, int check_quotes);
 static int check_user(struct sip_msg *msg, int type);
 void secf_reset_stats(void);
 void secf_ht_timer(unsigned int ticks, void *);
@@ -128,10 +128,12 @@ static const char *rpc_reload_doc[2] = {"Reload values from database", NULL};
 static const char *rpc_print_doc[2] = {"Print values from database", NULL};
 static const char *rpc_stats_doc[2] = {"Print statistics of blocked and allowed messages", NULL};
 static const char *rpc_stats_reset_doc[2] = {"Reset statistics", NULL};
-static const char *rpc_add_dst_doc[2] = {
-		"Add new values to destination blacklist", NULL};
+static const char *rpc_add_dst_doc[2] = {"Add new values to destination blacklist", NULL};
+static const char *rpc_del_dst_doc[2] = {"Delete a value from destination blacklist", NULL};
 static const char *rpc_add_bl_doc[2] = {"Add new values to blacklist", NULL};
+static const char *rpc_del_bl_doc[2] = {"Delete a value from blacklist", NULL};
 static const char *rpc_add_wl_doc[2] = {"Add new values to whitelist", NULL};
+static const char *rpc_del_wl_doc[2] = {"Delete a value from whitelist", NULL};
 
 rpc_export_t secfilter_rpc[] = {
 	{"secfilter.reload", secf_rpc_reload, rpc_reload_doc, 0},
@@ -139,8 +141,11 @@ rpc_export_t secfilter_rpc[] = {
 	{"secfilter.stats", secf_rpc_stats, rpc_stats_doc, 0},
 	{"secfilter.stats_reset", secf_rpc_stats_reset, rpc_stats_reset_doc, 0},
 	{"secfilter.add_dst", secf_rpc_add_dst, rpc_add_dst_doc, 0},
+	{"secfilter.del_dst", secf_rpc_del_dst, rpc_del_dst_doc, 0},
 	{"secfilter.add_bl", secf_rpc_add_bl, rpc_add_bl_doc, 0},
+	{"secfilter.del_bl", secf_rpc_del_bl, rpc_del_bl_doc, 0},
 	{"secfilter.add_wl", secf_rpc_add_wl, rpc_add_wl_doc, 0},
+	{"secfilter.del_wl", secf_rpc_del_wl, rpc_del_wl_doc, 0},
 	{0, 0, 0, 0}
 };
 /* clang-format on */
@@ -162,7 +167,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 	/* Find SQLi in user-agent header */
 	res = secf_get_ua(msg, &ua);
 	if(res == 0) {
-		if(sf_check_sqli(&ua) != 1) {
+		if(sf_check_sqli(&ua, 1) != 1) {
 			LM_INFO("Possible SQL injection found in User-agent (%.*s)\n",
 					ua.len, ua.s);
 			retval = 0;
@@ -174,7 +179,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 	res = secf_get_from(msg, &name, &user, &domain);
 	if(res == 0) {
 		if(name.len > 0) {
-			if(sf_check_sqli(&name) != 1) {
+			if(sf_check_sqli(&name, 0) != 1) {
 				LM_INFO("Possible SQL injection found in From name (%.*s)\n",
 						name.len, name.s);
 				retval = 0;
@@ -183,7 +188,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 		}
 
 		if(user.len > 0) {
-			if(sf_check_sqli(&user) != 1) {
+			if(sf_check_sqli(&user, 1) != 1) {
 				LM_INFO("Possible SQL injection found in From user (%.*s)\n",
 						user.len, user.s);
 				retval = 0;
@@ -192,7 +197,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 		}
 
 		if(domain.len > 0) {
-			if(sf_check_sqli(&domain) != 1) {
+			if(sf_check_sqli(&domain, 1) != 1) {
 				LM_INFO("Possible SQL injection found in From domain (%.*s)\n",
 						domain.len, domain.s);
 				retval = 0;
@@ -205,7 +210,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 	res = secf_get_to(msg, &name, &user, &domain);
 	if(res == 0) {
 		if(name.len > 0) {
-			if(sf_check_sqli(&name) != 1) {
+			if(sf_check_sqli(&name, 0) != 1) {
 				LM_INFO("Possible SQL injection found in To name (%.*s)\n",
 						name.len, name.s);
 				retval = 0;
@@ -214,7 +219,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 		}
 
 		if(user.len > 0) {
-			if(sf_check_sqli(&user) != 1) {
+			if(sf_check_sqli(&user, 1) != 1) {
 				LM_INFO("Possible SQL injection found in To user (%.*s)\n",
 						user.len, user.s);
 				retval = 0;
@@ -223,7 +228,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 		}
 
 		if(domain.len > 0) {
-			if(sf_check_sqli(&domain) != 1) {
+			if(sf_check_sqli(&domain, 1) != 1) {
 				LM_INFO("Possible SQL injection found in To domain (%.*s)\n",
 						domain.len, domain.s);
 				retval = 0;
@@ -236,7 +241,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 	res = secf_get_contact(msg, &user, &domain);
 	if(res == 0) {
 		if(user.len > 0) {
-			if(sf_check_sqli(&user) != 1) {
+			if(sf_check_sqli(&user, 1) != 1) {
 				LM_INFO("Possible SQL injection found in Contact user (%.*s)\n",
 						user.len, user.s);
 				retval = 0;
@@ -245,7 +250,7 @@ static int ki_check_sqli_all(struct sip_msg *msg)
 		}
 
 		if(domain.len > 0) {
-			if(sf_check_sqli(&domain) != 1) {
+			if(sf_check_sqli(&domain, 1) != 1) {
 				LM_INFO("Possible SQL injection found in Contact domain "
 						"(%.*s)\n",
 						domain.len, domain.s);
@@ -268,7 +273,7 @@ static int w_check_sqli_all(struct sip_msg *msg)
 /* External function to search for illegal characters in some header */
 static int ki_check_sqli_hdr(struct sip_msg *msg, str *cval)
 {
-	return sf_check_sqli(cval);
+	return sf_check_sqli(cval, 1);
 }
 
 static int w_check_sqli_hdr(struct sip_msg *msg, char *cval)
@@ -278,11 +283,11 @@ static int w_check_sqli_hdr(struct sip_msg *msg, char *cval)
 	val.s = cval;
 	val.len = strlen(cval);
 
-	return sf_check_sqli(&val);
+	return sf_check_sqli(&val, 1);
 }
 
 /* Search for illegal characters */
-static int sf_check_sqli(str *val)
+static int sf_check_sqli(str *val, int check_quotes)
 {
 	char *cval = NULL;
 	int res = 1;
@@ -295,15 +300,26 @@ static int sf_check_sqli(str *val)
 	memset(cval, 0, val->len + 1);
 	memcpy(cval, val->s, val->len);
 
-	if(strstr(cval, "'") || strstr(cval, "\"") || strstr(cval, "--")
-			|| strstr(cval, "%27") || strstr(cval, "%22")
-			|| strstr(cval, "%60")) {
-		/* Illegal characters found */
-		lock_get(secf_lock);
-		secf_stats[BL_SQL]++;
-		lock_release(secf_lock);
-		res = -1;
-		goto end;
+	if(check_quotes == 1) {
+		if(strstr(cval, "'") || strstr(cval, "\"") || strstr(cval, "--")
+				|| strstr(cval, "%27") || strstr(cval, "%22")
+				|| strstr(cval, "%60")) {
+			/* Illegal characters found */
+			lock_get(secf_lock);
+			secf_stats[BL_SQL]++;
+			lock_release(secf_lock);
+			res = -1;
+			goto end;
+		}
+	} else {
+		if(strstr(cval, "--") || strstr(cval, "%60")) {
+			/* Illegal characters found */
+			lock_get(secf_lock);
+			secf_stats[BL_SQL]++;
+			lock_release(secf_lock);
+			res = -1;
+			goto end;
+		}
 	}
 
 end:
@@ -903,28 +919,6 @@ static int child_init(int rank)
 static void mod_destroy(void)
 {
 	LM_DBG("SECFILTER module destroy\n");
-	if(!secf_data)
-		return;
-
-	if(secf_rpc_reload_time != NULL) {
-		shm_free(secf_rpc_reload_time);
-		secf_rpc_reload_time = 0;
-	}
-	/* Free shared data */
-	if(secf_data_1)
-		secf_free_data(secf_data_1);
-	if(secf_data_2)
-		secf_free_data(secf_data_2);
-	/* Destroy lock */
-	lock_destroy(&(*secf_data)->lock);
-	shm_free(secf_data);
-	secf_data = NULL;
-
-	if(secf_lock) {
-		lock_destroy(secf_lock);
-		lock_dealloc((void *)secf_lock);
-		secf_lock = NULL;
-	}
 }
 
 

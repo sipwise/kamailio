@@ -140,6 +140,8 @@ typedef enum request_method
 #define FL_FINAL_REPLY (1ULL << 32)	   /* local final reply sent */
 #define FL_DELAYED_REPLY (1ULL << 33)  /* local reply sending delayed */
 #define FL_VIA_NORECEIVED (1ULL << 34) /* no received test for incoming Via */
+/* apply msg changes before transaction is created */
+#define FL_MSG_APPLY_CHANGES (1ULL << 35)
 
 #define FL_MTU_FB_MASK (FL_MTU_TCP_FB | FL_MTU_TLS_FB | FL_MTU_SCTP_FB)
 
@@ -199,8 +201,8 @@ typedef enum request_method
 	(((m)->dst_uri.s && (m)->dst_uri.len)                   \
 					? (&(m)->dst_uri)                       \
 					: (((m)->new_uri.s && (m)->new_uri.len) \
-									? (&(m)->new_uri)       \
-									: (&(m)->first_line.u.request.uri)))
+									  ? (&(m)->new_uri)     \
+									  : (&(m)->first_line.u.request.uri)))
 
 
 /*! \brief
@@ -220,9 +222,9 @@ typedef enum request_method
  * - 5061 for _proto == TLS or WSS
  * - 5060 for the other _proto
  */
-#define GET_SIP_PORT(_port, _proto)                                      \
-	((_port == 0) ? (                                                    \
-			 (_proto == PROTO_TLS || _proto == PROTO_WSS) ? 5061 : 5060) \
+#define GET_SIP_PORT(_port, _proto)                                       \
+	((_port == 0) ? ((_proto == PROTO_TLS || _proto == PROTO_WSS) ? 5061  \
+																  : 5060) \
 				  : _port)
 
 enum _uri_type
@@ -402,9 +404,10 @@ typedef struct sip_msg
 
 	struct receive_info rcv; /*!< source & dest ip, ports, proto a.s.o*/
 
-	char *buf;		  /*!< scratch pad, holds a modified message,
+	char *buf;			   /*!< scratch pad, holds a modified message,
 						*  via, etc. point into it */
-	unsigned int len; /*!< message len (orig) */
+	unsigned int len;	   /*!< message len (orig) */
+	unsigned int buf_size; /*!< message buffer size */
 
 	/* modifications */
 
@@ -436,6 +439,7 @@ typedef struct sip_msg
 	msg_flags_t msg_flags;			/*!< internal flags used by core */
 	flag_t flags;					/*!< config flags */
 	flag_t xflags[KSR_XFLAGS_SIZE]; /*!< config extended flags */
+	flag_t vbflags;					/*!< config via-body flags */
 	str set_global_address;
 	str set_global_port;
 	struct socket_info *force_send_socket; /*!< force sending on this socket */

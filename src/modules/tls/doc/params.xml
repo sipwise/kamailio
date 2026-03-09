@@ -1506,4 +1506,93 @@ verify_client = optional_no_ca
                 </listitem>
             </itemizedlist>
         </section>
+	<section id="tls.p.keylog_mode">
+	<title><varname>keylog_mode</varname> (int)</title>
+	<para>
+		Control the TLS key logging functionality, available for libssl version
+		greater than 1.1.0. Its value is composed from bitwise values (can be
+		made as sum of them):
+	</para>
+	<itemizedlist>
+		<listitem>
+			<para><emphasis>0</emphasis> - keys logging not enabled</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>1 (bit 1)</emphasis> - initialise keys logging</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>2 (bit 2)</emphasis> - keys logging active</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>4 (bit 3)</emphasis> - write keys to NOTICE log</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>8 (bit 4)</emphasis> - write keys to file</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>16 (bit 5)</emphasis> - send keys to udp peer</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>1024 (bit 11)</emphasis> - enable filtering of
+			keys logging. When set, filtering is done on: "CLIENT_RANDOM",
+			"CLIENT_HANDSHAKE_TRAFFIC_SECRET", "SERVER_HANDSHAKE_TRAFFIC_SECRET",
+			"EXPORTER_SECRET", "CLIENT_TRAFFIC_SECRET_0", "SERVER_TRAFFIC_SECRET_0"
+			</para>
+		</listitem>
+	</itemizedlist>
+	<para>
+		Bit position is the index starting from 1 (practically a non-zero value
+		is (2 power (bitpos - 1)) ).
+	</para>
+	<para>
+		The default value: 0.
+	</para>
+	<example>
+		<title>Set <varname>keylog_mode</varname> parameter</title>
+		<programlisting>
+...
+modparam("tls", "keylog_mode", 15)
+...
+	</programlisting>
+	</example>
+	</section>
+	<section id="tls.p.keylog_file">
+	<title><varname>keylog_file</varname> (str)</title>
+	<para>
+		Path to the file where to write the TLS keys. The values are appended
+		to the content of the file. The value 8 (bit 4) has to be set to
+		keylog_mode parameter.
+	</para>
+	<para>
+		The default value: NULL.
+	</para>
+	<example>
+		<title>Set <varname>keylog_file</varname> parameter</title>
+		<programlisting>
+...
+modparam("tls", "keylog_file", "/tmp/kamailio-tls-keylog.txt")
+...
+	</programlisting>
+	</example>
+	</section>
+	<section id="tls.p.keylog_peer">
+	<title><varname>keylog_peer</varname> (str)</title>
+	<para>
+		Address of the peer where to send the keys log. It has to be in the
+		format "proto:ip:port". Only "udp" protocol (proto) is supported.
+		The value 16 (bit 5) has to be set to keylog_mode parameter.
+	</para>
+	<para>
+		The default value: NULL.
+	</para>
+	<example>
+		<title>Set <varname>keylog_peer</varname> parameter</title>
+		<programlisting>
+...
+modparam("tls", "keylog_peer", "udp:127.0.0.1:8020")
+...
+	</programlisting>
+	</example>
+	</section>
+
  </section>

@@ -124,27 +124,27 @@ modparam("pdb", "ll_info", 3)
 		<title>Functions</title>
 		<section>
 	    <title>
-				<function moreinfo="none">pdb_query (string query, string dstavp)</function>
+				<function moreinfo="none">pdb_query (string query, string dstpv)</function>
 	    </title>
 	    <para>
 				Sends the query string to all configured servers and stores the answer in
-				dstavp. If it takes more than the configured timeout, false is returned.
+				dstvp. If it takes more than the configured timeout, false is returned.
 
-				Pseudo-variables or AVPs can be used for the query string.
+				In addition to a string, any pseudo-variable can be used as query.
 
 				The answer must consist of the null terminated query string followed by
 				a two byte integer value in network byte order. The integer value will
-				be stored in the given AVP.
+				be stored in the given pseudo-variable dstvp.
 	    </para>
 			<example>
 				<title><function>pdb_query</function> usage</title>
 				<programlisting format="linespecific">
 ...
 # query external service for routing information
-if (!pdb_query("$rU", "$avp(i:82)"))
-  $avp(i:82) = 0; # default routing
+if (!pdb_query("$rU", "$avp(routing)"))
+  $avp(routing) = 0; # default routing
 }
-cr_route("$avp(i:82)", "$rd", "$rU", "$rU", "call_id");
+cr_route("$avp(routing)", "$rd", "$rU", "$rU", "call_id");
 ...
 				</programlisting>
 			</example>
@@ -162,7 +162,25 @@ cr_route("$avp(i:82)", "$rd", "$rU", "$rU", "call_id");
 				<title><function>pdb.status</function> usage</title>
 				<programlisting format="linespecific">
 ...
-&kamcmd; pdb.status
+&kamctl; rpc pdb.status
+...
+				</programlisting>
+	    </example>
+		</section>
+		<section id="pdb.r.timeout">
+	    <title>pdb.timeout</title>
+	    <para>
+				Prints the current PDB query timeout value.
+				This can also be used to set the PDB query timeout.
+	    </para>
+			<example>
+				<title><function>pdb.timeout</function> usage</title>
+				<programlisting format="linespecific">
+...
+# get the PDB query timeout
+&kamctl; rpc pdb.timeout
+# set the PDB query timeout to 10ms
+&kamctl; rpc pdb.timeout 10
 ...
 				</programlisting>
 	    </example>
@@ -176,7 +194,7 @@ cr_route("$avp(i:82)", "$rd", "$rU", "$rU", "call_id");
 				<title><function>pdb.activate</function> usage</title>
 				<programlisting format="linespecific">
 ...
-&kamcmd; pdb.activate
+&kamctl; rpc pdb.activate
 ...
 				</programlisting>
 	    </example>
@@ -194,7 +212,7 @@ cr_route("$avp(i:82)", "$rd", "$rU", "$rU", "call_id");
 				<title><function>pdb.deactivate</function> usage</title>
 				<programlisting format="linespecific">
 ...
-&kamcmd; pdb.deactivate
+&kamctl; rpc pdb.deactivate
 ...
 				</programlisting>
 	    </example>

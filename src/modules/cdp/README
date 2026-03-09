@@ -221,7 +221,7 @@ Chapter 1. Admin Guide
    transactions are implemented in transaction.c.
 
    There are 2 configuration areas for CDP. Firstly it must be loaded and
-   configured in the Kamailio.cfg file (this is the normal task associated
+   configured in the kamailio.cfg file (this is the normal task associated
    with Kamailio modules). Then, an XML file is required to configure
    various Diameter parameters and all related peers and the associated
    routes.
@@ -568,6 +568,8 @@ ed in the realm routing section
 8"/>
         <Peer FQDN="pcrf6.ims.smilecoms.com" Realm="ims.smilecoms.com" port="386
 8"/>
+        <Peer FQDN="pcrf7.ims.smilecoms.com" Realm="ims.smilecoms.com" src_addr=
+"192.168.2.1" port="3868" vrf="blue"/>
 
         <!--
                 Definition of incoming connection acceptors. If no bind is speci
@@ -577,6 +579,7 @@ fied, the acceptor will bind
         <Acceptor port="3868"  />
         <Acceptor port="3869" bind="127.0.0.1" />
         <Acceptor port="3870" bind="192.168.1.1" />
+        <Acceptor port="3870" bind="192.168.2.1" vrf="blue" />
 
         <!--
                 Definition of Auth (authorization) and Acct (accounting) support

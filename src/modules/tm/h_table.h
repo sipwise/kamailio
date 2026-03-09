@@ -204,6 +204,7 @@ typedef struct ua_client
 	struct dns_srv_handle dns_h;
 #endif
 	str uri;
+	str dst_uri;
 	str path;
 	str instance;
 	str ruid;
@@ -215,6 +216,8 @@ typedef struct ua_client
 	unsigned int flags;
 	/* per branch flags */
 	flag_t branch_flags;
+	/* via-body flags */
+	flag_t vbflags;
 	/* internal processing code - (mapping over sip warning codes)
 	 * - storing the code giving a clue of what happened internally */
 	int icode;
@@ -346,9 +349,9 @@ typedef struct cell
 	/* sequence number within hash collision slot */
 	unsigned int label;
 	/* different information about the transaction */
-	unsigned short flags;
+	unsigned int flags;
 	/* number of forks */
-	short nr_of_outgoings;
+	int nr_of_outgoings;
 
 	/* free operations counter - debug */
 	int fcount;

@@ -47,4 +47,100 @@ mem_free();
 		</example>
 	</section>
 
+	<section id="misctest.mt_tcp_thread_exec">
+		<title><function>mt_tcp_thread_exec(text)</function></title>
+		<para>
+			Print the text via the tcp main process threads.
+		</para>
+		<note>
+			<para>
+				This is a debugging function for simulating execution on
+				tcp main process threads. It should not
+				be used in production setups
+			</para>
+		</note>
+		<example>
+			<title><function>mt_tcp_thread_exec</function> usage</title>
+			<programlisting>
+...
+mt_tcp_thread_exec("request $rm uri $ru");
+...
+			</programlisting>
+		</example>
+	</section>
+
+	<section id="misctest.mt_lock_test">
+		<title>
+			<function>mt_lock_test(count)</function>
+		</title>
+		<para>
+			Lock and unlock the global lock count times.
+		</para>
+		<note>
+			<para>
+				This is a debugging function for simulating locking and unlocking of global lock.
+				It should not be used in production setups
+			</para>
+		</note>
+		<example>
+			<title>
+				<function>mt_lock_test</function> usage</title>
+			<programlisting>
+...
+mt_lock_test(100000000);
+...
+			</programlisting>
+		</example>
+	</section>
+
+	<section id="misctest.mt_lock_threads">
+		<title>
+			<function>mt_lock_threads(nrthreads)</function>
+		</title>
+		<para>
+			Creates a set of threads that try to use the internal lock (see
+			also lock_threads_mode parameter).
+		</para>
+		<note>
+			<para>
+				This is a debugging function to do locking and unlocking
+				of an internal global lock from threads. It should not be used
+				in production setups.
+			</para>
+		</note>
+		<example>
+			<title>
+				<function>mt_lock_threads</function> usage</title>
+			<programlisting>
+...
+mt_lock_threads("4");
+...
+			</programlisting>
+		</example>
+	</section>
+	<section id="misctest.mt_unlock_threads">
+		<title>
+			<function>mt_unlock_threads(nrops)</function>
+		</title>
+		<para>
+			Unlock the internal global lock used by mt_lock_threads(). It is
+			done nrops-times.
+		</para>
+		<note>
+			<para>
+				This is a debugging function to do locking and unlocking
+				of an internal global lock from threads. It should not be used
+				in production setups.
+			</para>
+		</note>
+		<example>
+			<title>
+				<function>mt_lock_threads</function> usage</title>
+			<programlisting>
+...
+mt_unlock_threads("4");
+...
+			</programlisting>
+		</example>
+	</section>
 </section>

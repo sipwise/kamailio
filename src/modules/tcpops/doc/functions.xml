@@ -44,6 +44,40 @@
 			]]></programlisting>
 		</example>
 	</section>
+	<section id="tcpops.f.tcp_con_alive">
+		<title>
+			<function>tcp_con_alive(addr)</function>
+		</title>
+		<para>
+			Check the connection based on target addrt.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+			<listitem>
+				<para><emphasis>addr</emphasis> - target "host:port" or SIP address.
+				The port can be omitted (default to 5060) and the parameter can
+				contain variables.
+				</para>
+			</listitem>
+		</itemizedlist>
+		<para>Return values:</para>
+		<para>1: connection was found</para>
+		<para>-1: connection was not found or an error occurred</para>
+		<example>
+			<title><function>tcp_con_alive</function> usage</title>
+			<programlisting><![CDATA[
+...
+	if(!tcp_con_alive("1.2.3.4:5060")) {
+		xlog("connection not found\n");
+	}
+	if(!tcp_con_alive("sip:2.3.4.5:5070")) {
+		xlog("connection not found\n");
+	}
+
+...
+			]]></programlisting>
+		</example>
+	</section>
 	<section id="tcpops.f.tcp_conid_state">
 		<title>
 			<function>tcp_conid_state(conid)</function>
@@ -305,7 +339,7 @@ event_route[tcp:closed] {
 		<itemizedlist>
 			<listitem>
 				<para><emphasis>conid</emphasis> - the value of tcp connection id.
-				It can be an integer number or a variable holding an interver value.
+				It can be an integer number or a variable holding an integer value.
 				</para>
 			</listitem>
 		</itemizedlist>
@@ -336,8 +370,8 @@ event_route[tcp:closed] {
 			Set or reset the internal flag for using or not the outbound tcp
 			connection id for sending out. The outbound connection id can be
 			set by module or by config using tcp_set_otcpid(...) function. An
-			example of a module setting the otcpid is register via lookup location
-			function, which sets the filed to the connection id used to receive
+			example of a module setting the otcpid is registrar via lookup location
+			function, which sets the field to the connection id used to receive
 			the registration request.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
@@ -387,7 +421,7 @@ event_route[tcp:closed] {
 		<itemizedlist>
 			<listitem>
 				<para><emphasis>conid</emphasis> - the value of tcp connection id.
-				It can be an integer number or a variable holding an interver value.
+				It can be an integer number or a variable holding an integer value.
 				</para>
 			</listitem>
 		</itemizedlist>

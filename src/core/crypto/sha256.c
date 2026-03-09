@@ -61,7 +61,6 @@
  *
  */
 
-
 /*** SHA-256/384/512 Machine Architecture Definitions *****************/
 /*
  * BYTE_ORDER NOTE:
@@ -862,6 +861,12 @@ void sr_SHA512_Update(SHA512_CTX *context, const sha2_byte *data, size_t len)
 	usedspace = freespace = 0;
 }
 
+void sr_SHA512_256_Update(
+		SHA512_CTX *context, const sha2_byte *data, size_t len)
+{
+	sr_SHA512_Update(context, data, len);
+}
+
 void SHA512_Last(SHA512_CTX *context)
 {
 	unsigned int usedspace;
@@ -908,6 +913,11 @@ void SHA512_Last(SHA512_CTX *context)
 	SHA512_Transform(context, (sha2_word64 *)context->buffer);
 }
 
+void SHA512_256_Last(SHA512_CTX *context)
+{
+	SHA512_Last(context);
+}
+
 void sr_SHA512_Final(
 		sha2_byte digest[SHA512_DIGEST_LENGTH], SHA512_CTX *context)
 {
@@ -939,6 +949,15 @@ void sr_SHA512_Final(
 	MEMSET_BZERO(context, sizeof(*context));
 }
 
+void sr_SHA512_256_Final(
+		sha2_byte digest[SHA512_256_DIGEST_LENGTH], SHA512_CTX *context)
+{
+	sha2_byte temp[SHA512_DIGEST_LENGTH];
+
+	sr_SHA512_Final(temp, context);
+	memcpy(digest, temp, SHA512_256_DIGEST_LENGTH);
+}
+
 char *sr_SHA512_End(
 		SHA512_CTX *context, char buffer[SHA512_DIGEST_STRING_LENGTH])
 {
@@ -964,6 +983,31 @@ char *sr_SHA512_End(
 	return buffer;
 }
 
+char *sr_SHA512_256_End(
+		SHA512_CTX *context, char buffer[SHA512_256_DIGEST_STRING_LENGTH])
+{
+	sha2_byte digest[SHA512_256_DIGEST_LENGTH], *d = digest;
+	int i;
+
+	/* Sanity check: */
+	assert(context != (SHA512_CTX *)0);
+
+	if(buffer != (char *)0) {
+		sr_SHA512_256_Final(digest, context);
+
+		for(i = 0; i < SHA512_256_DIGEST_LENGTH; i++) {
+			*buffer++ = sha2_hex_digits[(*d & 0xf0) >> 4];
+			*buffer++ = sha2_hex_digits[*d & 0x0f];
+			d++;
+		}
+		*buffer = (char)0;
+	} else {
+		MEMSET_BZERO(context, sizeof(*context));
+	}
+	MEMSET_BZERO(digest, SHA512_256_DIGEST_LENGTH);
+	return buffer;
+}
+
 char *sr_SHA512_Data(const sha2_byte *data, size_t len,
 		char digest[SHA512_DIGEST_STRING_LENGTH])
 {
@@ -974,6 +1018,15 @@ char *sr_SHA512_Data(const sha2_byte *data, size_t len,
 	return sr_SHA512_End(&context, digest);
 }
 
+char *sr_SHA512_256_Data(const sha2_byte *data, size_t len,
+		char digest[SHA512_256_DIGEST_STRING_LENGTH])
+{
+	SHA512_CTX context;
+
+	sr_SHA512_256_Init(&context);
+	sr_SHA512_256_Update(&context, data, len);
+	return sr_SHA512_256_End(&context, digest);
+}
 
 /*** SHA-384: *********************************************************/
 void sr_SHA384_Init(SHA384_CTX *context)
@@ -1056,4 +1109,173 @@ char *sr_SHA384_Data(const sha2_byte *data, size_t len,
 	sr_SHA384_Init(&context);
 	sr_SHA384_Update(&context, data, len);
 	return sr_SHA384_End(&context, digest);
+}
+
+/*** SHA-1 ******************/
+
+
+#define ROTLEFT(a, b) ((a << b) | (a >> (32 - b)))
+
+
+void sha1_transform(SHA1_CTX *ctx, const unsigned char data[])
+{
+	unsigned int a, b, c, d, e, i, j, t, m[80];
+
+	for(i = 0, j = 0; i < 16; ++i, j += 4)
+		m[i] = (data[j] << 24) + (data[j + 1] << 16) + (data[j + 2] << 8)
+			   + (data[j + 3]);
+	for(; i < 80; ++i) {
+		m[i] = (m[i - 3] ^ m[i - 8] ^ m[i - 14] ^ m[i - 16]);
+		m[i] = (m[i] << 1) | (m[i] >> 31);
+	}
+
+	a = ctx->state[0];
+	b = ctx->state[1];
+	c = ctx->state[2];
+	d = ctx->state[3];
+	e = ctx->state[4];
+
+	for(i = 0; i < 20; ++i) {
+		t = ROTLEFT(a, 5) + ((b & c) ^ (~b & d)) + e + ctx->k[0] + m[i];
+		e = d;
+		d = c;
+		c = ROTLEFT(b, 30);
+		b = a;
+		a = t;
+	}
+	for(; i < 40; ++i) {
+		t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[1] + m[i];
+		e = d;
+		d = c;
+		c = ROTLEFT(b, 30);
+		b = a;
+		a = t;
+	}
+	for(; i < 60; ++i) {
+		t = ROTLEFT(a, 5) + ((b & c) ^ (b & d) ^ (c & d)) + e + ctx->k[2]
+			+ m[i];
+		e = d;
+		d = c;
+		c = ROTLEFT(b, 30);
+		b = a;
+		a = t;
+	}
+	for(; i < 80; ++i) {
+		t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[3] + m[i];
+		e = d;
+		d = c;
+		c = ROTLEFT(b, 30);
+		b = a;
+		a = t;
+	}
+
+	ctx->state[0] += a;
+	ctx->state[1] += b;
+	ctx->state[2] += c;
+	ctx->state[3] += d;
+	ctx->state[4] += e;
+}
+
+void sr_SHA1_Init(SHA1_CTX *ctx)
+{
+	ctx->datalen = 0;
+	ctx->bitlen = 0;
+	ctx->state[0] = 0x67452301;
+	ctx->state[1] = 0xEFCDAB89;
+	ctx->state[2] = 0x98BADCFE;
+	ctx->state[3] = 0x10325476;
+	ctx->state[4] = 0xc3d2e1f0;
+	ctx->k[0] = 0x5a827999;
+	ctx->k[1] = 0x6ed9eba1;
+	ctx->k[2] = 0x8f1bbcdc;
+	ctx->k[3] = 0xca62c1d6;
+}
+
+void sr_SHA1_Update(SHA1_CTX *ctx, const unsigned char data[], size_t len)
+{
+	size_t i;
+
+	for(i = 0; i < len; ++i) {
+		ctx->data[ctx->datalen] = data[i];
+		ctx->datalen++;
+		if(ctx->datalen == 64) {
+			sha1_transform(ctx, ctx->data);
+			ctx->bitlen += 512;
+			ctx->datalen = 0;
+		}
+	}
+}
+
+void sr_SHA1_Final(unsigned char hash[SHA1_DIGEST_LENGTH], SHA1_CTX *ctx)
+{
+	unsigned int i;
+
+	i = ctx->datalen;
+
+	if(ctx->datalen < 56) {
+		ctx->data[i++] = 0x80;
+		while(i < 56)
+			ctx->data[i++] = 0x00;
+	} else {
+		ctx->data[i++] = 0x80;
+		while(i < 64)
+			ctx->data[i++] = 0x00;
+		sha1_transform(ctx, ctx->data);
+		memset(ctx->data, 0, 56);
+	}
+
+	ctx->bitlen += ctx->datalen * 8;
+	ctx->data[63] = ctx->bitlen;
+	ctx->data[62] = ctx->bitlen >> 8;
+	ctx->data[61] = ctx->bitlen >> 16;
+	ctx->data[60] = ctx->bitlen >> 24;
+	ctx->data[59] = ctx->bitlen >> 32;
+	ctx->data[58] = ctx->bitlen >> 40;
+	ctx->data[57] = ctx->bitlen >> 48;
+	ctx->data[56] = ctx->bitlen >> 56;
+	sha1_transform(ctx, ctx->data);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+	for(i = 0; i < 4; ++i) {
+		hash[i] = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff;
+		hash[i + 4] = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff;
+		hash[i + 8] = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff;
+		hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff;
+		hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff;
+	}
+#endif
+}
+
+char *sr_SHA1_End(SHA1_CTX *context, char buffer[SHA1_DIGEST_STRING_LENGTH])
+{
+	sha2_byte digest[SHA1_DIGEST_LENGTH], *d = digest;
+	int i;
+
+	/* Sanity check: */
+	assert(context != (SHA1_CTX *)0);
+
+	if(buffer != (char *)0) {
+		sr_SHA1_Final(digest, context);
+
+		for(i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+			*buffer++ = sha2_hex_digits[(*d & 0xf0) >> 4];
+			*buffer++ = sha2_hex_digits[*d & 0x0f];
+			d++;
+		}
+		*buffer = (char)0;
+	} else {
+		MEMSET_BZERO(context, sizeof(*context));
+	}
+	MEMSET_BZERO(digest, SHA1_DIGEST_LENGTH);
+	return buffer;
+}
+
+char *sr_SHA1_Data(const sha2_byte *data, size_t len,
+		char digest[SHA1_DIGEST_STRING_LENGTH])
+{
+	SHA1_CTX context;
+
+	sr_SHA1_Init(&context);
+	sr_SHA1_Update(&context, data, len);
+	return sr_SHA1_End(&context, digest);
 }

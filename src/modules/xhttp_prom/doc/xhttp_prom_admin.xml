@@ -255,6 +255,91 @@ modparam("xhttp_prom", "xhttp_prom_beginning", "");
 		</programlisting>
 	  </example>
 	</section>
+	<section id="xhttp_prom.p.xhttp_prom_metadata_flags">
+	  <title><varname>xhttp_prom_metadata_flags</varname> (integer)</title>
+	  <para>
+		Flags to enable Prometheus metadata lines in the output. The
+		flags are defined as a bitmask on an integer value. Bits have the
+		following meaning:
+	  </para>
+	  <itemizedlist>
+		<listitem>
+		  <para>
+			<emphasis>1</emphasis> - include TYPE metadata string for
+			user defined metrics. Metrics generated from Kamailio statistics are
+			untyped and can't have TYPE metadata.
+			<example><title><varname>xhttp_prom_metadata_flags</varname> TYPE example</title>
+			<programlisting format="linespecific">
+# Enable TYPE metadata and define some metrics.
+modparam("xhttp_prom", "xhttp_prom_beginning", "my_metric_")
+modparam("xhttp_prom", "xhttp_prom_metadata_flags", 1)
+modparam("xhttp_prom", "prom_counter", "name=cnt01")
+modparam("xhttp_prom", "prom_gauge", "name=gg01")
+modparam("xhttp_prom", "prom_histogram", "name=histo01")
+
+In this case the generated Prometheus output may look something like this:
+
+# TYPE my_metric_cnt01 counter
+my_metric_cnt01 0
+# TYPE my_metric_gg01 gauge
+my_metric_gg01 0
+# TYPE my_metric_hist01 histogram
+my_metric_hist01_sum 0.0
+my_metric_hist01_count 0
+			</programlisting>
+			</example>
+		  </para>
+		</listitem>
+		<listitem>
+		  <para>
+			<emphasis>2</emphasis> - include HELP metadata string for
+			user defined metrics. HELP metadata for a metric will only be
+			generated if the help string is defined in metric specification. See
+			description of the help attribute in <varname>prom_counter</varname>.
+			<example><title><varname>xhttp_prom_metadata_flags</varname> HELP example</title>
+			<programlisting format="linespecific">
+# Enable TYPE and HELP metadata and define some metrics (with and without HELP).
+modparam("xhttp_prom", "xhttp_prom_beginning", "my_metric_")
+modparam("xhttp_prom", "xhttp_prom_metadata_flags", 3)
+modparam("xhttp_prom", "prom_counter", "name=cnt01")
+modparam("xhttp_prom", "prom_gauge", "name=gg01; help='Some help string for the gauge'")
+
+In this case the generated Prometheus output may look something like this:
+
+# TYPE my_metric_cnt01 counter
+my_metric_cnt01 0
+# HELP my_metric_gg01 Some help string for the gauge
+# TYPE my_metric_gg01 gauge
+my_metric_gg01 0
+			</programlisting>
+			</example>
+		  </para>
+		</listitem>
+	  </itemizedlist>
+	  <para>
+		<emphasis>
+		  Default value is 0 (no metadata in the output).
+		</emphasis>
+	  </para>
+	  <example>
+		<title>Set <varname>xhttp_prom_metadata_flags</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+# There will be no metadata in the output (it's the default)
+modparam("xhttp_prom", "xhttp_prom_metadata_flags", 0)
+
+# Only the TYPE metadata entry will be included in the output.
+modparam("xhttp_prom", "xhttp_prom_metadata_flags", 1)
+
+# If there's HELP metadata defined for the metric, it will be included in the output.
+modparam("xhttp_prom", "xhttp_prom_metadata_flags", 2)
+
+# Both TYPE and HELP metadata lines are allowed in the output.
+modparam("xhttp_prom", "xhttp_prom_metadata_flags", 3)
+...
+		</programlisting>
+	  </example>
+	</section>
 	<section id="xhttp_prom.p.xhttp_prom_tags">
 	  <title><varname>xhttp_prom_tags</varname> (str)</title>
 	  <para>
@@ -317,6 +402,18 @@ the metric.
 			</example>
 		  </para>
 		</listitem>
+		<listitem>
+		  <para>
+			<emphasis>help</emphasis> - HELP metadata string for the counter. Optional.
+			If HELP string is defined for the metric and metadata
+			generation is enabled (see <varname>xhttp_prom_metadata_flags</varname> parameter),
+			then it will be included in the generated output. Be careful using special
+			characters in the help string. Prometheus requires some characters in
+			the HELP to be quoted, but this module doesn't process the provided
+			HELP string in any way. The provided HELP string will be included in
+			the output as is.
+		  </para>
+		</listitem>
 	  </itemizedlist>
 	  <example>
 		<title>Set <varname>prom_counter</varname> parameter</title>
@@ -332,6 +429,9 @@ modparam("xhttp_prom", "prom_counter", "name=cnt_second;");
 
 # Create cnt_third counter with label method
 modparam("xhttp_prom", "prom_counter", "name=cnt_third; label=method");
+
+# Create cnt_fourth counter with label method and HELP string
+modparam("xhttp_prom", "prom_counter", "name=cnt_fourth; label=method; help='Total number of SIP requests'");
 
 These lines declare the counter but the actual metric will be created when
 using it by prom_counter_inc or prom_counter_reset functions.
@@ -375,6 +475,13 @@ This would generate  {method="whatever", handler="whatever2"} when building
 the metric.
 			</programlisting>
 			</example>
+		  </para>
+		</listitem>
+		<listitem>
+		  <para>
+			<emphasis>help</emphasis> - HELP metadata string for the gauge. Optional.
+			See description for the help attribute in <varname>prom_counter</varname> parameter.
+			Everything is the same for <varname>prom_gauge</varname> help.
 		  </para>
 		</listitem>
 	  </itemizedlist>
@@ -450,6 +557,13 @@ the metric.
 		  <para>
 			If no buckets specified, default bucket list is set to these values:
 			<para>[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]</para>
+		  </para>
+		</listitem>
+		<listitem>
+		  <para>
+			<emphasis>help</emphasis> - HELP metadata string for the histogram. Optional.
+			See description for the help attribute in <varname>prom_counter</varname> parameter.
+			Everything is the same for <varname>prom_histogram</varname> help.
 		  </para>
 		</listitem>
 	  </itemizedlist>
@@ -597,6 +711,49 @@ modparam("xhttp_prom", "prom_counter", "name=cnt02; label=method:IP;");
 prom_counter_inc("cnt02", "15", "push", "192.168.0.1");
 # When listed the metric it will show a line like this:
 kamailio_cnt02 {method="push", IP="192.168.0.1"} 15 1234567890
+...
+		</programlisting>
+	  </example>
+	</section>
+	<section id="xhttp_prom.f.prom_gauge_inc">
+	  <title>
+		<function moreinfo="none">prom_gauge_inc(name, number, l0, l1, l2)</function>
+	  </title>
+	  <para>
+		Get a gauge identified by its name and labels and increase (or decrease, if amount is negative) its value by a given amount.
+		If gauge does not exist it creates the gauge and assigns the value to it.
+	  </para>
+	  <para>
+		Name and number are mandatory.
+		Number is a string that will be parsed as a float.
+		l0, l1, l2 are values of labels and are optional.
+	  </para>
+	  <para>
+		name value and number of labels have to match a previous gauge definition with prom_gauge.
+	  </para>
+	  <para>
+		This function accepts pseudovariables on its parameters.
+	  </para>
+	  <para>
+		Available via KEMI framework as <emphasis>gauge_set_l0</emphasis>,
+		<emphasis>gauge_set_l1</emphasis>,
+		<emphasis>gauge_set_l2</emphasis> and
+		<emphasis>gauge_set_l3</emphasis>.
+	  </para>
+	  <example>
+		<title><function>prom_gauge_inc</function> usage</title>
+		<programlisting format="linespecific">
+...
+# Definition of gg01 gauge with no labels.
+modparam("xhttp_prom", "prom_gauge", "name=gg01;");
+...
+# Increase the value of gg01 by 12.5 (with no labels).
+# Gauges start at zero and after the update gg01 will have value 12.5.
+prom_gauge_inc("gg01", "12.5");
+...
+# Decrease the value of gg01 by 22.5.
+# After the update gg01 will have value -10.
+prom_gauge_inc("gg01", "-22.5");
 ...
 		</programlisting>
 	  </example>
@@ -871,7 +1028,7 @@ event_route[xhttp:request] {
 		<title><function>xhttp_prom.counter_reset</function> usage</title>
 		<programlisting format="linespecific">
 		  ...
-		  &kamcmd; xhttp_prom.counter_reset "cnt01" "push" "192.168.0.1"
+		  &kamctl; rpc xhttp_prom.counter_reset "cnt01" "push" "192.168.0.1"
 		  ...
 		</programlisting>
 	  </example>
@@ -896,7 +1053,7 @@ event_route[xhttp:request] {
 		<title><function>xhttp_prom.counter_inc</function> usage</title>
 		<programlisting format="linespecific">
 		  ...
-		  &kamcmd; xhttp_prom.counter_inc "cnt01" 15 "push" "192.168.0.1"
+		  &kamctl; rpc xhttp_prom.counter_inc "cnt01" 15 "push" "192.168.0.1"
 		  ...
 		</programlisting>
 	  </example>
@@ -920,7 +1077,32 @@ event_route[xhttp:request] {
 		<title><function>xhttp_prom.gauge_reset</function> usage</title>
 		<programlisting format="linespecific">
 		  ...
-		  &kamcmd; xhttp_prom.gauge_reset "gg01" "push" "192.168.0.1"
+		  &kamctl; rpc xhttp_prom.gauge_reset "gg01" "push" "192.168.0.1"
+		  ...
+		</programlisting>
+	  </example>
+    </section>
+	<section  id="xhttp_prom.rpc.gauge_inc">
+	  <title><function moreinfo="none">xhttp_prom.gauge_inc</function></title>
+	  <para>
+		Increase (or decrease) a gauge by a number. Select the gauge by its name and labels.
+	  </para>
+      <para>
+        Name: <emphasis>xhttp_prom.gauge_inc</emphasis>
+      </para>
+      <para>Parameters:</para>
+	  <itemizedlist>
+				<listitem><para><emphasis>name</emphasis>: name of the gauge (mandatory)</para></listitem>
+		<listitem><para><emphasis>number</emphasis>: float value to add to the gauge value (mandatory)</para></listitem>
+		<listitem><para><emphasis>l0</emphasis>: value of the first label (optional)</para></listitem>
+		<listitem><para><emphasis>l1</emphasis>: value of second label (optional)</para></listitem>
+		<listitem><para><emphasis>l2</emphasis>: value of the third label (optional)</para></listitem>
+	  </itemizedlist>
+	  <example>
+		<title><function>xhttp_prom.gauge_inc</function> usage</title>
+		<programlisting format="linespecific">
+		  ...
+		  &kamctl; rpc xhttp_prom.gauge_inc "gg01" -- -5.2
 		  ...
 		</programlisting>
 	  </example>
@@ -945,7 +1127,7 @@ event_route[xhttp:request] {
 		<title><function>xhttp_prom.gauge_set</function> usage</title>
 		<programlisting format="linespecific">
 		  ...
-		  &kamcmd; xhttp_prom.gauge_set "gg01" -- -5.2
+		  &kamctl; rpc xhttp_prom.gauge_set "gg01" -- -5.2
 		  ...
 		</programlisting>
 	  </example>
@@ -970,7 +1152,7 @@ event_route[xhttp:request] {
 		<title><function>xhttp_prom.histogram_observe</function> usage</title>
 		<programlisting format="linespecific">
 		  ...
-		  &kamcmd; xhttp_prom.histogram_observe "hist01" -- -5.2
+		  &kamctl; rpc xhttp_prom.histogram_observe "hist01" -- -5.2
 		  ...
 		</programlisting>
 	  </example>
@@ -992,7 +1174,7 @@ event_route[xhttp:request] {
 		<title><function>xhttp_prom.metric_list_print</function> usage</title>
 		<programlisting format="linespecific">
 		  ...
-		  &kamcmd; xhttp_prom.metric_list_print
+		  &kamctl; rpc xhttp_prom.metric_list_print
 		  ...
 		</programlisting>
 	  </example>

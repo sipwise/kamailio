@@ -42,7 +42,10 @@ extern "C"
 #include <sys/types.h>
 #include <stdint.h>
 
-/*** SHA-256/384/512 Various Length Definitions ***********************/
+/*** SHA-1/256/384/512 Various Length Definitions ***********************/
+#define SHA1_BLOCK_LENGTH 64
+#define SHA1_DIGEST_LENGTH 20
+#define SHA1_DIGEST_STRING_LENGTH (SHA1_DIGEST_LENGTH * 2 + 1)
 #define SHA256_BLOCK_LENGTH 64
 #define SHA256_DIGEST_LENGTH 32
 #define SHA256_DIGEST_STRING_LENGTH (SHA256_DIGEST_LENGTH * 2 + 1)
@@ -52,9 +55,12 @@ extern "C"
 #define SHA512_BLOCK_LENGTH 128
 #define SHA512_DIGEST_LENGTH 64
 #define SHA512_DIGEST_STRING_LENGTH (SHA512_DIGEST_LENGTH * 2 + 1)
+#define SHA512_256_BLOCK_LENGTH 128
+#define SHA512_256_DIGEST_LENGTH 32
+#define SHA512_256_DIGEST_STRING_LENGTH (SHA512_256_DIGEST_LENGTH * 2 + 1)
 
 
-/*** SHA-256/384/512 Context Structures *******************************/
+/*** SHA-1/256/384/512 Context Structures *******************************/
 /* NOTE: If your architecture does not define either u_intXX_t types or
  * uintXX_t (from inttypes.h), you may need to define things by hand
  * for your system:
@@ -64,6 +70,15 @@ typedef unsigned char u_int8_t;		/* 1-byte  (8-bits)  */
 typedef unsigned int u_int32_t;		/* 4-bytes (32-bits) */
 typedef unsigned long long u_int64_t;	/* 8-bytes (64-bits) */
 #endif
+
+	typedef struct _SHA1_CTX
+	{
+		unsigned char data[SHA1_BLOCK_LENGTH];
+		unsigned int datalen;
+		unsigned long long bitlen;
+		unsigned int state[5];
+		unsigned int k[4];
+	} SHA1_CTX;
 
 	typedef struct _SHA256_CTX
 	{
@@ -84,8 +99,15 @@ typedef unsigned long long u_int64_t;	/* 8-bytes (64-bits) */
 	typedef uint32_t sha2_word32; /* Exactly 4 bytes */
 	typedef uint64_t sha2_word64; /* Exactly 8 bytes */
 
-/*** SHA-256/384/512 Function Prototypes ******************************/
+/*** SHA-1/256/384/512 Function Prototypes ******************************/
 #ifndef NOPROTO
+
+	void sr_SHA1_Init(SHA1_CTX *);
+	void sr_SHA1_Update(SHA1_CTX *, const uint8_t *, size_t);
+	void sr_SHA1_Final(unsigned char hash[SHA1_DIGEST_LENGTH], SHA1_CTX *ctx);
+	char *sr_SHA1_End(SHA1_CTX *, char[SHA1_DIGEST_STRING_LENGTH]);
+	char *sr_SHA1_Data(
+			const uint8_t *, size_t, char[SHA1_DIGEST_STRING_LENGTH]);
 
 	void sr_SHA256_Init(SHA256_CTX *);
 	void sr_SHA256_Update(SHA256_CTX *, const uint8_t *, size_t);
@@ -104,12 +126,24 @@ typedef unsigned long long u_int64_t;	/* 8-bytes (64-bits) */
 	void sr_SHA512_Init(SHA512_CTX *);
 	void sr_SHA512_256_Init(SHA512_CTX *);
 	void sr_SHA512_Update(SHA512_CTX *, const uint8_t *, size_t);
+	void sr_SHA512_256_Update(SHA512_CTX *, const uint8_t *, size_t);
 	void sr_SHA512_Final(sha2_byte[SHA512_DIGEST_LENGTH], SHA512_CTX *);
+	void sr_SHA512_256_Final(sha2_byte[SHA512_256_DIGEST_LENGTH], SHA512_CTX *);
 	char *sr_SHA512_End(SHA512_CTX *, char[SHA512_DIGEST_STRING_LENGTH]);
+	char *sr_SHA512_256_End(
+			SHA512_CTX *, char[SHA512_256_DIGEST_STRING_LENGTH]);
 	char *sr_SHA512_Data(
 			const uint8_t *, size_t, char[SHA512_DIGEST_STRING_LENGTH]);
+	char *sr_SHA512_256_Data(
+			const uint8_t *, size_t, char[SHA512_256_DIGEST_STRING_LENGTH]);
 
 #else /* NOPROTO */
+
+void sr_SHA1_Init();
+void sr_SHA1_Update();
+void sr_SHA1_Final();
+char *sr_SHA1_End();
+char *sr_SHA1_Data();
 
 void sr_SHA256_Init();
 void sr_SHA256_Update();

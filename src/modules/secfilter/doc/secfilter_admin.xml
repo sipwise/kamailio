@@ -350,16 +350,29 @@
 		<listitem>-2 = the value is blacklisted</listitem>
 		</itemizedlist>
  		</para>
+ 		<para>
+ 		You can filter by blocking the IPs of messages coming from countries that are on the blacklist. Alternatively, you can block everything that is not explicitly on the whitelist.
+ 		</para>
 
        <example>
          <title><function>secf_check_country</function> usage</title>
 
          <programlisting format="linespecific">
 		...
+	if (geoip2_match("$si", "src")) {
+                secf_check_country($gip2(src=>cc));
+                if ($? == -2) {
+                        xdbg("$rm from $si blocked because Country '$gip2(src=>cc)' is blacklisted");
+                        exit;
+                }
+        }
+
+		...
+
         if (geoip2_match("$si", "src")) {
                 secf_check_country($gip2(src=>cc));
-                if ($avp(secfilter) == -2) {
-                        xlog("L_ALERT", "$rm from $si blocked because Country '$gip2(src=>cc)' is blacklisted");
+                if ($? != 2) {
+                        xdbg("$rm from $si blocked because Country '$gip2(src=>cc)' is not whitelisted");
                         exit;
                 }
         }
@@ -607,7 +620,7 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.reload
+		&kamctl; rpc secfilter.reload
 		...
 		</programlisting>
        </example>
@@ -641,10 +654,10 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.print
-		&kamcmd; secfilter.print ua
-		&kamcmd; secfilter.print country
-		&kamcmd; secfilter.print dst
+		&kamctl; rpc secfilter.print
+		&kamctl; rpc secfilter.print ua
+		&kamctl; rpc secfilter.print country
+		&kamctl; rpc secfilter.print dst
 		...
 		</programlisting>
        </example>
@@ -664,7 +677,7 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.stats
+		&kamctl; rpc secfilter.stats
 		...
 		</programlisting>
        </example>
@@ -684,7 +697,7 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.stats_reset
+		&kamctl; rpc secfilter.stats_reset
 		...
 		</programlisting>
        </example>
@@ -712,11 +725,36 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.add_dst 555123123
+		&kamctl; rpc secfilter.add_dst 555123123
 		...
 		</programlisting>
        </example>
      </section>
+
+	<section id="secfilter.r.del_dst">
+		<title>
+		<function moreinfo="none">secfilter.del_dst</function>
+		</title>
+
+		<para>Delete value from destination blacklist.</para>
+
+		<para>
+		Parameters:
+		<itemizedlist>
+		<listitem>number (number to remove from the destination blacklist)</listitem>
+		</itemizedlist>
+		</para>
+
+		<example>
+		<title><function>secfilter.del_dst</function> usage</title>
+
+		<programlisting format="linespecific">
+		...
+		&kamctl; rpc secfilter.del_dst 555123123
+		...
+		</programlisting>
+		</example>
+	</section>
 
 	<section id="secfilter.r.add_bl">
        <title>
@@ -740,12 +778,39 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.add_bl ua friendly-scanner
-		&kamcmd; secfilter.add_bl user sipvicious
+		&kamctl; rpc secfilter.add_bl ua friendly-scanner
+		&kamctl; rpc secfilter.add_bl user sipvicious
 		...
 		</programlisting>
        </example>
      </section>
+
+	<section id="secfilter.r.del_bl">
+		<title>
+		<function moreinfo="none">secfilter.del_bl</function>
+		</title>
+
+		<para>Delete value from blacklist.</para>
+
+		<para>
+		Parameters:
+		<itemizedlist>
+		<listitem>type  (must be: ua, country, domain, user or ip)</listitem>
+		<listitem>value (value to remove from the blacklist)</listitem>
+		</itemizedlist>
+		</para>
+
+		<example>
+		<title><function>secfilter.del_bl</function> usage</title>
+
+		<programlisting format="linespecific">
+		...
+		&kamctl; rpc secfilter.del_bl ua friendly-scanner
+		&kamctl; rpc secfilter.del_bl user sipvicious
+		...
+		</programlisting>
+		</example>
+	</section>
 
 	<section id="secfilter.r.add_wl">
        <title>
@@ -769,12 +834,39 @@
 
          <programlisting format="linespecific">
 		...
-		&kamcmd; secfilter.add_wl country es
-		&kamcmd; secfilter.add_wl user trusted_user
+		&kamctl; rpc secfilter.add_wl country es
+		&kamctl; rpc secfilter.add_wl user trusted_user
 		...
 		</programlisting>
        </example>
      </section>
+
+	<section id="secfilter.r.del_wl">
+		<title>
+		<function moreinfo="none">secfilter.del_wl</function>
+		</title>
+
+		<para>Delete value from whitelist.</para>
+
+		<para>
+		Parameters:
+		<itemizedlist>
+		<listitem>type  (must be: ua, country, domain, user or ip)</listitem>
+		<listitem>value (value to remove from the blacklist)</listitem>
+		</itemizedlist>
+		</para>
+
+		<example>
+		<title><function>secfilter.del_wl</function> usage</title>
+
+		<programlisting format="linespecific">
+		...
+		&kamctl; rpc secfilter.del_wl country es
+		&kamctl; rpc secfilter.del_wl user trusted_user
+		...
+		</programlisting>
+		</example>
+	</section>
 	</section>
 
  	<section>
@@ -785,7 +877,7 @@
 
  		<para>
 		Before running &kamailio; with the secfilter module,
-		it is necessary to setup the database table where the module will
+		it is necessary to set up the database table where the module will
 		read the blacklist data from. In order to do that, if the table was
 		not created by the installation script or you choose to install everything
 		by yourself you can use the <emphasis>secfilter-create.sql</emphasis>
@@ -849,7 +941,7 @@
        <title>Print data</title>
 
        <example>
-         <title>kamcmd secfilter.print ua</title>
+         <title>kamctl rpc secfilter.print ua</title>
 
          <programlisting format="linespecific">
 		...
@@ -890,7 +982,7 @@
        <title>Statistics</title>
 
        <example>
-         <title>kamcmd secfilter.stats</title>
+         <title>kamctl rpc secfilter.stats</title>
 
          <programlisting format="linespecific">
 		...
@@ -934,4 +1026,3 @@
      </section>
 	</section>
 </chapter>
-

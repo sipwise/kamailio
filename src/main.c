@@ -105,6 +105,7 @@
 #include "core/poll_types.h"
 #include "core/tcp_init.h"
 #include "core/tcp_options.h"
+#include "core/tcp_mtops.h"
 #ifdef CORE_TLS
 #include "core/tls/tls_init.h"
 #define tls_has_init_si() 1
@@ -147,6 +148,7 @@
 #include "core/timer_proc.h"
 #include "core/srapi.h"
 #include "core/receive.h"
+#include "core/coreparam.h"
 
 #ifdef DEBUG_DMALLOC
 #include <dmalloc.h>
@@ -167,8 +169,8 @@ Usage: " NAME " [options]\n\
 Options:\n\
     -a mode      Auto aliases mode: enable with yes or on,\n\
                   disable with no or off\n\
-    --alias=val  Add an alias, the value has to be '[proto:]hostname[:port]'\n\
-                  (like for 'alias' global parameter)\n\
+    --alias=val  Add a domain alias, the value has to be '[proto:]hostname[:port]'\n\
+                  (like for 'alias'/'domain' global parameter)\n\
     --atexit=val Control atexit callbacks execution from external libraries\n\
                   which may access destroyed shm memory causing crash on shutdown.\n\
                   Can be y[es] or 1 to enable atexit callbacks, n[o] or 0 to disable,\n\
@@ -187,6 +189,8 @@ Options:\n\
                   -D..do not fork (almost) anyway;\n\
                   -DD..do not daemonize creator;\n\
                   -DDD..daemonize (default)\n\
+    --domain=val Add a domain alias, the value has to be '[proto:]hostname[:port]'\n\
+                  (like for 'alias'/'domain' global parameter)\n\
     -e           Log messages printed in terminal colors (requires -E)\n\
     -E           Log to stderr\n\
     -f file      Configuration file (default: " CFG_FILE ")\n\
@@ -194,6 +198,7 @@ Options:\n\
     -G file      Create a pgid file\n\
     -h           This help message\n\
     --help       Long option for `-h`\n\
+    --iuid=val   Instance unique id\n\
     -I           Print more internal compile flags and options\n\
     -K           Turn on \"via:\" host checking when forwarding replies\n\
     -l address   Listen on the specified address/interface (multiple -l\n\
@@ -496,6 +501,10 @@ struct socket_info *sendipv6_sctp;
 unsigned short port_no = 0; /* default port*/
 #ifdef USE_TLS
 unsigned short tls_port_no = 0; /* default port */
+#endif
+
+#ifdef USE_TLS
+int tls_connection_match_domain = 0;
 #endif
 
 struct host_alias *aliases = 0; /* name aliases list */
@@ -1481,6 +1490,7 @@ int main_loop(void)
 
 		/* init log prefix format */
 		log_prefix_init();
+		log_prefix_set(NULL);
 
 		/* init childs with rank==PROC_INIT before forking any process,
 		 * this is a place for delayed (after mod_init) initializations
@@ -1757,6 +1767,7 @@ int main_loop(void)
 
 		/* init log prefix format */
 		log_prefix_init();
+		log_prefix_set(NULL);
 
 		/* init childs with rank==PROC_INIT before forking any process,
 		 * this is a place for delayed (after mod_init) initializations
@@ -2201,8 +2212,6 @@ int main(int argc, char **argv)
 	char *listen_fields[3];
 	char *options;
 	int ret;
-	unsigned int seed;
-	int rfd;
 	int debug_save, debug_flag;
 	int dont_fork_cnt;
 	struct name_lst *n_lst;
@@ -2216,10 +2225,14 @@ int main(int argc, char **argv)
 	int option_index = 0;
 
 #define KARGOPTVAL 1024
-	static struct option long_options[] = {/* long options with short variant */
-			{"help", no_argument, 0, 'h'}, {"version", no_argument, 0, 'v'},
+	/* clang-format off */
+	static struct option long_options[] = {
+			/* long options with short variant */
+			{"help", no_argument, 0, 'h'},
+			{"version", no_argument, 0, 'v'},
 			/* long options without short variant */
 			{"alias", required_argument, 0, KARGOPTVAL},
+			{"domain", required_argument, 0, KARGOPTVAL},
 			{"subst", required_argument, 0, KARGOPTVAL + 1},
 			{"substdef", required_argument, 0, KARGOPTVAL + 2},
 			{"substdefs", required_argument, 0, KARGOPTVAL + 3},
@@ -2230,7 +2243,11 @@ int main(int argc, char **argv)
 			{"debug", required_argument, 0, KARGOPTVAL + 8},
 			{"cfg-print", no_argument, 0, KARGOPTVAL + 9},
 			{"atexit", required_argument, 0, KARGOPTVAL + 10},
-			{"all-errors", no_argument, 0, KARGOPTVAL + 11}, {0, 0, 0, 0}};
+			{"all-errors", no_argument, 0, KARGOPTVAL + 11},
+			{"iuid", required_argument, 0, KARGOPTVAL + 12},
+			{0, 0, 0, 0}
+		};
+	/* clang-format on */
 
 	if(argc > 1) {
 		/* checks for common wrong arguments */
@@ -2610,6 +2627,16 @@ int main(int argc, char **argv)
 					goto error;
 				}
 				break;
+			case KARGOPTVAL + 12:
+				if(optarg == NULL) {
+					fprintf(stderr, "bad instance unique id parameter\n");
+					goto error;
+				}
+				if(ksr_iuid_set(optarg, 0) < 0) {
+					fprintf(stderr, "failed to set instance unique id\n");
+					goto error;
+				}
+				break;
 
 			/* special cases */
 			case '?':
@@ -2714,30 +2741,15 @@ int main(int argc, char **argv)
 				cfg_file, strerror(errno));
 		goto error;
 	}
-
-	/* seed the prng */
-	/* try to use /dev/urandom if possible */
-	seed = 0;
-	if((rfd = open("/dev/urandom", O_RDONLY)) != -1) {
-	try_again:
-		if(read(rfd, (void *)&seed, sizeof(seed)) == -1) {
-			if(errno == EINTR)
-				goto try_again; /* interrupted by signal */
-			LM_WARN("could not read from /dev/urandom (%d)\n", errno);
-		}
-		LM_DBG("read %u from /dev/urandom\n", seed);
-		close(rfd);
-	} else {
-		LM_WARN("could not open /dev/urandom (%d)\n", errno);
+	/* we need to do it early, as other user should get proper random numbers */
+	if(cryptorand_init() != 0) {
+		fprintf(stderr,
+				"ERROR: could not initalize secure random number generator\n");
+		goto error;
 	}
-	seed += getpid() + time(0);
-	LM_DBG("seeding PRNG with %u\n", seed);
-	cryptorand_seed(seed);
 	fastrand_seed(cryptorand());
 	kam_srand(cryptorand());
 	srandom(cryptorand());
-	LM_DBG("test random numbers %u %lu %u %u\n", kam_rand(), random(),
-			fastrand(), cryptorand());
 
 	/*register builtin  modules*/
 	register_builtin_modules();
@@ -3062,8 +3074,9 @@ int main(int argc, char **argv)
 		dont_fork = dont_fork == 1;
 	}
 	/* init locks first */
-	if(init_lock_ops() != 0)
+	if(init_lock_ops() != 0) {
 		goto error;
+	}
 #ifdef USE_TCP
 #ifdef USE_TLS
 	if(tcp_disable)
@@ -3178,12 +3191,12 @@ int main(int argc, char **argv)
 
 	if(dont_fork) {
 		fprintf(stderr, "WARNING: no fork mode %s\n",
-				(udp_listen) ? (
-						(udp_listen->next)
-								? "and more than one listen address found "
-								  "(will use only the first one)"
-								: "")
-							 : "and no udp listen address found");
+				(udp_listen)
+						? ((udp_listen->next) ? "and more than one listen "
+												"address found "
+												"(will use only the first one)"
+											  : "")
+						: "and no udp listen address found");
 	}
 	if(config_check) {
 		fprintf(stderr, "config file ok, exiting...\n");
@@ -3323,6 +3336,10 @@ int main(int argc, char **argv)
 				(unsigned long)lim.rlim_cur, (unsigned long)lim.rlim_max);
 	}
 
+	LM_DBG("test random number generators - kam_rand: %u, random: %lu, "
+		   "fastrand %u, cryptorand %u\n",
+			kam_rand(), random(), fastrand(), cryptorand());
+
 	if(mlock_pages)
 		mem_lock_pages();
 
@@ -3397,6 +3414,16 @@ int main(int argc, char **argv)
 	}
 #endif
 
+	if(ksr_tcp_main_threads != 0) {
+		if(ksr_tcpx_proc_list_init() < 0) {
+			LM_ERR("failed to initialize multi-thread processing list\n");
+			goto error;
+		}
+		LM_INFO("tcp main processing threads initialized\n");
+	} else {
+		LM_INFO("tcp main processing threads not enabled\n");
+	}
+
 	/* fix routing lists */
 	if((r = fix_rls()) != 0) {
 		fprintf(stderr, "error %d while trying to fix configuration\n", r);
@@ -3443,7 +3470,7 @@ error:
 int SYMBOL_EXPORT pthread_mutex_init(
 		pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr)
 {
-	static int (*real_pthread_mutex_init)(pthread_mutex_t * __mutex,
+	static int (*real_pthread_mutex_init)(pthread_mutex_t *__mutex,
 			const pthread_mutexattr_t *__mutexattr) = 0;
 	pthread_mutexattr_t attr;
 	int ret;

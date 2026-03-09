@@ -401,8 +401,8 @@ void async_aar_reg_callback(
 		ci.reg_state = PCONTACT_REG_PENDING_AAR;
 		ci.num_service_routes = 0;
 		ci.num_public_ids = 0;
-		LM_DBG("impu: [%.*s] updating status to PCONTACT_REG_PENDING\n",
-				pcontact->aor.len, pcontact->aor.s);
+		LM_DBG("impu: [%.*s] updating status to %s\n", pcontact->aor.len,
+				pcontact->aor.s, reg_state_to_string(ci.reg_state));
 		ul.update_pcontact(domain_t, &ci, pcontact);
 		//register for callbacks on contact
 		ul.register_ulcb(pcontact, PCSCF_CONTACT_DELETE | PCSCF_CONTACT_EXPIRE,
@@ -465,13 +465,14 @@ int add_media_components_using_current_flow_description(
 {
 
 	flow_description_t *flow_description;
-	int add_flow = 1;
+	int add_flow;
 
 	flow_description = p_session_data->first_current_flow_description;
 	if(!flow_description) {
 		return -1;
 	}
 	while(flow_description) {
+		add_flow = 1;
 
 		if(!authorize_video_flow) {
 			if(strncmp(flow_description->media.s, "video", 5) == 0) {
@@ -480,6 +481,20 @@ int add_media_components_using_current_flow_description(
 		}
 
 		if(add_flow) {
+			LM_DBG("Adding media component - stream_num: %d, media: %.*s, "
+				   "req_ip: %.*s, req_port: %.*s, rpl_ip: %.*s, rpl_port: "
+				   "%.*s, direction: %d\n",
+					flow_description->stream_num, flow_description->media.len,
+					flow_description->media.s,
+					flow_description->req_sdp_ip_addr.len,
+					flow_description->req_sdp_ip_addr.s,
+					flow_description->req_sdp_port.len,
+					flow_description->req_sdp_port.s,
+					flow_description->rpl_sdp_ip_addr.len,
+					flow_description->rpl_sdp_ip_addr.s,
+					flow_description->rpl_sdp_port.len,
+					flow_description->rpl_sdp_port.s,
+					flow_description->direction);
 			rx_add_media_component_description_avp(aar,
 					flow_description->stream_num, &flow_description->media,
 					&flow_description->req_sdp_ip_addr,
@@ -494,13 +509,14 @@ int add_media_components_using_current_flow_description(
 		}
 
 		flow_description = flow_description->next;
-		add_flow = 1;
 	}
 	return 0;
 }
 
 
-/** Helper function for adding media component AVPs for each SDP stream*/
+/*
+ * Helper function for adding media component AVPs for each SDP stream.
+ */
 int add_media_components(AAAMessage *aar, struct sip_msg *req,
 		struct sip_msg *rpl, enum dialog_direction direction, AAASession *auth)
 {
@@ -508,11 +524,13 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 	int sdp_stream_num;
 	sdp_session_cell_t *req_sdp_session, *rpl_sdp_session;
 	sdp_stream_cell_t *req_sdp_stream, *rpl_sdp_stream;
-	int add_flow = 1;
+	int add_flow;
 	str ttag = {0, 0};
 	str ftag = {0, 0};
 	int request_originated_from_callee = 0;
 	str ipA, ipB, portA, portB;
+	// New flow descriptions are added hence it wont be added directly to the currently active flow description list until dialog is confirmed.
+	int in_current_flow_description_list = 0;
 
 	rx_authsessiondata_t *p_session_data = 0;
 	p_session_data = (rx_authsessiondata_t *)auth->u.auth.generic_data;
@@ -533,9 +551,10 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 
 	sdp_session_num = 0;
 
-	//Loop through req sessions and streams and get corresponding rpl sessions and streams and populate avps
+	// Loop through req sessions and streams and get corresponding rpl sessions and streams and populate avps.
 	for(;;) {
-		//we only cater for one session at the moment: TDOD: extend
+		// We only cater for one session at the moment.
+		// TODO: Extend to multiple sessions.
 		if(sdp_session_num > 0) {
 			break;
 		}
@@ -554,18 +573,18 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 
 		sdp_stream_num = 0;
 		for(;;) {
+			add_flow = 1;
+
 			req_sdp_stream =
 					get_sdp_stream(req, sdp_session_num, sdp_stream_num);
 			rpl_sdp_stream =
 					get_sdp_stream(rpl, sdp_session_num, sdp_stream_num);
 			if(!req_sdp_stream || !rpl_sdp_stream) {
-				//LM_ERR("Missing SDP stream information\n");
 				break;
 			}
-			//is this a stream to add to AAR.
+			// Check if this is a stream to add to AAR.
 			if(req_sdp_stream->is_rtp) {
-
-				//check if the src or dst port is 0 and if so then don't add to rx
+				// Check if the src or dst port is 0. If so, then don't add to Rx AAR.
 				int intportA = atoi(req_sdp_stream->port.s);
 				int intportB = atoi(rpl_sdp_stream->port.s);
 				if(intportA != 0 && intportB != 0) {
@@ -576,8 +595,6 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 					}
 
 					if(add_flow) {
-
-
 						if(cscf_get_to_tag(rpl, &ttag)
 								&& cscf_get_from_tag(rpl, &ftag)) {
 							LM_DBG("Original ftag [%.*s] ttag [%.*s].  Current "
@@ -663,15 +680,19 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 							}
 						}
 
-						//add this to auth session data
-						add_flow_description((rx_authsessiondata_t *)
-													 auth->u.auth.generic_data,
-								sdp_stream_num + 1, &req_sdp_stream->media,
-								&ipA, &portA, &ipB, &portB,
-								&rpl_sdp_stream->transport,
-								&req_sdp_stream->raw_stream,
-								&rpl_sdp_stream->raw_stream, direction,
-								0 /*This is a new mcd, we are not setting it as active*/);
+						if(!flow_description_exists(p_session_data,
+								   &req_sdp_stream->media, &ipA, &portA, &ipB,
+								   &portB, &rpl_sdp_stream->transport,
+								   in_current_flow_description_list)) {
+							// Flow description does not exist in the list of flow descriptions to be added. So we add it to auth session data.
+							add_flow_description(p_session_data,
+									sdp_stream_num + 1, &req_sdp_stream->media,
+									&ipA, &portA, &ipB, &portB,
+									&rpl_sdp_stream->transport,
+									&req_sdp_stream->raw_stream,
+									&rpl_sdp_stream->raw_stream, direction,
+									in_current_flow_description_list);
+						}
 
 						rx_add_media_component_description_avp(aar,
 								sdp_stream_num + 1, &req_sdp_stream->media,
@@ -681,7 +702,6 @@ int add_media_components(AAAMessage *aar, struct sip_msg *req,
 								&rpl_sdp_stream->raw_stream, direction,
 								AVP_EPC_Flow_Usage_No_Information);
 					}
-					add_flow = 1;
 				}
 			}
 			sdp_stream_num++;
@@ -774,8 +794,8 @@ int rx_send_aar_update_no_video(AAASession *auth)
 			   __FUNCTION__))
 		goto error;
 
-	/* Add Auth lifetime AVP */ LM_DBG("auth_lifetime %u\n",
-			rx_auth_expiry); //TODO check why this is 0 all the time
+	/* Add Auth lifetime AVP */
+	LM_DBG("auth_lifetime %u\n", rx_auth_expiry);
 	if(rx_auth_expiry) {
 		set_4bytes(x, rx_auth_expiry);
 		if(!rx_add_avp(aar, x, 4, AVP_Authorization_Lifetime,
@@ -942,13 +962,17 @@ int rx_send_aar(struct sip_msg *req, struct sip_msg *res, AAASession *auth,
 			goto error;
 	}
 
-	/* Add Auth lifetime AVP */ LM_DBG("auth_lifetime %u\n",
-			rx_auth_expiry); //TODO check why this is 0 all the time
+	/* Add Auth lifetime AVP */
+	LM_DBG("auth_lifetime %u\n", rx_auth_expiry);
 	if(rx_auth_expiry) {
 		set_4bytes(x, rx_auth_expiry);
 		if(!rx_add_avp(aar, x, 4, AVP_Authorization_Lifetime,
 				   AAA_AVP_FLAG_MANDATORY, 0, AVP_DUPLICATE_DATA, __FUNCTION__))
 			goto error;
+		// Update the auth session expiry time only in case of session refresh.
+		if(saved_t_data->session_refresh) {
+			auth->u.auth.lifetime = time(NULL) + rx_auth_expiry;
+		}
 	}
 
 	LM_DBG("Adding subscription id...\n");
@@ -985,8 +1009,14 @@ int rx_send_aar(struct sip_msg *req, struct sip_msg *res, AAASession *auth,
      * 									[RR-Bandwidth]
      * 									*[Codec-Data]
      */
-
-	add_media_components(aar, req, res, dlg_direction, auth);
+	if(saved_t_data->session_refresh) {
+		LM_DBG("Case of session refresh with no SDP in message body. Sending "
+			   "AAR with previously authorized flows\n");
+		add_media_components_using_current_flow_description(
+				aar, p_session_data);
+	} else {
+		add_media_components(aar, req, res, dlg_direction, auth);
+	}
 
 	LM_DBG("Adding framed ip address [%.*s]\n", ip.len, ip.s);
 	/* Add Framed IP address AVP*/
@@ -1150,8 +1180,8 @@ int rx_send_aar_register(struct sip_msg *msg, AAASession *auth,
 		goto error;
 	}
 
-	/* Add Auth lifetime AVP */ LM_DBG("auth_lifetime %u\n",
-			rx_auth_expiry); //TODO check why this is 0 all the time
+	/* Add Auth lifetime AVP */
+	LM_DBG("auth_lifetime %u\n", rx_auth_expiry);
 	if(rx_auth_expiry) {
 		set_4bytes(x, rx_auth_expiry);
 		if(!rx_add_avp(aar, x, 4, AVP_Authorization_Lifetime,

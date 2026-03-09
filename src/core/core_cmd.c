@@ -47,6 +47,7 @@
 #include "tcp_options.h"
 #include "cfg_core.h"
 #include "ppcfg.h"
+#include "sr_module.h"
 
 #ifdef USE_DNS_CACHE
 void dns_cache_debug(rpc_t *rpc, void *ctx);
@@ -1050,88 +1051,344 @@ static void core_ppdefines_full(rpc_t *rpc, void *c)
 /*
  * RPC Methods exported by core
  */
+/* clang-format off */
 static rpc_export_t core_rpc_methods[] = {
-		{"system.listMethods", system_listMethods, system_listMethods_doc,
-				RPC_RET_ARRAY},
-		{"system.methodSignature", system_methodSignature,
-				system_methodSignature_doc, 0},
-		{"system.methodHelp", system_methodHelp, system_methodHelp_doc, 0},
-		{"core.prints", core_prints, core_prints_doc, RPC_RET_ARRAY},
-		{"core.printi", core_printi, core_printi_doc, RPC_RET_ARRAY},
-		{"core.echo", core_echo, core_echo_doc, RPC_RET_ARRAY},
-		{"core.echo_delta", core_echo_delta, core_echo_delta_doc,
-				RPC_RET_ARRAY | RPC_EXEC_DELTA},
-		{"core.version", core_version, core_version_doc, 0},
-		{"core.flags", core_flags, core_flags_doc, 0},
-		{"core.info", core_info, core_info_doc, 0},
-		{"core.runinfo", core_runinfo, core_runinfo_doc, 0},
-		{"core.uptime", core_uptime, core_uptime_doc, 0},
-		{"core.ps", core_ps, core_ps_doc, RPC_RET_ARRAY},
-		{"core.psx", core_psx, core_psx_doc, RPC_RET_ARRAY},
-		{"core.psa", core_psa, core_psa_doc, RPC_RET_ARRAY},
-		{"core.pwd", core_pwd, core_pwd_doc, RPC_RET_ARRAY},
-		{"core.arg", core_arg, core_arg_doc, RPC_RET_ARRAY},
-		{"core.kill", core_kill, core_kill_doc, 0},
-		{"core.shmmem", core_shmmem, core_shmmem_doc, 0},
+	{"system.listMethods", system_listMethods, system_listMethods_doc,
+			RPC_RET_ARRAY},
+	{"system.methodSignature", system_methodSignature,
+			system_methodSignature_doc, 0},
+	{"system.methodHelp", system_methodHelp, system_methodHelp_doc, 0},
+	{"core.prints", core_prints, core_prints_doc, RPC_RET_ARRAY},
+	{"core.printi", core_printi, core_printi_doc, RPC_RET_ARRAY},
+	{"core.echo", core_echo, core_echo_doc, RPC_RET_ARRAY},
+	{"core.echo_delta", core_echo_delta, core_echo_delta_doc,
+			RPC_RET_ARRAY | RPC_EXEC_DELTA},
+	{"core.version", core_version, core_version_doc, 0},
+	{"core.flags", core_flags, core_flags_doc, 0},
+	{"core.info", core_info, core_info_doc, 0},
+	{"core.runinfo", core_runinfo, core_runinfo_doc, 0},
+	{"core.uptime", core_uptime, core_uptime_doc, 0},
+	{"core.ps", core_ps, core_ps_doc, RPC_RET_ARRAY},
+	{"core.psx", core_psx, core_psx_doc, RPC_RET_ARRAY},
+	{"core.psa", core_psa, core_psa_doc, RPC_RET_ARRAY},
+	{"core.pwd", core_pwd, core_pwd_doc, RPC_RET_ARRAY},
+	{"core.arg", core_arg, core_arg_doc, RPC_RET_ARRAY},
+	{"core.kill", core_kill, core_kill_doc, 0},
+	{"core.shmmem", core_shmmem, core_shmmem_doc, 0},
 #if defined(SF_MALLOC) || defined(LL_MALLOC)
-		{"core.sfmalloc", core_sfmalloc, core_sfmalloc_doc, 0},
+	{"core.sfmalloc", core_sfmalloc, core_sfmalloc_doc, 0},
 #endif
-		{"core.tcp_info", core_tcpinfo, core_tcpinfo_doc, 0},
-		{"core.tcp_options", core_tcp_options, core_tcp_options_doc, 0},
-		{"core.tcp_list", core_tcp_list, core_tcp_list_doc, RPC_RET_ARRAY},
-		{"core.udp4_raw_info", core_udp4rawinfo, core_udp4rawinfo_doc, 0},
-		{"core.aliases_list", core_aliases_list, core_aliases_list_doc, 0},
-		{"core.sockets_list", core_sockets_list, core_sockets_list_doc, 0},
-		{"core.modules", core_modules, core_modules_doc, RPC_RET_ARRAY},
-		{"core.ppdefines", core_ppdefines, core_ppdefines_doc, RPC_RET_ARRAY},
-		{"core.ppdefines_full", core_ppdefines_full, core_ppdefines_full_doc,
+	{"core.tcp_info", core_tcpinfo, core_tcpinfo_doc, 0},
+	{"core.tcp_options", core_tcp_options, core_tcp_options_doc, 0},
+	{"core.tcp_list", core_tcp_list, core_tcp_list_doc, RPC_RET_ARRAY},
+	{"core.udp4_raw_info", core_udp4rawinfo, core_udp4rawinfo_doc, 0},
+	{"core.aliases_list", core_aliases_list, core_aliases_list_doc, 0},
+	{"core.sockets_list", core_sockets_list, core_sockets_list_doc, 0},
+	{"core.modules", core_modules, core_modules_doc, RPC_RET_ARRAY},
+	{"core.ppdefines", core_ppdefines, core_ppdefines_doc, RPC_RET_ARRAY},
+	{"core.ppdefines_full", core_ppdefines_full, core_ppdefines_full_doc,
 				RPC_RET_ARRAY},
 #ifdef USE_DNS_CACHE
-		{"dns.mem_info", dns_cache_mem_info, dns_cache_mem_info_doc, 0},
-		{"dns.debug", dns_cache_debug, dns_cache_debug_doc, 0},
-		{"dns.debug_all", dns_cache_debug_all, dns_cache_debug_all_doc, 0},
-		{"dns.view", dns_cache_view, dns_cache_view_doc, RPC_RET_ARRAY},
-		{"dns.lookup", dns_cache_rpc_lookup, dns_cache_rpc_lookup_doc, 0},
-		{"dns.delete_all", dns_cache_delete_all, dns_cache_delete_all_doc, 0},
-		{"dns.delete_all_force", dns_cache_delete_all_force,
+	{"dns.mem_info", dns_cache_mem_info, dns_cache_mem_info_doc, 0},
+	{"dns.debug", dns_cache_debug, dns_cache_debug_doc, 0},
+	{"dns.debug_all", dns_cache_debug_all, dns_cache_debug_all_doc, 0},
+	{"dns.view", dns_cache_view, dns_cache_view_doc, RPC_RET_ARRAY},
+	{"dns.lookup", dns_cache_rpc_lookup, dns_cache_rpc_lookup_doc, 0},
+	{"dns.delete_all", dns_cache_delete_all, dns_cache_delete_all_doc, 0},
+	{"dns.delete_all_force", dns_cache_delete_all_force,
 				dns_cache_delete_all_force_doc, 0},
-		{"dns.add_a", dns_cache_add_a, dns_cache_add_a_doc, 0},
-		{"dns.add_aaaa", dns_cache_add_aaaa, dns_cache_add_aaaa_doc, 0},
-		{"dns.add_srv", dns_cache_add_srv, dns_cache_add_srv_doc, 0},
-		{"dns.delete_a", dns_cache_delete_a, dns_cache_delete_a_doc, 0},
-		{"dns.delete_aaaa", dns_cache_delete_aaaa, dns_cache_delete_aaaa_doc,
-				0},
-		{"dns.delete_srv", dns_cache_delete_srv, dns_cache_delete_srv_doc, 0},
-		{"dns.delete_naptr", dns_cache_delete_naptr, dns_cache_delete_naptr_doc,
-				0},
-		{"dns.delete_cname", dns_cache_delete_cname, dns_cache_delete_cname_doc,
-				0},
-		{"dns.delete_txt", dns_cache_delete_txt, dns_cache_delete_txt_doc, 0},
-		{"dns.delete_ebl", dns_cache_delete_ebl, dns_cache_delete_ebl_doc, 0},
-		{"dns.delete_ptr", dns_cache_delete_ptr, dns_cache_delete_ptr_doc, 0},
+	{"dns.add_a", dns_cache_add_a, dns_cache_add_a_doc, 0},
+	{"dns.add_aaaa", dns_cache_add_aaaa, dns_cache_add_aaaa_doc, 0},
+	{"dns.add_srv", dns_cache_add_srv, dns_cache_add_srv_doc, 0},
+	{"dns.delete_a", dns_cache_delete_a, dns_cache_delete_a_doc, 0},
+	{"dns.delete_aaaa", dns_cache_delete_aaaa, dns_cache_delete_aaaa_doc, 0},
+	{"dns.delete_srv", dns_cache_delete_srv, dns_cache_delete_srv_doc, 0},
+	{"dns.delete_naptr", dns_cache_delete_naptr, dns_cache_delete_naptr_doc, 0},
+	{"dns.delete_cname", dns_cache_delete_cname, dns_cache_delete_cname_doc, 0},
+	{"dns.delete_txt", dns_cache_delete_txt, dns_cache_delete_txt_doc, 0},
+	{"dns.delete_ebl", dns_cache_delete_ebl, dns_cache_delete_ebl_doc, 0},
+	{"dns.delete_ptr", dns_cache_delete_ptr, dns_cache_delete_ptr_doc, 0},
 #ifdef USE_DNS_CACHE_STATS
-		{"dns.stats_get", dns_cache_stats_get, dns_cache_stats_get_doc, 0},
+	{"dns.stats_get", dns_cache_stats_get, dns_cache_stats_get_doc, 0},
 #endif /* USE_DNS_CACHE_STATS */
 #ifdef DNS_WATCHDOG_SUPPORT
-		{"dns.set_server_state", dns_set_server_state_rpc,
-				dns_set_server_state_doc, 0},
-		{"dns.get_server_state", dns_get_server_state_rpc,
-				dns_get_server_state_doc, 0},
+	{"dns.set_server_state", dns_set_server_state_rpc,
+			dns_set_server_state_doc, 0},
+	{"dns.get_server_state", dns_get_server_state_rpc,
+			dns_get_server_state_doc, 0},
 #endif
 #endif
 #ifdef USE_DST_BLOCKLIST
-		{"dst_blocklist.mem_info", dst_blst_mem_info, dst_blst_mem_info_doc, 0},
-		{"dst_blocklist.debug", dst_blst_debug, dst_blst_debug_doc, 0},
-		{"dst_blocklist.view", dst_blst_view, dst_blst_view_doc, 0},
-		{"dst_blocklist.delete_all", dst_blst_delete_all,
-				dst_blst_delete_all_doc, 0},
-		{"dst_blocklist.add", dst_blst_add, dst_blst_add_doc, 0},
+	{"dst_blocklist.mem_info", dst_blst_mem_info, dst_blst_mem_info_doc, 0},
+	{"dst_blocklist.debug", dst_blst_debug, dst_blst_debug_doc, 0},
+	{"dst_blocklist.view", dst_blst_view, dst_blst_view_doc, 0},
+	{"dst_blocklist.delete_all", dst_blst_delete_all,
+			dst_blst_delete_all_doc, 0},
+	{"dst_blocklist.add", dst_blst_add, dst_blst_add_doc, 0},
 #ifdef USE_DST_BLOCKLIST_STATS
-		{"dst_blocklist.stats_get", dst_blst_stats_get, dst_blst_stats_get_doc,
-				0},
+	{"dst_blocklist.stats_get", dst_blst_stats_get, dst_blst_stats_get_doc, 0},
 #endif /* USE_DST_BLOCKLIST_STATS */
 #endif
-		{0, 0, 0, 0}};
+	{0, 0, 0, 0}
+};
+/* clang-format on */
+
+static const char *rpc_modparam_getn_doc[] = {
+		"Get the value of an integer parameter.", /* Documentation string */
+		0										  /* Method signature(s) */
+};
+
+static void rpc_modparam_getn(rpc_t *rpc, void *c)
+{
+	char *mname;
+	char *pname;
+	sr_module_t *mod = NULL;
+	void *pp = NULL;
+	modparam_t param_type = 0;
+	void *h = NULL;
+
+	if(rpc->scan(c, "ss", &mname, &pname) < 2) {
+		rpc->fault(c, 400, "Module And Parameter Names Expected");
+		return;
+	}
+
+	mod = find_module_by_name(mname);
+	if(mod == NULL) {
+		rpc->fault(c, 404, "Module Not Found");
+		return;
+	}
+	pp = find_param_export(mod, pname, PARAM_INT, &param_type);
+	if(pp == NULL) {
+		rpc->fault(c, 404, "Parameter Not Found");
+		return;
+	}
+	if(param_type & PARAM_USE_FUNC) {
+		rpc->fault(c, 488, "Not Acceptable Here - Use Func Param");
+		return;
+	}
+	rpc->add(c, "{", &h);
+	rpc->struct_add(h, "sssd", "module", mname, "param", pname, "shm",
+			(param_type & PARAM_USE_SHM) ? "yes" : "no", "value",
+			(param_type & PARAM_USE_SHM) ? *(*((int **)pp)) : *((int *)pp));
+	return;
+}
+
+static const char *rpc_modparam_gets_doc[] = {
+		"Get the value of a string parameter.", /* Documentation string */
+		0										/* Method signature(s) */
+};
+
+static void rpc_modparam_gets(rpc_t *rpc, void *c)
+{
+	char *mname;
+	char *pname;
+	sr_module_t *mod = NULL;
+	void *pp = NULL;
+	modparam_t param_type = 0;
+	void *h = NULL;
+
+	if(rpc->scan(c, "ss", &mname, &pname) < 2) {
+		rpc->fault(c, 400, "Module And Parameter Names Expected");
+		return;
+	}
+
+	mod = find_module_by_name(mname);
+	if(mod == NULL) {
+		rpc->fault(c, 404, "Module Not Found");
+		return;
+	}
+	pp = find_param_export(mod, pname, PARAM_STRING | PARAM_STR, &param_type);
+	if(pp == NULL) {
+		rpc->fault(c, 404, "Parameter Not Found");
+		return;
+	}
+	if(param_type & PARAM_USE_FUNC) {
+		rpc->fault(c, 488, "Not Acceptable Here - Use Func Param");
+		return;
+	}
+	rpc->add(c, "{", &h);
+	if(param_type & PARAM_STR) {
+		rpc->struct_add(h, "sssS", "module", mname, "param", pname, "shm", "no",
+				"value", (str *)pp);
+	} else {
+		rpc->struct_add(h, "ssss", "module", mname, "param", pname, "shm", "no",
+				"value", *((char **)pp));
+	}
+	return;
+}
+
+static const char *rpc_modparam_setn_doc[] = {
+		"Set the value of an integer parameter kept in shared memory.", 0};
+
+static void rpc_modparam_setn(rpc_t *rpc, void *c)
+{
+	char *mname;
+	char *pname;
+	int oval;
+	int nval;
+	sr_module_t *mod = NULL;
+	void *pp = NULL;
+	modparam_t param_type = 0;
+	void *h = NULL;
+
+	if(rpc->scan(c, "ssd", &mname, &pname, &nval) < 3) {
+		rpc->fault(c, 400, "Module, Parameter And Value Expected");
+		return;
+	}
+
+	mod = find_module_by_name(mname);
+	if(mod == NULL) {
+		rpc->fault(c, 404, "Module Not Found");
+		return;
+	}
+	pp = find_param_export(mod, pname, PARAM_INT, &param_type);
+	if(pp == NULL) {
+		rpc->fault(c, 404, "Parameter Not Found");
+		return;
+	}
+	if(!(param_type & PARAM_USE_SHM)) {
+		rpc->fault(c, 488, "Not Acceptable Here - Not A Shm Param");
+		return;
+	}
+	oval = *(*((int **)pp));
+	*(*((int **)pp)) = nval;
+
+	rpc->add(c, "{", &h);
+	rpc->struct_add(h, "sssdd", "module", mname, "param", pname, "shm", "yes",
+			"ovalue", oval, "value", nval);
+	return;
+}
+
+static const char *rpc_modparam_list_doc[] = {"List the modules parameters", 0};
+
+static int rpc_modparam_list_module(rpc_t *rpc, void *c, sr_module_t *mod)
+{
+	param_export_t *param;
+	void *pp = NULL;
+	void *h = NULL;
+
+	for(param = mod->exports.params; param && param->name; param++) {
+		/* add entry node */
+		if(rpc->add(c, "{", &h) < 0) {
+			rpc->fault(c, 500, "Internal error root reply");
+			return -1;
+		}
+		if(rpc->struct_add(h, "ssu", "module", mod->exports.name, "param",
+				   param->name, "typeval", param->type)
+				< 0) {
+			rpc->fault(c, 500, "Internal error building structure");
+			return -1;
+		}
+		pp = param->param_pointer;
+		if(param->type & PARAM_STRING) {
+			if(rpc->struct_add(h, "s", "type", "string") < 0) {
+				rpc->fault(c, 500, "Internal error building structure");
+				return -1;
+			}
+			if(param->type & PARAM_USE_FUNC) {
+				if(rpc->struct_add(h, "sss", "use_func", "yes", "use_shm", "no",
+						   "value", "[unknown]")
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			} else {
+				if(rpc->struct_add(h, "sss", "use_func", "no", "use_shm", "no",
+						   "value", *((char **)pp))
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			}
+		} else if(param->type & PARAM_STR) {
+			if(rpc->struct_add(h, "s", "type", "str") < 0) {
+				rpc->fault(c, 500, "Internal error building structure");
+				return -1;
+			}
+			if(param->type & PARAM_USE_FUNC) {
+				if(rpc->struct_add(h, "sss", "use_func", "yes", "use_shm", "no",
+						   "value", "[unknown]")
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			} else {
+				if(rpc->struct_add(h, "ssS", "use_func", "no", "use_shm", "no",
+						   "value", (str *)pp)
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			}
+		} else if(param->type & PARAM_INT) {
+			if(rpc->struct_add(h, "s", "type", "int") < 0) {
+				rpc->fault(c, 500, "Internal error building structure");
+				return -1;
+			}
+			if(param->type & PARAM_USE_FUNC) {
+				if(rpc->struct_add(h, "ssd", "use_func", "yes", "use_shm", "no",
+						   "value", 0)
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			} else if(param->type & PARAM_USE_SHM) {
+				if(rpc->struct_add(h, "ssd", "use_func", "no", "use_shm", "yes",
+						   "value", *(*((int **)pp)))
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			} else {
+				if(rpc->struct_add(h, "ssd", "use_func", "no", "use_shm", "no",
+						   "value", *((int *)pp))
+						< 0) {
+					rpc->fault(c, 500, "Internal error building structure");
+					return -1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+static void rpc_modparam_list(rpc_t *rpc, void *c)
+{
+	char *mname = NULL;
+	sr_module_t *mod = NULL;
+
+	if(rpc->scan(c, "*s", &mname) < 1) {
+		mname = NULL;
+	}
+	if(mname != NULL) {
+		mod = find_module_by_name(mname);
+		if(mod == NULL) {
+			rpc->fault(c, 404, "Module Not Found");
+			return;
+		}
+		rpc_modparam_list_module(rpc, c, mod);
+		return;
+	}
+	mod = get_loaded_modules();
+	while(mod != NULL) {
+		rpc_modparam_list_module(rpc, c, mod);
+		mod = mod->next;
+	}
+}
+
+/*
+ * RPC Methods exported by core for modparam operations
+ */
+/* clang-format off */
+static rpc_export_t core_modparam_rpc_methods[] = {
+	{"modparam.getn", rpc_modparam_getn, rpc_modparam_getn_doc, 0},
+	{"modparam.gets", rpc_modparam_gets, rpc_modparam_gets_doc, 0},
+	{"modparam.setn", rpc_modparam_setn, rpc_modparam_setn_doc, 0},
+	{"modparam.list", rpc_modparam_list, rpc_modparam_list_doc, RPC_RET_ARRAY},
+
+	{0, 0, 0, 0}
+};
+/* clang-format on */
 
 
 int register_core_rpcs(void)
@@ -1146,6 +1403,17 @@ int register_core_rpcs(void)
 		ERR("%d duplicate RPCs name detected while registering core RPCs\n", i);
 		goto error;
 	}
+	i = rpc_register_array(core_modparam_rpc_methods);
+	if(i < 0) {
+		BUG("failed to register core modparam RPCs\n");
+		goto error;
+	} else if(i > 0) {
+		ERR("%d duplicate RPCs name detected while registering core modparam"
+			" RPCs\n",
+				i);
+		goto error;
+	}
+
 	return 0;
 error:
 	return -1;

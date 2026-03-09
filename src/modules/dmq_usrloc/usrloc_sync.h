@@ -31,6 +31,7 @@
 
 #define DMQ_USRLOC_REPLICATE_SOCKET 1
 #define DMQ_USRLOC_REPLICATE_SOCKNAME 2
+#define DMQ_USRLOC_REPLICATE_SOCKET_LOCAL 3
 
 extern usrloc_api_t dmq_ul;
 
@@ -42,8 +43,6 @@ typedef enum
 	DMQ_SYNC,
 } usrloc_dmq_action_t;
 
-int usrloc_dmq_resp_callback_f(
-		struct sip_msg *msg, int code, dmq_node_t *node, void *param);
 int usrloc_dmq_initialize();
 int usrloc_dmq_handle_msg(
 		struct sip_msg *msg, peer_reponse_t *resp, dmq_node_t *node);

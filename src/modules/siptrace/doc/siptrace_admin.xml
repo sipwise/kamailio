@@ -889,9 +889,9 @@ hlog("$hdr(P-MyID)", "Another one with a custom correlation ID");
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; siptrace.status on
-&kamcmd; siptrace.status off
-&kamcmd; siptrace.status check
+&kamctl; rpc siptrace.status on
+&kamctl; rpc siptrace.status off
+&kamctl; rpc siptrace.status check
 ...
 		</programlisting>
 	</section>
@@ -928,7 +928,7 @@ event_route[siptrace:msg] {
 		<title>Database setup</title>
 		<para>
 		Before running &kamailio; with siptrace and activated trace_to_database
-		parameter, you have to setup the database tables where the module will
+		parameter, you have to set up the database tables where the module will
 		store the data. For that, if the table were not created by the
 		installation script or you choose to install everything by yourself
 		you can use the siptrace-create.sql <acronym>SQL</acronym> script in

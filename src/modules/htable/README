@@ -25,7 +25,7 @@ Tyler Moore
 
    Copyright © 2008-2011 http://www.asipto.com
 
-   Copyright © 2023 Tyler Moore (devopsec), dOpenSource
+   Copyright © 2023-2025 Tyler Moore, dOpenSource
      __________________________________________________________________
 
    Table of Contents
@@ -82,6 +82,9 @@ Tyler Moore
               4.20. sht_has_name(htable, op, mval)
               4.21. sht_match_str_value(htable, op, mval)
               4.22. sht_has_str_value(htable, op, mval)
+              4.23. sht_is_null(htname, itname)
+              4.24. sht_inc(htname, itname)
+              4.25. sht_dec(htname, itname)
 
         5. Exported pseudo-variables
         6. RPC Commands
@@ -148,6 +151,9 @@ Tyler Moore
    1.37. sht_iterator_setex usage
    1.38. sht_match_name usage
    1.39. sht_match_name usage
+   1.40. sht_is_null usage
+   1.41. sht_inc usage
+   1.42. sht_dec usage
 
 Chapter 1. Admin Guide
 
@@ -203,6 +209,9 @@ Chapter 1. Admin Guide
         4.20. sht_has_name(htable, op, mval)
         4.21. sht_match_str_value(htable, op, mval)
         4.22. sht_has_str_value(htable, op, mval)
+        4.23. sht_is_null(htname, itname)
+        4.24. sht_inc(htname, itname)
+        4.25. sht_dec(htname, itname)
 
    5. Exported pseudo-variables
    6. RPC Commands
@@ -334,7 +343,7 @@ $ cat /usr/local/etc/kamailio/dbtext/htable
 3:key:1:0:value1:0
 
 # The array key will be loaded in memory in the following format:
-$ kamcmd htable.dump htable
+$ kamctl rpc htable.dump htable
 {
         entry: 35
         size: 1
@@ -377,10 +386,10 @@ $ kamcmd htable.dump htable
 }
 
 # Now let's delete a particular entry in the array: key[0].
-$ kamcmd htable.delete htable key[0]
+$ kamctl rpc htable.delete htable key[0]
 
 # The array key will look like this after a key was deleted:
-$ kamcmd htable.dump htable
+$ kamctl rpc htable.dump htable
 {
         entry: 50
         size: 1
@@ -791,6 +800,9 @@ modparam("htable", "event_callback_mode", 1)
    4.20. sht_has_name(htable, op, mval)
    4.21. sht_match_str_value(htable, op, mval)
    4.22. sht_has_str_value(htable, op, mval)
+   4.23. sht_is_null(htname, itname)
+   4.24. sht_inc(htname, itname)
+   4.25. sht_dec(htname, itname)
 
 4.1.  sht_print()
 
@@ -1137,6 +1149,68 @@ if(sht_match_str_value("ha", "eq", "alice")) {
 
    Alias for sht_match_str_value().
 
+4.23.  sht_is_null(htname, itname)
+
+   Check if the item with the name 'itname' from hash table 'htname'
+   exists. This API function is equivalent to '($sht(htname=>itname) ==
+   $null)'.
+
+   This function returns:
+     * 3 - if parameters could not be parsed
+     * 2 - if hash table is null
+     * 1 - if the value is null
+     * -1 - if hash table default is non null
+     * -2 - if the value is not null
+
+   All parameters can be static strings or contain variables.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.40. sht_is_null usage
+...
+if (sht_is_null("my_ht", "my_key")) {
+    xlog("L_ERR", "could not find my_key in my_ht\n");
+}
+...
+
+4.24.  sht_inc(htname, itname)
+
+   Atomically increment the value of 'itname' in hash table 'htname'. This
+   API function is similar to '$shtinc(htname=>itname)', without returning
+   the value.
+
+   This function returns 1 on successful increment or -1 otherwise.
+
+   All parameters can be static strings or contain variables.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.41. sht_inc usage
+...
+if (!sht_inc("my_ht", "my_key")) {
+    xlog("L_ERR", "could not increment my_key\n");
+}
+...
+
+4.25.  sht_dec(htname, itname)
+
+   Atomically decrement the value of 'itname' in hash table 'htname'. This
+   API function is similar to '$sht_dec(htname=>itname)', without
+   returning the value.
+
+   This function returns 1 on successful decrement or -1 otherwise.
+
+   All parameters can be static strings or contain variables.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.42. sht_dec usage
+...
+if (!sht_dec("my_ht", "my_key")) {
+    xlog("L_ERR", "could not decrement my_key\n");
+}
+...
+
 5. Exported pseudo-variables
 
      * $sht(htable=>key)
@@ -1144,6 +1218,7 @@ if(sht_match_str_value("ha", "eq", "alice")) {
      * $shtcn(htable=>key)
      * $shtcv(htable=>key)
      * $shtinc(htable=>key)
+     * $shtdec(htable=>key)
      * $shtitkey(iname)
      * $shtitval(iname)
      * $shtrecord(attribute)
@@ -1183,13 +1258,13 @@ if(sht_match_str_value("ha", "eq", "alice")) {
    Example:
 ...
 # Dump $sht(students=>alice)
-kamcmd htable.get students alice
+kamctl rpc htable.get students alice
 
 # Dump $sht(students=>15)
-kamcmd htable.get students s:15
+kamctl rpc htable.get students s:15
 
 # Dump first entry in array key course $sht(students=>course[0])
-kamcmd htable.get students course[0]
+kamctl rpc htable.get students course[0]
 ...
 
 6.2.  htable.delete htable key
@@ -1206,13 +1281,13 @@ kamcmd htable.get students course[0]
    Example:
 ...
 # Delete $sht(students=>alice)
-kamcmd htable.delete students alice
+kamctl rpc htable.delete students alice
 
 # Delete $sht(students=>15)
-kamcmd htable.delete students s:15
+kamctl rpc htable.delete students s:15
 
 # Delete first entry in array key course $sht(students=>course[0])
-kamcmd htable.delete students course[0]
+kamctl rpc htable.delete students course[0]
 ...
 
 6.3.  htable.sets htable key value
@@ -1230,13 +1305,13 @@ kamcmd htable.delete students course[0]
    Example:
 ...
 # Set $sht(test=>x) as string
-kamcmd htable.sets test x abc
+kamctl rpc htable.sets test x abc
 
 # Set $sht(test=>5) as string
-kamcmd htable.sets test s:5 abc
+kamctl rpc htable.sets test s:5 abc
 
 # Set firsti entry in array key x $sht(test=>x[0]) as string
-kamcmd htable.sets test x[0] abc
+kamctl rpc htable.sets test x[0] abc
 ...
 
 6.4.  htable.seti htable key value
@@ -1254,13 +1329,13 @@ kamcmd htable.sets test x[0] abc
    Example:
 ...
 # Set $sht(test=>x) as integer
-kamcmd htable.seti test x 123
+kamctl rpc htable.seti test x 123
 
 # Set $sht(test=>5) as integer
-kamcmd htable.seti test s:5 123
+kamctl rpc htable.seti test s:5 123
 
 # Set first entry in array key x $sht(test=>x[0]) as integer
-kamcmd htable.seti test x[0] 123
+kamctl rpc htable.seti test x[0] 123
 ...
 
 6.5.  htable.setex htable key expire
@@ -1339,7 +1414,7 @@ kamctl rpc htable.setxi test s:5 10 120
 
    Example:
 ...
-kamcmd htable.dump ipban
+kamctl rpc htable.dump ipban
 ...
 
 6.9.  htable.reload htable
@@ -1353,7 +1428,7 @@ kamcmd htable.dump ipban
 
    Example:
 ...
-kamcmd htable.reload ipban
+kamctl rpc htable.reload ipban
 ...
 
 6.10.  htable.store htable
@@ -1367,7 +1442,7 @@ kamcmd htable.reload ipban
 
    Example:
 ...
-kamcmd htable.store ipban
+kamctl rpc htable.store ipban
 ...
 
 6.11.  htable.flush htable
@@ -1381,7 +1456,7 @@ kamcmd htable.store ipban
 
    Example:
 ...
-kamcmd htable.flush ipban
+kamctl rpc htable.flush ipban
 ...
 
 6.12.  htable.listTables
@@ -1395,7 +1470,7 @@ kamcmd htable.flush ipban
 
    Example:
 ...
-kamcmd htable.listTables
+kamctl rpc htable.listTables
 ...
 
 6.13.  htable.stats
@@ -1410,7 +1485,7 @@ kamcmd htable.listTables
 
    Example:
 ...
-kamcmd htable.stats
+kamctl rpc htable.stats
 ...
 
 6.14.  htable.dmqsync [htable]
@@ -1426,8 +1501,8 @@ kamcmd htable.stats
 
    Example:
 ...
-kamcmd htable.dmqsync
-kamcmd htable.dmqsync ipban
+kamctl rpc htable.dmqsync
+kamctl rpc htable.dmqsync ipban
 ...
 
 6.15.  htable.dmqresync htable
@@ -1441,7 +1516,7 @@ kamcmd htable.dmqsync ipban
 
    Example:
 ...
-kamcmd htable.dmqresync ipban
+kamctl rpc htable.dmqresync ipban
 ...
 
 7. Event routes

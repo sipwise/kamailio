@@ -61,6 +61,7 @@ static tr_export_t mod_trans[] = {
 	{{"line", sizeof("line") - 1}, tr_parse_line}, /* line class */
 	{{"urialias", sizeof("urialias") - 1}, tr_parse_urialias}, /* uri alias class */
 	{{"val", sizeof("val") - 1}, tr_parse_val}, /* val class */
+	{{"num", sizeof("num") - 1}, tr_parse_num}, /* num class */
 
 	{{0, 0}, 0}
 };
@@ -89,6 +90,8 @@ static pv_export_t mod_pvs[] = {
 	{{"sndfrom", (sizeof("sndfrom") - 1)}, PVT_OTHER, pv_get_sndfrom, 0,
 			pv_parse_snd_name, 0, 0, 0},
 	{{"rcv", (sizeof("rcv") - 1)}, PVT_OTHER, pv_get_rcv, pv_set_rcv,
+			pv_parse_rcv_name, 0, 0, 0},
+	{{"recv", (sizeof("recv") - 1)}, PVT_OTHER, pv_get_rcv, pv_set_rcv,
 			pv_parse_rcv_name, 0, 0, 0},
 	{{"xavp", sizeof("xavp") - 1}, /* xavp */
 			PVT_XAVP, pv_get_xavp, pv_set_xavp, pv_parse_xavp_name, 0, 0, 0},
@@ -398,6 +401,8 @@ static pv_export_t mod_pvs[] = {
 			pv_init_iname, 5},
 	{{"tt", (sizeof("tt") - 1)}, /* */
 			PVT_OTHER, pv_get_to_attr, 0, 0, 0, pv_init_iname, 4},
+	{{"tts", (sizeof("tts") - 1)}, /* */
+			PVT_OTHER, pv_get_totagstate, 0, 0, 0, 0, 0},
 	{{"tu", (sizeof("tu") - 1)}, /* */
 			PVT_TO, pv_get_to_attr, pv_set_to_uri, 0, 0, pv_init_iname, 1},
 	{{"to", (sizeof("to") - 1)}, /* */
@@ -507,6 +512,7 @@ static int w_xavp_child_seti(
 static int w_xavp_child_sets(
 		sip_msg_t *msg, char *prname, char *pcname, char *pval);
 static int w_xavp_rm(sip_msg_t *msg, char *prname, char *p2);
+static int w_xavp_rm_all(sip_msg_t *msg, char *prname, char *p2);
 static int w_xavp_child_rm(sip_msg_t *msg, char *prname, char *pcname);
 static int w_sbranch_set_ruri(sip_msg_t *msg, char p1, char *p2);
 static int w_sbranch_append(sip_msg_t *msg, char p1, char *p2);
@@ -519,6 +525,7 @@ static int w_xavi_child_seti(
 static int w_xavi_child_sets(
 		sip_msg_t *msg, char *prname, char *pcname, char *pval);
 static int w_xavi_rm(sip_msg_t *msg, char *prname, char *p2);
+static int w_xavi_rm_all(sip_msg_t *msg, char *prname, char *p2);
 static int w_xavi_child_rm(sip_msg_t *msg, char *prname, char *pcname);
 
 static int w_xavp_lshift(sip_msg_t *msg, char *pxname, char *pidx);
@@ -577,6 +584,8 @@ static cmd_export_t cmds[] = {
 		fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
 	{"xavp_rm", (cmd_function)w_xavp_rm, 1,
 		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"xavp_rm_all", (cmd_function)w_xavp_rm_all, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"xavp_child_rm", (cmd_function)w_xavp_child_rm, 2,
 		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 	{"xavi_child_seti", (cmd_function)w_xavi_child_seti, 3,
@@ -584,6 +593,8 @@ static cmd_export_t cmds[] = {
 	{"xavi_child_sets", (cmd_function)w_xavi_child_sets, 3,
 		fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
 	{"xavi_rm", (cmd_function)w_xavi_rm, 1,
+		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
+	{"xavi_rm_all", (cmd_function)w_xavi_rm_all, 1,
 		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
 	{"xavi_child_rm", (cmd_function)w_xavi_child_rm, 2,
 		fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
@@ -635,8 +646,6 @@ static int mod_init(void)
 
 static void mod_destroy(void)
 {
-	shvar_destroy_locks();
-	destroy_shvars();
 }
 
 static int pv_isset(struct sip_msg *msg, char *pvid, char *foo)
@@ -1643,6 +1652,56 @@ static int w_xavp_rm(sip_msg_t *msg, char *prname, char *p2)
 static int w_xavi_rm(sip_msg_t *msg, char *prname, char *p2)
 {
 	return w_xav_rm(msg, prname, p2, 1);
+}
+
+/**
+ *
+ */
+static int ki_xav_rm_all(sip_msg_t *msg, str *rname, int _case)
+{
+	int ret;
+	if(_case) {
+		ret = xavi_rm_by_name(rname, 1, NULL);
+	} else {
+		ret = xavp_rm_by_name(rname, 1, NULL);
+	}
+
+	return (ret == 0) ? 1 : ret;
+}
+
+static int ki_xavp_rm_all(sip_msg_t *msg, str *rname)
+{
+	return ki_xav_rm_all(msg, rname, 0);
+}
+
+static int ki_xavi_rm_all(sip_msg_t *msg, str *rname)
+{
+	return ki_xav_rm_all(msg, rname, 1);
+}
+
+/**
+ *
+ */
+static int w_xav_rm_all(sip_msg_t *msg, char *prname, char *p2, int _case)
+{
+	str rname;
+
+	if(fixup_get_svalue(msg, (gparam_t *)prname, &rname) < 0) {
+		LM_ERR("failed to get root xavp name\n");
+		return -1;
+	}
+
+	return ki_xav_rm_all(msg, &rname, _case);
+}
+
+static int w_xavp_rm_all(sip_msg_t *msg, char *prname, char *p2)
+{
+	return w_xav_rm_all(msg, prname, p2, 0);
+}
+
+static int w_xavi_rm_all(sip_msg_t *msg, char *prname, char *p2)
+{
+	return w_xav_rm_all(msg, prname, p2, 1);
 }
 
 /**
@@ -3041,6 +3100,11 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("pvx"), str_init("xavp_rm_all"),
+		SR_KEMIP_INT, ki_xavp_rm_all,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("pvx"), str_init("xavp_is_null"),
 		SR_KEMIP_INT, ki_xavp_is_null,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
@@ -3193,6 +3257,11 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
 	},
 	{ str_init("pvx"), str_init("xavi_rm"),
 		SR_KEMIP_INT, ki_xavi_rm,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("pvx"), str_init("xavi_rm_all"),
+		SR_KEMIP_INT, ki_xavi_rm_all,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

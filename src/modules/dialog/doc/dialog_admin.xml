@@ -249,22 +249,6 @@ modparam("dialog", "rr_param", "xyz")
 		</example>
 	</section>
 
-	<section id="dialog.p.flag">
-		<title><varname>dlg_flag</varname> (integer)</title>
-		<para>
-		Note: This flag has beed deprecated and not used anymore.
-		It is not needed to set this parameter and its corresponding flag
-		for initial request in case the <quote>dlg_manage()</quote> function
-		is used.
-		In other words, use <quote>dlg_manage()</quote>.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>none</quote>.
-		</emphasis>
-		</para>
-	</section>
-
 	<section id="dialog.p.timeout_avp">
 		<title><varname>timeout_avp</varname> (string)</title>
 		<para>
@@ -2093,14 +2077,97 @@ dlg_refer("caller", "sip:announcement@kamailio.org");
 		</example>
 	</section>
 
+
+	<section id="dialog.f.dlg_refer_did">
+		<title>
+		<function moreinfo="none">dlg_refer_did(h_entry, h_id, side, address)</function>
+		</title>
+		<para>
+		Refer the 'side' of the identified dialog to a new SIP 'address'.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>h_entry</emphasis> - hash entry of the dialog in the
+			internal dialog table
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>h_id</emphasis> - hash id of the dialog on the hash
+			entry
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>side</emphasis> - which side of the dialog to REFER. It can be:
+				'caller' or 'callee'.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>address</emphasis> - SIP address to refer to.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		The parameters can contain variables.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_refer_did</function> usage</title>
+		<programlisting format="linespecific">
+...
+dlg_refer_did("246","468", "caller", "sip:announcement@kamailio.org");
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="dialog.f.dlg_refer_cid">
+		<title>
+		<function moreinfo="none">dlg_refer_dcid(callid, side, address)</function>
+		</title>
+		<para>
+		Refer the 'side' of the first matching dialog by call-id to a new SIP 'address'.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>callid</emphasis> - call-id of the dialog
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>side</emphasis> - which side of the dialog to REFER. It can be:
+				'caller' or 'callee'.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>address</emphasis> - SIP address to refer to.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		The parameters can contain variables.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_refer_cid</function> usage</title>
+		<programlisting format="linespecific">
+...
+dlg_refer_cid("abcd-efgh-ijkl", "caller", "sip:announcement@kamailio.org");
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="dialog.f.dlg_manage">
 		<title>
 		<function moreinfo="none">dlg_manage()</function>
 		</title>
 		<para>
-		Process current SIP request with dialog module. It is an alternative to
-		setting dialog flag for initial INVITE and Route-parameter-callback
-		execution for within-dialog requests.
+		Process current SIP request with dialog module.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE.
@@ -2800,7 +2867,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.list
+&kamctl; rpc dlg.list
 ...
 		</programlisting>
 		</section>
@@ -2816,7 +2883,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.list_ctx
+&kamctl; rpc dlg.list_ctx
 ...
 		</programlisting>
 		</section>
@@ -2824,7 +2891,7 @@ dlg_set_state("early");
 		<section id="dlg.r.list_match">
 		<title>dlg.list_match</title>
 		<para>
-		Lists the details of matching dialogs. The paramters specify the matching
+		Lists the details of matching dialogs. The parameters specify the matching
 		key, operator, value and optionally a limit of matched dialogs.
 		</para>
 		<para>Name: <emphasis>dlg.list_match</emphasis></para>
@@ -2855,11 +2922,11 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.list_match furi eq sip:alice@test.com 2
+&kamctl; rpc dlg.list_match furi eq sip:alice@test.com 2
 ...
-&kamcmd; dlg.list_match furi sw sip:alice@
+&kamctl; rpc dlg.list_match furi sw sip:alice@
 ...
-&kamcmd; dlg.list_match start_ts gt s:1641550904
+&kamctl; rpc dlg.list_match start_ts gt s:1641550904
 ...
 		</programlisting>
 		</section>
@@ -2875,7 +2942,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.list_match_ctx furi sw sip:alice@
+&kamctl; rpc dlg.list_match_ctx furi sw sip:alice@
 ...
 		</programlisting>
 		</section>
@@ -2893,7 +2960,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.dump_file "/tmp/dlg.json"
+&kamctl; rpc dlg.dump_file "/tmp/dlg.json"
 ...
 		</programlisting>
 		</section>
@@ -2918,9 +2985,9 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.dlg_list abcdrssfrs122444@192.168.1.1 AAdfeEFF33
+&kamctl; rpc dlg.dlg_list abcdrssfrs122444@192.168.1.1 AAdfeEFF33
 ...
-&kamcmd; dlg.dlg_list abcdrssfrs122444@192.168.1.1
+&kamctl; rpc dlg.dlg_list abcdrssfrs122444@192.168.1.1
 ...
 		</programlisting>
 		</section>
@@ -2937,9 +3004,9 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.list_ctx abcdrssfrs122444@192.168.1.1 AAdfeEFF33
+&kamctl; rpc dlg.list_ctx abcdrssfrs122444@192.168.1.1 AAdfeEFF33
 ...
-&kamcmd; dlg.list_ctx abcdrssfrs122444@192.168.1.1
+&kamctl; rpc dlg.list_ctx abcdrssfrs122444@192.168.1.1
 ...
 		</programlisting>
 		</section>
@@ -2967,7 +3034,7 @@ dlg_set_state("early");
 		</para>
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
-		kamcmd dlg.terminate_dlg callid12345 fromtag123 totag123
+		kamctl rpc dlg.terminate_dlg callid12345 fromtag123 totag123
 		</programlisting>
 		</section>
 		<section>
@@ -2998,7 +3065,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.end_dlg 342 56
+&kamctl; rpc dlg.end_dlg 342 56
 ...
 		</programlisting>
 		</section>
@@ -3036,7 +3103,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.set_state callid12345 fromtag123 totag123 5
+&kamctl; rpc dlg.set_state callid12345 fromtag123 totag123 5
 ...
 		</programlisting>
 		</section>
@@ -3065,7 +3132,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.dlg.profile_get_size inbound_calls
+&kamctl; rpc dlg.dlg.profile_get_size inbound_calls
 ...
 		</programlisting>
 		</section>
@@ -3095,7 +3162,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.profile_list inbound_calls
+&kamctl; rpc dlg.profile_list inbound_calls
 ...
 		</programlisting>
 		</section>
@@ -3132,7 +3199,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.bridge_dlg _from_ _to_ _op_
+&kamctl; rpc dlg.bridge_dlg _from_ _to_ _op_
 ...
 		</programlisting>
 		</section>
@@ -3178,7 +3245,7 @@ dlg_set_state("early");
 		<para>RPC Command Format:</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; dlg.stats_active
+&kamctl; rpc dlg.stats_active
 ...
 		</programlisting>
 		</section>
@@ -3208,7 +3275,7 @@ dlg_set_state("early");
 			<para>RPC Command Format:</para>
 			<programlisting format="linespecific">
 ...
-&kamcmd; dlg.is_alive callid123 fromtag123 totag123
+&kamctl; rpc dlg.is_alive callid123 fromtag123 totag123
 ...
 			</programlisting>
 		</section>
@@ -3337,14 +3404,22 @@ kamctl rpc dlg.briefing "ft"
 			<title><varname>$dlg_var(key)</varname></title>
 			<para>
 			This is a read/write variable that can be used to store
-			custom values assigned with a dialog (e.g. the URI of a
-			billing-server, an assigned emergency-server).
-			This pseudo-variable will be available only for subsequential
-			requests after doing loose_route().
+			custom values associated to a dialog (e.g. the URI of a
+			billing-server, an assigned emergency-server). The value has to
+			be a string. This pseudo-variable will be available for subsequential
+			requests only after loose_route() or dlg_manage().
 			</para>
 			<para>
-			Note: You will receive "NULL", if there is no dialog for this
+			Note: "NULL" is returned, if there is no dialog for this
 			request.
+			</para>
+			<para>
+			Note: dialog variables set before the dialog is created for the
+			initial INVITE can be associated to the dialog only when the dialog
+			is created by the same Kamailio process. They are lost if the
+			variables are set in a process that calls an asynchronous function
+			that resumes the processing in another process, which then creates
+			the dialog.
 			</para>
 		</section>
 

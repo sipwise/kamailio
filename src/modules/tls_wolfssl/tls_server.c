@@ -218,6 +218,8 @@ static str *tls_get_connect_server_name(void)
 static int tls_complete_init(struct tcp_connection *c)
 {
 	tls_domain_t *dom;
+	char *dom_str;
+	size_t dom_str_size;
 	struct tls_extra_data *data = 0;
 	tls_domains_cfg_t *cfg;
 	enum tls_conn_states state;
@@ -262,7 +264,11 @@ static int tls_complete_init(struct tcp_connection *c)
 	DBG("Using initial TLS domain %s (dom %p ctx %p sn [%s])\n",
 			tls_domain_str(dom), dom, dom->ctx[0], ZSW(dom->server_name.s));
 
-	data = (struct tls_extra_data *)shm_malloc(sizeof(struct tls_extra_data));
+	dom_str = tls_domain_str(dom);
+	dom_str_size = strlen(dom_str) + 1;
+
+	data = (struct tls_extra_data *)shm_malloc(
+			sizeof(struct tls_extra_data) + dom_str_size);
 	if(!data) {
 		ERR("Not enough shared memory left\n");
 		goto error;
@@ -274,6 +280,9 @@ static int tls_complete_init(struct tcp_connection *c)
 	data->rwbio = rw_bio;
 	data->cfg = cfg;
 	data->state = state;
+	data->dom.s = (char *)data + sizeof(struct tls_extra_data);
+	data->dom.len = dom_str_size - 1;
+	memcpy(data->dom.s, dom_str, dom_str_size);
 
 	if(unlikely(data->ssl == 0 || data->rwbio == 0)) {
 		TLS_ERR_SSL("Failed to create SSL or BIO structure:", data->ssl);
@@ -678,14 +687,101 @@ void tls_h_tcpconn_close_f(struct tcp_connection *c, int fd)
 					break;
 				nr += npos;
 			}
-			assert(nr == wr_used);
-			_tcpconn_write_nb(fd, c, (char *)wr_buf, wr_used);
+			if(nr == wr_used) {
+				_tcpconn_write_nb(fd, c, (char *)wr_buf, wr_used);
+			} else {
+				LM_ERR("skip tcp con write - nr(%lu) != wr_used(%lu)\n",
+						(unsigned long)nr, (unsigned long)wr_used);
+			}
 		}
 		/* we don't bother reading anything (we don't want to wait
            on close) */
 
 		lock_release(&c->write_lock);
 	}
+}
+
+
+static char *get_tls_domain_str(
+		struct tcp_connection *c, struct ip_addr *ip, unsigned short port)
+{
+	tls_domain_t *dom;
+	char *dom_str;
+	tls_domains_cfg_t *cfg;
+	str *sname = NULL;
+	str *srvid = NULL;
+
+	lock_get(tls_domains_cfg_lock);
+	cfg = *tls_domains_cfg;
+	atomic_inc(&cfg->ref_count);
+	lock_release(tls_domains_cfg_lock);
+
+	if(c->flags & F_CONN_PASSIVE) {
+		dom = tls_lookup_cfg(cfg, TLS_DOMAIN_SRV, ip, port, 0, 0);
+	} else {
+		sname = tls_get_connect_server_name();
+		srvid = tls_get_connect_server_id();
+		dom = tls_lookup_cfg(cfg, TLS_DOMAIN_CLI, ip, port, sname, srvid);
+	}
+
+	dom_str = tls_domain_str(dom);
+	atomic_dec(&cfg->ref_count);
+
+	return dom_str;
+}
+
+
+int tls_h_match_domain_f(
+		struct tcp_connection *c, struct ip_addr *ip, unsigned short port)
+{
+	struct tls_extra_data *tls_c;
+	char *dom_str;
+	str dom;
+
+	if(c->type != PROTO_TLS) {
+		LM_ERR("Connection is not TLS\n");
+		return 0;
+	}
+
+	tls_c = (struct tls_extra_data *)c->extra_data;
+
+	if(!c->extra_data) {
+		LM_ERR("called before tls_complete_init()\n");
+		return 0;
+	}
+
+	dom_str = get_tls_domain_str(c, ip, port);
+	STR_SET(dom, dom_str);
+
+	return STR_EQ(tls_c->dom, dom);
+}
+
+
+int tls_h_match_connections_domain_f(
+		struct tcp_connection *l_c, struct tcp_connection *r_c)
+{
+	struct tls_extra_data *l_tls_c, *r_tls_c;
+	char *l_dom_str;
+	str l_dom;
+
+	l_tls_c = (struct tls_extra_data *)l_c->extra_data;
+	r_tls_c = (struct tls_extra_data *)r_c->extra_data;
+
+	if(!r_tls_c)
+		return 1; //consider connection wihout extra_data as matched to keep old behavior
+
+	if(l_tls_c)
+		return STR_EQ(l_tls_c->dom, r_tls_c->dom);
+
+	if(l_c->type != PROTO_TLS) {
+		LM_ERR("Connection is not TLS\n");
+		return 0;
+	}
+
+	l_dom_str = get_tls_domain_str(l_c, &l_c->rcv.dst_ip, l_c->rcv.dst_port);
+	STR_SET(l_dom, l_dom_str);
+
+	return STR_EQ(l_dom, r_tls_c->dom);
 }
 
 
@@ -925,7 +1021,11 @@ end:
 			break;
 		nr += npos;
 	}
-	assert(nr == wr_used);
+	if(unlikely(nr != wr_used)) {
+		LM_ERR("failure - nr(%lu) != wr_used(%lu)\n", (unsigned long)nr,
+				(unsigned long)wr_used);
+		goto error;
+	}
 	*plen = wr_used;
 	*pbuf = (const char *)wr_buf;
 	TLS_WR_TRACE("(%p) end (offs %d, rest_buf=%p rest_len=%d 0x%0x) => %d \n",
@@ -949,7 +1049,11 @@ ssl_eof:
 			break;
 		nr += npos;
 	}
-	assert(nr == wr_used);
+	if(unlikely(nr != wr_used)) {
+		LM_ERR("failure - nr(%lu) != wr_used(%lu)\n", (unsigned long)nr,
+				(unsigned long)wr_used);
+		return -1;
+	}
 	*plen = wr_used;
 	*pbuf = (const char *)wr_buf;
 	DBG("TLS connection has been closed\n");
@@ -1053,7 +1157,11 @@ redo_read:
 				break;
 			nw += npos;
 		}
-		assert(nw == bytes_read);
+		if(unlikely(nw != bytes_read)) {
+			LM_ERR("failure - nw(%lu) != bytes_read(%lu)\n", (unsigned long)nw,
+					(unsigned long)bytes_read);
+			goto error;
+		}
 	}
 continue_ssl_read:
 	ssl_error = WOLFSSL_ERROR_NONE;
@@ -1204,7 +1312,13 @@ continue_ssl_read:
 				break;
 			nr += npos;
 		}
-		assert(nr == wr_used);
+		if(unlikely(nr != wr_used)) {
+			LM_ERR("failure - nr(%lu) != wr_used(%lu)\n", (unsigned long)nr,
+					(unsigned long)wr_used);
+			lock_release(&c->write_lock);
+			TLS_RD_TRACE("(%p, %p) tcpconn_send_unsafe failure\n", c, flags);
+			goto error_send;
+		}
 		if(unlikely(tcpconn_send_unsafe(
 							c->fd, c, (char *)wr_buf, wr_used, c->send_flags)
 					< 0)) {

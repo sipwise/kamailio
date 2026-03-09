@@ -5,7 +5,7 @@
 #===================================================================
 
 ### version for this script
-VERSION='6.0.0'
+VERSION='6.1.0'
 
 PATH=$PATH:/usr/local/sbin/
 
@@ -144,12 +144,6 @@ case $DBENGINE in
 	DBTEXT|dbtext|textdb)
 		if [ -f "$MYLIBDIR/kamctl.dbtext" ]; then
 			. "$MYLIBDIR/kamctl.dbtext"
-			DBENGINELOADED=1
-		fi
-		;;
-	DB_BERKELEY|db_berkeley|BERKELEY|berkeley)
-		if [ -f "$MYLIBDIR/kamctl.db_berkeley" ]; then
-			. "$MYLIBDIR/kamctl.db_berkeley"
 			DBENGINELOADED=1
 		fi
 		;;

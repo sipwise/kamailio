@@ -137,6 +137,8 @@ static int w_t_relay_to_sctp_uri(struct sip_msg *, char *, char *);
 #endif
 static int w_t_relay_to_avp(struct sip_msg *msg, char *str, char *);
 static int w_t_relay_to(struct sip_msg *msg, char *str, char *);
+static int w_t_relay_to_proxy(sip_msg_t *msg, char *paddr, char *p2);
+static int w_t_relay_to_proxy_flags(sip_msg_t *msg, char *paddr, char *pflags);
 static int w_t_replicate_uri(struct sip_msg *p_msg,
 		char *uri, /* sip uri as string or variable */
 		char *_foo /* nothing expected */);
@@ -195,6 +197,7 @@ static int w_t_set_no_e2e_cancel_reason(
 		struct sip_msg *msg, char *on_off, char *f);
 static int w_t_set_disable_internal_reply(
 		struct sip_msg *msg, char *on_off, char *f);
+static int w_t_set_no_auto_ack(struct sip_msg *msg, char *on_off, char *f);
 static int w_t_branch_timeout(struct sip_msg *msg, char *, char *);
 static int w_t_branch_replied(struct sip_msg *msg, char *, char *);
 static int w_t_any_timeout(struct sip_msg *msg, char *, char *);
@@ -215,6 +218,7 @@ static int w_t_get_status_code(sip_msg_t *msg, char *p1, char *p2);
 static int t_clean(struct sip_msg *msg, char *key, char *value);
 static int w_t_exists(struct sip_msg *msg, char *p1, char *p2);
 static int w_t_cell_append_branches(sip_msg_t *msg, char *pindex, char *plabel);
+static int w_t_msg_apply_changes(sip_msg_t *msg, char *p1, char *p2);
 
 /* by default the fr timers avps are not set, so that the avps won't be
  * searched for nothing each time a new transaction is created */
@@ -229,6 +233,8 @@ int tm_remap_503_500 = 1;
 str _tm_event_callback_lres_sent = {NULL, 0};
 int _tm_reply_408_code = 408;
 str _tm_reply_408_reason = str_init("Request Timeout");
+int _tm_delayed_reply = 1;
+int _tm_evlreq_mode = 0;
 
 #ifdef USE_DNS_FAILOVER
 str failover_reply_codes_str = {NULL, 0};
@@ -249,9 +255,13 @@ int tm_dns_reuse_rcv_socket = 0;
 
 int tm_headers_mode = 0;
 
+int tm_local_ack_branch_mode = 0;
+
 static rpc_export_t tm_rpc[];
 
 str tm_event_callback = STR_NULL;
+
+str tm_evcb_local_ack_sent = STR_NULL;
 
 static int fixup_t_check_status(void **param, int param_no);
 
@@ -323,6 +333,10 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE | FAILURE_ROUTE},
 	{"t_relay_to", w_t_relay_to, 2, fixup_t_relay_to, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE},
+	{"t_relay_to_proxy", w_t_relay_to_proxy, 1, fixup_spve_null,
+			fixup_free_spve_null, REQUEST_ROUTE | FAILURE_ROUTE},
+	{"t_relay_to_proxy", w_t_relay_to_proxy_flags, 1, fixup_spve_igp,
+			fixup_free_spve_igp, REQUEST_ROUTE | FAILURE_ROUTE},
 	{"t_forward_nonack", w_t_forward_nonack, 2, fixup_hostport2proxy, 0,
 			REQUEST_ROUTE},
 	{"t_forward_nonack_uri", w_t_forward_nonack_uri, 0, 0, 0,
@@ -388,6 +402,9 @@ static cmd_export_t cmds[] = {
 	{"t_set_disable_6xx", w_t_set_disable_6xx, 1, fixup_var_int_1, 0,
 			REQUEST_ROUTE | TM_ONREPLY_ROUTE | FAILURE_ROUTE
 					| BRANCH_ROUTE},
+	{"t_set_no_auto_ack", w_t_set_no_auto_ack, 1,
+			fixup_var_int_1, 0,
+			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"t_set_disable_failover", w_t_set_disable_failover, 1, fixup_var_int_1,
 			0,
 			REQUEST_ROUTE | TM_ONREPLY_ROUTE | FAILURE_ROUTE
@@ -447,6 +464,7 @@ static cmd_export_t cmds[] = {
 	{"t_next_contact_flow", t_next_contact_flow, 0, 0, 0, REQUEST_ROUTE},
 	{"t_clean", t_clean, 0, 0, 0, ANY_ROUTE},
 	{"t_exists", w_t_exists, 0, 0, 0, ANY_ROUTE},
+	{"t_msg_apply_changes", w_t_msg_apply_changes, 0, 0, 0, BRANCH_ROUTE},
 	{"t_cell_append_branches", w_t_cell_append_branches, 2, fixup_igp_igp,
 			fixup_free_igp_igp, ANY_ROUTE},
 
@@ -506,6 +524,7 @@ static param_export_t params[] = {
 	{"contact_flows_avp", PARAM_STR, &contact_flows_avp},
 	{"disable_6xx_block", PARAM_INT, &default_tm_cfg.disable_6xx},
 	{"local_ack_mode", PARAM_INT, &default_tm_cfg.local_ack_mode},
+	{"local_ack_branch_mode", PARAM_INT, &tm_local_ack_branch_mode},
 	{"failure_reply_mode", PARAM_INT, &failure_reply_mode},
 	{"faked_reply_prio", PARAM_INT, &faked_reply_prio},
 	{"remap_503_500", PARAM_INT, &tm_remap_503_500},
@@ -517,6 +536,7 @@ static param_export_t params[] = {
 	{"headers_mode", PARAM_INT, &tm_headers_mode},
 	{"xavp_contact", PARAM_STR, &ulattrs_xavp_name},
 	{"event_callback", PARAM_STR, &tm_event_callback},
+	{"evcb_local_ack_sent", PARAM_STR, &tm_evcb_local_ack_sent},
 	{"relay_100", PARAM_INT, &default_tm_cfg.relay_100},
 	{"rich_redirect", PARAM_INT, &tm_rich_redirect},
 	{"event_callback_lres_sent", PARAM_STR, &_tm_event_callback_lres_sent},
@@ -528,6 +548,8 @@ static param_export_t params[] = {
 #endif
 	{"reply_408_code", PARAM_INT, &_tm_reply_408_code},
 	{"reply_408_reason", PARAM_STR, &_tm_reply_408_reason},
+	{"delayed_reply", PARAM_INT, &_tm_delayed_reply},
+	{"evlreq_mode", PARAM_INT, &_tm_evlreq_mode},
 	{0, 0, 0}
 };
 
@@ -767,6 +789,12 @@ static int mod_init(void)
 	if(tm_exec_time_check_param > 0) {
 		tm_exec_time_check = (unsigned long)tm_exec_time_check_param * 1000;
 	}
+
+	/* Check if evlreq_mode is set to correct range	*/
+	if(_tm_evlreq_mode < 0 || _tm_evlreq_mode > TM_EVLREQ_BOTH_HBH) {
+		LM_ERR("evlreq_mode tm modparam must be in [0,%d]", TM_EVLREQ_BOTH_HBH);
+		return -1;
+	};
 
 	/* checking if we have sufficient bitmap capacity for given
 	 * maximum number of  branches */
@@ -2277,6 +2305,10 @@ T_SET_FLAG_GEN_FUNC(t_set_disable_internal_reply, T_DISABLE_INTERNAL_REPLY)
 
 W_T_SET_FLAG_GEN_FUNC(t_set_disable_internal_reply, T_DISABLE_INTERNAL_REPLY)
 
+/* disable generating an ACK automatically for local transaction */
+T_SET_FLAG_GEN_FUNC(t_set_no_auto_ack, T_NO_AUTO_ACK)
+
+W_T_SET_FLAG_GEN_FUNC(t_set_no_auto_ack, T_NO_AUTO_ACK)
 
 /* FAILURE_ROUTE and BRANCH_FAILURE_ROUTE only,
  * returns true if the choosed "failure" branch failed because of a timeout,
@@ -2862,6 +2894,16 @@ static const char *rpc_reply_doc[2] = {
 	0
 };
 
+static const char *rpc_retransmit_reply_doc[2] = {
+	"Retransmit the transaction reply",
+	0
+};
+
+static const char *rpc_retransmit_reply_callid_doc[2] = {
+	"Retransmit the transaction reply by call-id",
+	0
+};
+
 static const char *rpc_reply_callid_doc[2] = {
 	"Reply transaction by call-id",
 	0
@@ -2885,6 +2927,12 @@ static const char *rpc_t_uac_start_doc[2] = {
 	0
 };
 
+static const char *rpc_t_uac_start_hex_doc[2] = {
+	"starts a tm uac using  a list of string parameters: method, ruri, "
+	"dst_uri, send_sock, headers (CRLF separated) and hexa body (optional)",
+	0
+};
+
 static const char *rpc_t_uac_wait_doc[2] = {
 	"starts a tm uac and waits for the final reply, using a list of string "
 	"parameters: method, ruri, dst_uri send_sock, headers (CRLF separated)"
@@ -2892,10 +2940,72 @@ static const char *rpc_t_uac_wait_doc[2] = {
 	0
 };
 
+static const char *rpc_t_uac_wait_hex_doc[2] = {
+	"starts a tm uac and waits for the final reply, using a list of string "
+	"parameters: method, ruri, dst_uri send_sock, headers (CRLF separated)"
+	" and hexa body (optional)",
+	0
+};
+
 static const char *rpc_t_uac_wait_block_doc[2] = {
 	"starts a tm uac and waits for the final reply in blocking mode, using a"
 	" list of string parameters: method, ruri, dst_uri send_sock, headers"
 	" (CRLF separated) and body (optional)",
+	0
+};
+
+static const char *rpc_t_uac_wait_block_hex_doc[2] = {
+	"starts a tm uac and waits for the final reply in blocking mode, using a"
+	" list of string parameters: method, ruri, dst_uri send_sock, headers"
+	" (CRLF separated) and hexa body (optional)",
+	0
+};
+
+static const char *rpc_t_uac_start_noack_doc[2] = {
+	"starts a tm uac using a list of string parameters: method, ruri, "
+	"dst_uri, send_sock, headers (CRLF separated) and body (optional), "
+	"without sending ACK for local INVITE",
+	0
+};
+
+static const char *rpc_t_uac_start_noack_hex_doc[2] = {
+	"starts a tm uac using a list of string parameters: method, ruri, "
+	"dst_uri, send_sock, headers (CRLF separated) and hexa body (optional), "
+	"without sending ACK for local INVITE",
+	0
+};
+
+static const char *rpc_t_uac_wait_noack_doc[2] = {
+	"starts a tm uac and waits for the final reply, using a list of string "
+	"parameters: method, ruri, dst_uri send_sock, headers (CRLF separated)"
+	" and body (optional), without sending ACK for local INVITE",
+	0
+};
+
+static const char *rpc_t_uac_wait_noack_hex_doc[2] = {
+	"starts a tm uac and waits for the final reply, using a list of string "
+	"parameters: method, ruri, dst_uri send_sock, headers (CRLF separated)"
+	" and hexa body (optional), without sending ACK for local INVITE",
+	0
+};
+
+static const char *rpc_t_uac_wait_block_noack_doc[2] = {
+	"starts a tm uac and waits for the final reply in blocking mode, using a"
+	" list of string parameters: method, ruri, dst_uri send_sock, headers "
+	"(CRLF separated) and body (optional), without sending ACK for local INVITE",
+	0
+};
+
+static const char *rpc_t_uac_wait_block_noack_hex_doc[2] = {
+	"starts a tm uac and waits for the final reply in blocking mode, using a"
+	" list of string parameters: method, ruri, dst_uri send_sock, headers "
+	"(CRLF separated) and hexa body (optional), without sending ACK for local INVITE",
+	0
+};
+
+static const char *rpc_t_uac_attrs_doc[2] = {
+	"starts a tm uac using a list of string parameters: attributes, method,"
+	" ruri, dst_uri, send_sock, headers (CRLF separated) and body (optional)",
 	0
 };
 
@@ -2914,12 +3024,38 @@ static const char *tm_rpc_clean_doc[2] = {
 static rpc_export_t tm_rpc[] = {
 	{"tm.cancel", rpc_cancel, rpc_cancel_doc, 0},
 	{"tm.reply", rpc_reply, rpc_reply_doc, 0},
+	{"tm.retransmit_reply", rpc_retransmit_reply, rpc_retransmit_reply_doc, 0},
+	{"tm.retransmit_reply_callid", rpc_retransmit_reply_callid,
+		rpc_retransmit_reply_callid_doc, 0},
 	{"tm.reply_callid", rpc_reply_callid, rpc_reply_callid_doc, 0},
 	{"tm.stats", tm_rpc_stats, tm_rpc_stats_doc, 0},
 	{"tm.hash_stats", tm_rpc_hash_stats, tm_rpc_hash_stats_doc, 0},
-	{"tm.t_uac_start", rpc_t_uac_start, rpc_t_uac_start_doc, 0},
-	{"tm.t_uac_wait", rpc_t_uac_wait, rpc_t_uac_wait_doc, RET_ARRAY},
-	{"tm.t_uac_wait_block", rpc_t_uac_wait_block, rpc_t_uac_wait_block_doc, 0},
+	{"tm.t_uac_start", rpc_t_uac_start,
+		rpc_t_uac_start_doc, 0},
+	{"tm.t_uac_start_hex", rpc_t_uac_start_hex,
+		rpc_t_uac_start_hex_doc, 0},
+	{"tm.t_uac_wait", rpc_t_uac_wait,
+		rpc_t_uac_wait_doc, RET_ARRAY},
+	{"tm.t_uac_wait_hex", rpc_t_uac_wait_hex,
+		rpc_t_uac_wait_hex_doc, RET_ARRAY},
+	{"tm.t_uac_wait_block", rpc_t_uac_wait_block,
+		rpc_t_uac_wait_block_doc, 0},
+	{"tm.t_uac_wait_block_hex", rpc_t_uac_wait_block_hex,
+		rpc_t_uac_wait_block_hex_doc, 0},
+	{"tm.t_uac_start_noack", rpc_t_uac_start_noack,
+		rpc_t_uac_start_noack_doc, 0},
+	{"tm.t_uac_start_noack_hex", rpc_t_uac_start_noack_hex,
+		rpc_t_uac_start_noack_hex_doc, 0},
+	{"tm.t_uac_wait_noack", rpc_t_uac_wait_noack,
+		rpc_t_uac_wait_noack_doc, RET_ARRAY},
+	{"tm.t_uac_wait_noack_hex", rpc_t_uac_wait_noack_hex,
+		rpc_t_uac_wait_noack_hex_doc, RET_ARRAY},
+	{"tm.t_uac_wait_block_noack", rpc_t_uac_wait_block_noack,
+		rpc_t_uac_wait_block_noack_doc, 0},
+	{"tm.t_uac_wait_block_noack_hex", rpc_t_uac_wait_block_noack_hex,
+		rpc_t_uac_wait_block_noack_hex_doc, 0},
+	{"tm.t_uac_attrs", rpc_t_uac_attrs,
+		rpc_t_uac_attrs_doc, RET_ARRAY},
 	{"tm.list", tm_rpc_list, tm_rpc_list_doc, RET_ARRAY},
 	{"tm.clean", tm_rpc_clean, tm_rpc_clean_doc, 0},
 	{0, 0, 0, 0}
@@ -3160,6 +3296,41 @@ static int ki_t_relay_to_proxy(sip_msg_t *msg, str *sproxy)
 /**
  *
  */
+static int w_t_relay_to_proxy(sip_msg_t *msg, char *paddr, char *bar)
+{
+	str addr = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t *)paddr, &addr) != 0) {
+		LM_ERR("invalid proxy address parameter\n");
+		return -1;
+	}
+
+	return ki_t_relay_to_proxy_flags(msg, &addr, 0);
+}
+
+/**
+ *
+ */
+static int w_t_relay_to_proxy_flags(sip_msg_t *msg, char *paddr, char *pflags)
+{
+	str addr = STR_NULL;
+	int flags = 0;
+
+	if(fixup_get_svalue(msg, (gparam_t *)paddr, &addr) != 0) {
+		LM_ERR("invalid proxy address parameter\n");
+		return -1;
+	}
+	if(fixup_get_ivalue(msg, (gparam_t *)pflags, &flags) != 0) {
+		LM_ERR("invalid flags parameter\n");
+		return -1;
+	}
+
+	return ki_t_relay_to_proxy_flags(msg, &addr, flags);
+}
+
+/**
+ *
+ */
 static int ki_t_relay_to_flags(sip_msg_t *msg, int rflags)
 {
 	return ki_t_relay_to_proxy_flags(msg, NULL, rflags);
@@ -3236,6 +3407,42 @@ static int w_t_cell_append_branches(sip_msg_t *msg, char *pindex, char *plabel)
 	ret = t_cell_append_branches(tindex, tlabel);
 
 	return (ret == 0) ? 1 : ret;
+}
+
+static int w_t_msg_apply_changes(sip_msg_t *msg, char *p1, char *p2)
+{
+	tm_cell_t *t;
+
+	if(get_route_type() != BRANCH_ROUTE) {
+		LM_ERR("the function must be used in a branch route\n");
+		return -1;
+	}
+
+	if((ksr_msg_apply_changes_mode != 1)
+			&& !(msg->msg_flags & FL_MSG_APPLY_CHANGES)) {
+		LM_ERR("the function cannot be used\n");
+		return -1;
+	}
+
+	if(t_check(msg, 0) == -1) {
+		return 1;
+	}
+	t = get_t();
+	if(!t || !t->uas.request) {
+		return -1;
+	}
+	if(sip_msg_apply_changes_now(msg) < 0) {
+		return E_BAD_REQ;
+	}
+	if(parse_headers(msg, HDR_EOH_F, 0)) {
+		LM_ERR("parse_headers failed\n");
+		return E_BAD_REQ;
+	}
+	if((msg->parsed_flag & HDR_EOH_F) != HDR_EOH_F) {
+		LM_ERR("EoH not parsed\n");
+		return E_UNEXPECTED_STATE;
+	}
+	return 1;
 }
 
 #ifdef USE_DNS_FAILOVER
@@ -3590,6 +3797,11 @@ static sr_kemi_t tm_kemi_exports[] = {
 	},
 	{ str_init("tm"), str_init("t_set_disable_internal_reply"),
 		SR_KEMIP_INT, t_set_disable_internal_reply,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tm"), str_init("t_set_no_auto_ack"),
+		SR_KEMIP_INT, t_set_no_auto_ack,
 		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

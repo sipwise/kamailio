@@ -111,9 +111,10 @@ typedef int (*child_init_function)(int rank);
 #define PARAM_STRING (1U << 0) /**< String (char *) parameter type */
 #define PARAM_INT (1U << 1)	   /**< Integer parameter type */
 #define PARAM_STR (1U << 2)	   /**< struct str parameter type */
-#define PARAM_VAR (1U << 3)	   /**< var parameter type - mdoparamx */
+#define PARAM_VAR (1U << 8)	   /**< var parameter type - mdoparamx */
+#define PARAM_USE_SHM (1U << (8 * sizeof(int) - 2))
 #define PARAM_USE_FUNC (1U << (8 * sizeof(int) - 1))
-#define PARAM_TYPE_MASK(_x) ((_x) & (~PARAM_USE_FUNC))
+#define PARAM_TYPE_MASK(_x) ((_x) & (~(PARAM_USE_FUNC | PARAM_USE_SHM)))
 
 typedef unsigned int modparam_t;
 
@@ -345,7 +346,6 @@ typedef struct sr_module
 } sr_module_t;
 
 
-extern sr_module_t *modules;				 /**< global module list*/
 extern response_function *mod_response_cbks; /**< response callback array */
 extern int mod_response_cbk_no; /**< size of response callbacks array */
 

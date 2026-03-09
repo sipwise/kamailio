@@ -104,6 +104,10 @@ set(MOD_LIST_EXTRA
     dlgs
     sworker
     influxdbc
+    peerstate
+    ptimer
+    pvtpl
+    siprepo
 )
 
 # * common modules depending on database
@@ -180,9 +184,6 @@ set(MOD_LIST_SNMPSTATS snmpstats)
 # * modules depending on expat library
 set(MOD_LIST_XMPP xmpp)
 
-# * modules depending on bdb (db4) library
-set(MOD_LIST_BERKELEY db_berkeley)
-
 # * modules depending on curl library
 set(MOD_LIST_UTILS utils http_client lost slack)
 
@@ -242,7 +243,7 @@ set(MOD_LIST_PRESENCE
 set(MOD_LIST_LUA app_lua)
 
 # * modules depending on perl library
-set(MOD_LIST_PERLDEPS app_perl db_perlvdb)
+set(MOD_LIST_PERLDEPS app_perl)
 
 # * modules depending on python library
 set(MOD_LIST_PYTHON app_python)
@@ -292,6 +293,7 @@ set(MOD_LIST_IMS
     ims_isc
     ims_icscf
     ims_qos
+    ims_qos_npn
     ims_registrar_pcscf
     ims_registrar_scscf
     ims_usrloc_pcscf
@@ -301,9 +303,6 @@ set(MOD_LIST_IMS
     ims_diameter_server
     ims_ipsec_pcscf
 )
-
-# * modules depending on java library
-set(MOD_LIST_JAVA app_java)
 
 # * modules depending on gzip library
 set(MOD_LIST_GZCOMPRESS gzcompress)
@@ -374,6 +373,9 @@ set(MOD_LIST_SECSIPID secsipid secsipid_proc)
 # * modules depending on oRTP and mediastreamer2 libraries
 set(MOD_LIST_RTP_MEDIA_SERVER rtp_media_server)
 
+# modules depending on curl and secp256k1 library
+set(MOD_LIST_AUTH_BLOCKCHAIN auth_web3 auth_arnacon)
+
 # * all modules
 set(MOD_LIST_ALL
     ${MOD_LIST_BASIC}
@@ -391,7 +393,6 @@ set(MOD_LIST_ALL
     ${MOD_LIST_PERLDEPS}
     ${MOD_LIST_CPL}
     ${MOD_LIST_XMPP}
-    ${MOD_LIST_BERKELEY}
     ${MOD_LIST_UTILS}
     ${MOD_LIST_MEMCACHED}
     ${MOD_LIST_TLSDEPS}
@@ -410,7 +411,6 @@ set(MOD_LIST_ALL
     ${MOD_LIST_IMS}
     ${MOD_LIST_ORACLE}
     ${MOD_LIST_OUTBOUND}
-    ${MOD_LIST_JAVA}
     ${MOD_LIST_DNSSEC}
     ${MOD_LIST_SCTP}
     ${MOD_LIST_AUTHEPH}
@@ -444,6 +444,7 @@ set(MOD_LIST_ALL
     ${MOD_LIST_NGHTTP2}
     ${MOD_LIST_GCRYPT}
     ${MOD_LIST_RTP_MEDIA_SERVER}
+    ${MOD_LIST_AUTH_BLOCKCHAIN}
 )
 
 # sort the list
@@ -526,9 +527,6 @@ set(MODULE_GROUP_KSNMPSTATS ${MOD_LIST_SNMPSTATS})
 # pkg xmpp module
 set(MODULE_GROUP_KXMPP ${MOD_LIST_XMPP})
 
-# pkg berkeley module
-set(MODULE_GROUP_KBERKELEY ${MOD_LIST_BERKELEY})
-
 # pkg ldap modules
 set(MODULE_GROUP_KLDAP ${MOD_LIST_LDAP})
 
@@ -545,7 +543,7 @@ set(MODULE_GROUP_KMEMCACHED ${MOD_LIST_MEMCACHED})
 set(MODULE_GROUP_KTLS_BASIC ${MOD_LIST_TLSDEPS})
 
 # pkg tls module with curl
-if(KTLS_INCLUDE_TLSA)
+if(DEFINED ENV{KTLS_INCLUDE_TLSA})
   set(MODULE_GROUP_KTLS ${MOD_LIST_TLSDEPS} ${MOD_LIST_TLSA})
 else()
   set(MODULE_GROUP_KTLS ${MOD_LIST_TLSDEPS})
@@ -602,9 +600,6 @@ set(MODULE_GROUP_KIMS ${MOD_LIST_IMS})
 
 # pkg outbound module
 set(MODULE_GROUP_KOUTBOUND ${MOD_LIST_OUTBOUND})
-
-# pkg java module
-set(MODULE_GROUP_KJAVA ${MOD_LIST_JAVA})
 
 # pkg dnssec module
 set(MODULE_GROUP_KDNSSEC ${MOD_LIST_DNSSEC})
@@ -684,6 +679,9 @@ set(MODULE_GROUP_KSECSIPID ${MOD_LIST_SECSIPID})
 # K rtp_media_server modules
 set(MODULE_GROUP_KRTP_MEDIA_SERVER ${MOD_LIST_RTP_MEDIA_SERVER})
 
+# K auth_blockchain modules
+set(MODULE_GROUP_KAUTH_BLOCKCHAIN ${MOD_LIST_AUTH_BLOCKCHAIN})
+
 # list of static modules
 set(STATIC_MODULES "")
 
@@ -699,13 +697,13 @@ set(MODULE_GROUP_PACKAGE_GROUPS
     KPERL
     KSNMPSTATS
     KXMPP
-    KBERKELEY
     KLDAP
     KUTILS
     KHTTP_ASYNC
     KMEMCACHED
     KTLS_BASIC
     KTLS
+    KTLSA
     KTLS_WOLFSSL
     KWEBSOCKET
     KPRESENCE
@@ -750,6 +748,7 @@ set(MODULE_GROUP_PACKAGE_GROUPS
     KGCRYPT
     KSECSIPID
     KRTP_MEDIA_SERVER
+    KAUTH_BLOCKCHAIN
 )
 
 # Add group names to available group and provide "ALL_PACKAGED" as well

@@ -28,10 +28,18 @@
 #include "redis_connection.h"
 #include "redis_table.h"
 
-int db_redis_key_add_string(redis_key_t **list, const char *entry, int len)
+extern unsigned int db_redis_max_key_len;
+
+int db_redis_key_add_string(redis_key_t **list, const char *entry, size_t len)
 {
 	redis_key_t *k;
 
+	if(db_redis_max_key_len > 0 && len > db_redis_max_key_len) {
+		LM_ERR("Too big length for key being added: allowed '%u' / given "
+			   "'%zu'\n",
+				db_redis_max_key_len, len);
+		return -1;
+	}
 
 	k = (redis_key_t *)pkg_malloc(sizeof(redis_key_t));
 	if(!k) {
@@ -46,8 +54,14 @@ int db_redis_key_add_string(redis_key_t **list, const char *entry, int len)
 		goto err;
 	}
 
-	memcpy(k->key.s, entry, len);
-	k->key.s[len] = '\0';
+	/* run memcpy only on non-NULL pointer, because in fact it may happen
+	 * it comes here empty and with len = 0, this is then an implicit
+	 * conversion of <null> redis key value into the empty "" string.
+	 * see `db_redis_val2str()`
+	 * This is the allowed behavior, but avoid then running memcpy() on it. */
+	if(entry && len > 0)
+		memcpy(k->key.s, entry, len);
+	k->key.s[len] = '\0'; /* at least 1 byte is already pre-allocated before */
 	k->key.len = len;
 
 	if(!*list) {
@@ -69,12 +83,27 @@ err:
 
 int db_redis_key_add_str(redis_key_t **list, const str *entry)
 {
-	return db_redis_key_add_string(list, entry->s, entry->len);
+	if(entry->len < 0)
+		return -1;
+	return db_redis_key_add_string(list, entry->s, (size_t)entry->len);
 }
 
-int db_redis_key_prepend_string(redis_key_t **list, const char *entry, int len)
+int db_redis_key_prepend_string(
+		redis_key_t **list, const char *entry, size_t len)
 {
 	redis_key_t *k;
+
+	if(!entry || !len) {
+		LM_ERR("Empty entry or zero length\n");
+		return -1;
+	}
+
+	if(db_redis_max_key_len > 0 && len > db_redis_max_key_len) {
+		LM_ERR("Too big length for key being prepended: allowed '%u' / given "
+			   "'%zu'\n",
+				db_redis_max_key_len, len);
+		return -1;
+	}
 
 	k = (redis_key_t *)pkg_malloc(sizeof(redis_key_t));
 	if(!k) {

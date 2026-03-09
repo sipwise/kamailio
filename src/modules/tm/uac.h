@@ -32,6 +32,7 @@
 
 #define DEFAULT_CSEQ 10 /* Default CSeq number */
 
+
 /* structure for UAC interface
  *
  * You can free the memory allocated
@@ -53,7 +54,10 @@ typedef struct uac_req
 	transaction_cb *cb;
 	void *cbp;
 	str *callid;
+	str *fromtag;
 	unsigned int cseqno;
+	unsigned int fr_timeout;
+	unsigned int fr_inv_timeout;
 } uac_req_t;
 
 /* macro for setting the values of uac_req_t struct */
@@ -136,6 +140,8 @@ void free_local_ack_unsafe(struct retr_buf *lack);
  * ACK an existing local INVITE transaction...
  */
 int ack_local_uac(struct cell *trans, str *hdrs, str *body);
+
+int uac_evrt_local_ack_sent(sip_msg_t *rpl);
 
 /*
  * Send a transactional request, no dialogs involved

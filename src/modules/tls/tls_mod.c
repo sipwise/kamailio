@@ -246,6 +246,9 @@ gen_lock_t *tls_domains_cfg_lock = NULL;
 int sr_tls_renegotiation = 0;
 int ksr_tls_init_mode = 0;
 int ksr_tls_key_password_mode = 0;
+int *ksr_tls_keylog_mode = NULL;
+str ksr_tls_keylog_file = STR_NULL;
+str ksr_tls_keylog_peer = STR_NULL;
 
 /* clang-format off */
 /*
@@ -317,6 +320,9 @@ static param_export_t params[] = {
 			(void *)ksr_rand_engine_param},
 	{"init_mode", PARAM_INT, &ksr_tls_init_mode},
 	{"key_password_mode", PARAM_INT, &ksr_tls_key_password_mode},
+	{"keylog_mode", PARAM_INT | PARAM_USE_SHM, &ksr_tls_keylog_mode},
+	{"keylog_file", PARAM_STR, &ksr_tls_keylog_file},
+	{"keylog_peer", PARAM_STR, &ksr_tls_keylog_peer},
 
 	{0, 0, 0}
 };
@@ -352,6 +358,8 @@ static struct tls_hooks tls_h = {
 	tls_h_mod_init_f,
 	tls_h_mod_destroy_f,
 	tls_h_mod_pre_init_f,
+	tls_h_match_domain_f,
+	tls_h_match_connections_domain_f,
 };
 /* clang-format on */
 
@@ -556,6 +564,16 @@ static int mod_init(void)
 		LM_WARN("set maximum pthreads key to %d\n", tls_pthreads_key_mark);
 	}
 #endif
+
+	if(ksr_tls_keylog_file_init() < 0) {
+		LM_ERR("failed to init keylog file\n");
+		goto error;
+	}
+	if(ksr_tls_keylog_peer_init() < 0) {
+		LM_ERR("failed to init keylog peer\n");
+		goto error;
+	}
+
 	return 0;
 error:
 	tls_h_mod_destroy_f();
