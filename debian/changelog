@@ -1,3 +1,13 @@
+ngcp-kamailio (5.8.6-1+0~mr12.5.1.11) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [b5a36eb] MT#55283 enable TLS debugging
+
+  [ Donat Zenichev ]
+  * [163bdd0] MT#64562 core: tcp read - checks for MSRP first line
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 09 Mar 2026 14:45:37 +0100
+
 ngcp-kamailio (5.8.6-1+0~mr12.5.1.10) unstable; urgency=medium
 
   [ Alessio Garzi ]
