@@ -1,3 +1,14 @@
+ngcp-kamailio (6.1.1-1+0~mr14.2.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [928aabc] MT#55283 add "directional" flag to list
+
+  [ Donat Zenichev ]
+  * [96d96d9] New upstream version 6.1.1
+  * [05583d8] MT#64611 Remove already applied upstream patches and refresh old ones
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Mon, 09 Mar 2026 15:42:13 +0100
+
 ngcp-kamailio (6.0.5-1+0~mr14.2.0.0) unstable; urgency=medium
 
   [ Donat Zenichev ]
