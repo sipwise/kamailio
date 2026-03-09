@@ -114,44 +114,6 @@ static inline int find_first_route(struct sip_msg *_m)
 
 
 /*!
- * \brief Check if URI is myself
- * \param _host host
- * \param _port port
- * \return 0 if the URI is not myself, 1 otherwise
- */
-static inline int is_myself(sip_uri_t *_puri)
-{
-	int ret;
-
-	if(_puri->host.len == 0) {
-		/* catch uri without host (e.g., tel uri) */
-		return 0;
-	}
-
-	ret = check_self(&_puri->host, _puri->port_no ? _puri->port_no : SIP_PORT,
-			0); /* match all protos*/
-	if(ret < 0)
-		return 0;
-
-#ifdef ENABLE_USER_CHECK
-	if(ret == 1 && i_user.len && i_user.len == _puri->user.len
-			&& strncmp(i_user.s, _puri->user.s, _puri->user.len) == 0) {
-		LM_DBG("ignore user matched - URI is not to the server itself\n");
-		return 0;
-	}
-#endif
-
-	if(ret == 1) {
-		/* match on host:port, but if gruu, then fail */
-		if(_puri->gr.s != NULL)
-			return 0;
-	}
-
-	return ret;
-}
-
-
-/*!
  * \brief Find and parse next Route header field
  * \param _m SIP message
  * \param _hdr SIP header
@@ -626,7 +588,7 @@ static inline int after_strict(struct sip_msg *_m)
 		return RR_ERROR;
 	}
 
-	if(enable_double_rr && is_2rr(&puri.params) && is_myself(&puri)) {
+	if(enable_double_rr && is_2rr(&puri.params) && check_self_uri(&puri)) {
 		/* double route may occur due different IP and port, so force as
 		 * send interface the one advertise in second Route */
 		si = grep_sock_info(&puri.host, puri.port_no, puri.proto);
@@ -837,7 +799,7 @@ static inline void rr_do_force_send_socket(
 		if(enable_socket_mismatch_warning && rr2on) {
 			LM_WARN("no socket found to match second RR (%.*s)\n",
 					rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
-			if(!is_myself(puri)) {
+			if(!check_self_uri(puri)) {
 				LM_WARN("second RR uri is not myself (%.*s)\n",
 						rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
 			}
@@ -854,7 +816,7 @@ static inline void rr_do_force_send_socket(
  * \param preloaded do we have a preloaded route set
  * \return -1 on failure, 1 on success
  */
-static inline int after_loose(struct sip_msg *_m, int preloaded)
+static inline int after_loose(struct sip_msg *_m, int _mode, int preloaded)
 {
 	struct hdr_field *hdr;
 	struct sip_uri puri;
@@ -881,7 +843,7 @@ static inline int after_loose(struct sip_msg *_m, int preloaded)
 	}
 
 	routed_params = puri.params;
-	uri_is_myself = is_myself(&puri);
+	uri_is_myself = check_self_uri(&puri);
 
 	/* IF the URI was added by me, remove it */
 	if(uri_is_myself > 0) {
@@ -890,9 +852,11 @@ static inline int after_loose(struct sip_msg *_m, int preloaded)
 		routed_msg_id.msgid = _m->id;
 		routed_msg_id.pid = _m->pid;
 
-		if((use_ob = process_outbound(_m, puri.user)) < 0) {
-			LM_INFO("failed to process outbound flow-token\n");
-			return RR_FLOW_TOKEN_BROKEN;
+		if(!(_mode & RR_LR_MODE_SKIP_OUTBOUND)) {
+			if((use_ob = process_outbound(_m, puri.user)) < 0) {
+				LM_INFO("failed to process outbound flow-token\n");
+				return RR_FLOW_TOKEN_BROKEN;
+			}
 		}
 
 		if(rr_force_send_socket && !use_ob) {
@@ -966,11 +930,6 @@ static inline int after_loose(struct sip_msg *_m, int preloaded)
 		}
 		_m->msg_flags |= FL_ROUTE_ADDR;
 	} else {
-#ifdef ENABLE_USER_CHECK
-		/* check if it the ignored user */
-		if(uri_is_myself < 0)
-			return RR_NOT_DRIVEN;
-#endif
 		LM_DBG("Topmost URI is NOT myself\n");
 		routed_params.s = NULL;
 		routed_params.len = 0;
@@ -1050,12 +1009,13 @@ int loose_route_mode(sip_msg_t *_m, int _mode)
 	if(ret < 0) {
 		return -1;
 	} else if(ret == 1) {
-		return after_loose(_m, 1);
+		return after_loose(_m, _mode, 1);
 	} else {
-		if((_mode == 0) && (is_myself(&_m->parsed_uri))) {
+		if((!(_mode & RR_LR_MODE_LOOSE_ONLY))
+				&& (check_self_uri(&_m->parsed_uri))) {
 			return after_strict(_m);
 		} else {
-			return after_loose(_m, 0);
+			return after_loose(_m, _mode, 0);
 		}
 	}
 }
@@ -1130,7 +1090,7 @@ int redo_route_params(sip_msg_t *msg)
 			return -1;
 		}
 
-		uri_is_myself = is_myself(&puri);
+		uri_is_myself = check_self_uri(&puri);
 
 		/* if the URI was added by me, remove it */
 		if(uri_is_myself > 0) {

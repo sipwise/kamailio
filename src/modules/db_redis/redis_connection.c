@@ -24,6 +24,7 @@
 
 #include "db_redis_mod.h"
 #include "redis_connection.h"
+#include "redis_sentinels.h"
 #include "redis_table.h"
 #include "redis_dbase.h"
 
@@ -37,11 +38,12 @@ static unsigned int MAX_URL_LENGTH = 1023;
 #endif
 
 extern int db_redis_verbosity;
+extern int mapping_struct_type;
+extern str db_redis_hash_expires_str;
 #ifdef WITH_SSL
 extern int db_redis_opt_tls;
 extern char *db_redis_ca_path;
 #endif
-extern char *db_redis_db_pass;
 
 static void print_query(redis_key_t *query)
 {
@@ -120,18 +122,26 @@ static redis_key_t *db_redis_shift_query(km_redis_con_t *con)
 	return query;
 }
 
+static inline int redis_supports_expires(int major, int minor, int patch)
+{
+	if(!(major > 7 || (major == 7 && minor >= 4)))
+		return 0;
+	return 1;
+}
+
 int db_redis_connect(km_redis_con_t *con)
 {
 	struct timeval tv;
 	redisReply *reply;
+	redisContext *sentinel_ctx = NULL;
+	int try_replicas = use_replicas;
+
 #ifndef WITH_HIREDIS_CLUSTER
 	int db;
 #endif
 #ifdef WITH_SSL
 	redisSSLContext *ssl = NULL;
 #endif
-	char *password = NULL;
-
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 #ifndef WITH_HIREDIS_CLUSTER
@@ -205,7 +215,70 @@ int db_redis_connect(km_redis_con_t *con)
 		goto err;
 	}
 #else
-	LM_DBG("connecting to redis at %s:%d\n", con->id->host, con->id->port);
+	if(db_redis_with_sentinels) {
+		redis_sentinel_t *sentinel;
+		int select_status, srv_found = 0;
+
+	recheck_sentinels:
+		for(sentinel = db_redis_sc.sentinel_list; sentinel != NULL;
+				sentinel = sentinel->next) {
+			struct timeval timeout;
+			timeout.tv_sec = 0;
+			timeout.tv_usec = 500000;
+
+			LM_INFO("Connecting to sentinel %s:%d\n", sentinel->host,
+					sentinel->port);
+			sentinel_ctx = redisConnectWithTimeout(
+					sentinel->host, sentinel->port, timeout);
+
+			if(!sentinel_ctx || sentinel_ctx->err) {
+				LM_ERR("Failed to create Redis context for sentinel %s:%d\n",
+						sentinel->host, sentinel->port);
+				if(sentinel_ctx) {
+					redisFree(sentinel_ctx);
+					sentinel_ctx = NULL;
+				}
+				continue;
+			}
+
+			if(db_redis_authenticate(sentinel_ctx, db_redis_sc.password) != 0) {
+				LM_ERR("Authentication error\n");
+				if(sentinel_ctx) {
+					redisFree(sentinel_ctx);
+					sentinel_ctx = NULL;
+				}
+				continue;
+			}
+
+			select_status = try_replicas
+									? db_redis_select_replica(sentinel_ctx, con)
+									: db_redis_select_master(sentinel_ctx, con);
+
+			if(select_status != 0) { // Failed to select master/replica
+				continue;
+			}
+
+			srv_found = 1;
+			break; // Successfully selected a server, break out of the loop
+		}
+		if(!srv_found) {
+			if(try_replicas) {
+				LM_ERR("Could not connect to any redis replica via sentinel, "
+					   "now defaulting to checking for master\n");
+				replica_list_free(&replica_list);
+				if(sentinel_ctx) {
+					redisFree(sentinel_ctx);
+					sentinel_ctx = NULL;
+				}
+				try_replicas = 0; // now try to connect to master
+				goto recheck_sentinels;
+			} else {
+				LM_ERR("Could not connect to any redis servers via sentinel\n");
+				goto err;
+			}
+		}
+	}
+	LM_INFO("connecting to redis at %s:%d\n", con->id->host, con->id->port);
 
 #ifdef WITH_SSL
 	if(db_redis_opt_tls != 0) {
@@ -237,27 +310,11 @@ int db_redis_connect(km_redis_con_t *con)
 	}
 #endif
 #endif
-
-	password = con->id->password;
-	if(!password) {
-		password = db_redis_db_pass;
+	// Authenticate if needed
+	if(db_redis_authenticate(con->con, con->id->password) != 0) {
+		LM_ERR("Authentication error\n");
+		goto err;
 	}
-	if(password) {
-		reply = redisCommand(con->con, "AUTH %s", password);
-		if(!reply) {
-			LM_ERR("cannot authenticate connection %.*s: %s\n",
-					con->id->url.len, con->id->url.s, con->con->errstr);
-			goto err;
-		}
-		if(reply->type == REDIS_REPLY_ERROR) {
-			LM_ERR("cannot authenticate connection %.*s: %s\n",
-					con->id->url.len, con->id->url.s, reply->str);
-			goto err;
-		}
-		freeReplyObject(reply);
-		reply = NULL;
-	}
-
 #ifndef WITH_HIREDIS_CLUSTER
 	reply = redisCommand(con->con, "PING");
 	if(!reply) {
@@ -290,7 +347,11 @@ int db_redis_connect(km_redis_con_t *con)
 	LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
 
 #ifndef WITH_HIREDIS_CLUSTER
-	reply = redisCommand(con->con, "SCRIPT LOAD %s", SREM_KEY_LUA);
+	if(mapping_struct_type == MS_HASH) {
+		reply = redisCommand(con->con, "SCRIPT LOAD %s", HDEL_KEY_LUA);
+	} else {
+		reply = redisCommand(con->con, "SCRIPT LOAD %s", SREM_KEY_LUA);
+	}
 	if(!reply) {
 		LM_ERR("failed to load LUA script to server %.*s: %s\n",
 				con->id->url.len, con->id->url.s, con->con->errstr);
@@ -315,6 +376,40 @@ int db_redis_connect(km_redis_con_t *con)
 	strcpy(con->srem_key_lua, reply->str);
 	freeReplyObject(reply);
 	reply = NULL;
+
+	if(db_redis_hash_expires_str.len) {
+		char *version_str = NULL;
+		int major = 0, minor = 0, patch = 0;
+
+		reply = redisCommand(con->con, "INFO server");
+		if(!reply) {
+			LM_ERR("failed to get INFO from Redis server\n");
+			goto err;
+		}
+
+		version_str = strstr(reply->str, "redis_version:");
+		if(!version_str) {
+			LM_ERR("Redis version not found in INFO reply\n");
+			goto err;
+		}
+
+		version_str += strlen("redis_version:"); // Skip past the field name
+		if(sscanf(version_str, "%d.%d.%d", &major, &minor, &patch) < 3) {
+			LM_ERR("Error parsing the version string: %s\n", version_str);
+			goto err;
+		}
+
+		if(!redis_supports_expires(major, minor, patch)) {
+			LM_ERR("HEXPIRE (used by redis_expire parameter) is not "
+				   "implemented in Redis version %d.%d.%d\n.",
+					major, minor, patch);
+			goto err;
+		}
+
+		LM_DBG("Redis server version is: %d.%d.%d\n", major, minor, patch);
+		freeReplyObject(reply);
+		reply = NULL;
+	}
 #endif
 	LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
 
@@ -327,6 +422,8 @@ err:
 		redisFree(con->con);
 		con->con = NULL;
 	}
+	if(sentinel_ctx)
+		redisFree(sentinel_ctx);
 	return -1;
 }
 
@@ -457,7 +554,7 @@ void *db_redis_command_argv_to_node(
 
 	redisReply *reply = redisClusterCommandToNode(con->con, node, cmd);
 	if(con->con->err != REDIS_OK) {
-		LM_DBG("redis connection is gone, try reconnect. (%d:%s)\n",
+		LM_WARN("redis connection is gone, try reconnect. (%d:%s)\n",
 				con->con->err, con->con->errstr);
 		if(db_redis_connect(con) != 0) {
 			LM_ERR("Failed to reconnect to redis db\n");
@@ -476,10 +573,27 @@ void *db_redis_command_argv_to_node(
 
 #endif
 
+static inline int should_recheck_replicas(time_t crt_time)
+{
+	if(!using_master_read_only || !recheck_replicas_interval) {
+		return 0;
+	}
+
+	if(crt_time != last_seen_time
+			&& (crt_time - last_seen_time) > min_recheck_interval) {
+		last_seen_time = crt_time;
+		return 1;
+	}
+	return 0;
+}
+
 void *db_redis_command_argv(km_redis_con_t *con, redis_key_t *query)
 {
 	char **argv = NULL;
 	int argc;
+	redisReply *reply = NULL;
+	int reconnect_needed = 0;
+	time_t current_time;
 
 	print_query(query);
 
@@ -490,11 +604,22 @@ void *db_redis_command_argv(km_redis_con_t *con, redis_key_t *query)
 	}
 	LM_DBG("query has %d args\n", argc);
 
-	redisReply *reply =
-			redisCommandArgv(con->con, argc, (const char **)argv, NULL);
-	if(con->con->err != REDIS_OK) {
-		LM_DBG("redis connection is gone, try reconnect. (%d:%s)\n",
-				con->con->err, con->con->errstr);
+	current_time = *db_redis_shared_time;
+	if(should_recheck_replicas(current_time)) {
+		LM_WARN("Reconnecting: redis master is being used for read-only "
+				"operations.\n");
+		last_seen_time = current_time;
+		reconnect_needed = 1;
+	} else {
+		reply = redisCommandArgv(con->con, argc, (const char **)argv, NULL);
+		if(con->con->err != REDIS_OK) {
+			LM_WARN("redis connection is gone, try reconnect. (%d:%s)\n",
+					con->con->err, con->con->errstr);
+			reconnect_needed = 1;
+		}
+	}
+
+	if(reconnect_needed) {
 		if(db_redis_connect(con) != 0) {
 			LM_ERR("Failed to reconnect to redis db\n");
 			pkg_free(argv);
@@ -536,7 +661,7 @@ int db_redis_append_command_argv(
 	// are properly consumed for the previous command, it won't send
 	// out a new query until redisGetReply is called
 	if(con->con->err != REDIS_OK) {
-		LM_DBG("redis connection is gone, try reconnect. (%d:%s)\n",
+		LM_WARN("redis connection is gone, try reconnect. (%d:%s)\n",
 				con->con->err, con->con->errstr);
 		if(db_redis_connect(con) != 0) {
 			LM_ERR("Failed to reconnect to redis db\n");
@@ -560,17 +685,31 @@ int db_redis_get_reply(km_redis_con_t *con, void **reply)
 {
 	int ret;
 	redis_key_t *query;
+	int reconnect_needed = 0;
+	time_t current_time;
 
 	if(!con || !con->con) {
 		LM_ERR("Internal error passing null connection\n");
 		return -1;
 	}
 
-	*reply = NULL;
-	ret = redisGetReply(con->con, reply);
-	if(con->con->err != REDIS_OK) {
-		LM_DBG("redis connection is gone, try reconnect. (%d:%s)\n",
-				con->con->err, con->con->errstr);
+	current_time = *db_redis_shared_time;
+	if(should_recheck_replicas(current_time)) {
+		LM_WARN("Reconnecting: redis master is being used for read-only "
+				"operations.\n");
+		last_seen_time = current_time;
+		reconnect_needed = 1;
+	} else {
+		*reply = NULL;
+		ret = redisGetReply(con->con, reply);
+		if(con->con->err != REDIS_OK) {
+			LM_WARN("redis connection is gone, try reconnect. (%d:%s)\n",
+					con->con->err, con->con->errstr);
+			reconnect_needed = 1;
+		}
+	}
+
+	if(reconnect_needed) {
 		con->append_counter = 0;
 		if(db_redis_connect(con) != 0) {
 			LM_ERR("Failed to reconnect to redis db\n");

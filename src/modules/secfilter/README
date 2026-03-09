@@ -48,8 +48,11 @@ Jose Luis Verdeguer
               5.3. secfilter.stats
               5.4. secfilter.stats_reset
               5.5. secfilter.add_dst
-              5.6. secfilter.add_bl
-              5.7. secfilter.add_wl
+              5.6. secfilter.del_dst
+              5.7. secfilter.add_bl
+              5.8. secfilter.del_bl
+              5.9. secfilter.add_wl
+              5.10. secfilter.del_wl
 
         6. Installation
 
@@ -84,11 +87,14 @@ Jose Luis Verdeguer
    1.20. secfilter.stats usage
    1.21. secfilter.stats_reset usage
    1.22. secfilter.add_dst usage
-   1.23. secfilter.add_bl usage
-   1.24. secfilter.add_wl usage
-   1.25. Example database content - secfilter table
-   1.26. kamcmd secfilter.print ua
-   1.27. kamcmd secfilter.stats
+   1.23. secfilter.del_dst usage
+   1.24. secfilter.add_bl usage
+   1.25. secfilter.del_bl usage
+   1.26. secfilter.add_wl usage
+   1.27. secfilter.del_wl usage
+   1.28. Example database content - secfilter table
+   1.29. kamctl rpc secfilter.print ua
+   1.30. kamctl rpc secfilter.stats
 
 Chapter 1. Admin Guide
 
@@ -130,8 +136,11 @@ Chapter 1. Admin Guide
         5.3. secfilter.stats
         5.4. secfilter.stats_reset
         5.5. secfilter.add_dst
-        5.6. secfilter.add_bl
-        5.7. secfilter.add_wl
+        5.6. secfilter.del_dst
+        5.7. secfilter.add_bl
+        5.8. secfilter.del_bl
+        5.9. secfilter.add_wl
+        5.10. secfilter.del_wl
 
    6. Installation
 
@@ -372,13 +381,28 @@ klisted");
      * -1 = error
      * -2 = the value is blacklisted
 
+   You can filter by blocking the IPs of messages coming from countries
+   that are on the blacklist. Alternatively, you can block everything that
+   is not explicitly on the whitelist.
+
    Example 1.11. secf_check_country usage
                 ...
         if (geoip2_match("$si", "src")) {
                 secf_check_country($gip2(src=>cc));
-                if ($avp(secfilter) == -2) {
-                        xlog("L_ALERT", "$rm from $si blocked because Country '$
-gip2(src=>cc)' is blacklisted");
+                if ($? == -2) {
+                        xdbg("$rm from $si blocked because Country '$gip2(src=>c
+c)' is blacklisted");
+                        exit;
+                }
+        }
+
+                ...
+
+        if (geoip2_match("$si", "src")) {
+                secf_check_country($gip2(src=>cc));
+                if ($? != 2) {
+                        xdbg("$rm from $si blocked because Country '$gip2(src=>c
+c)' is not whitelisted");
                         exit;
                 }
         }
@@ -542,8 +566,11 @@ d in the user-agent header ($ua)");
    5.3. secfilter.stats
    5.4. secfilter.stats_reset
    5.5. secfilter.add_dst
-   5.6. secfilter.add_bl
-   5.7. secfilter.add_wl
+   5.6. secfilter.del_dst
+   5.7. secfilter.add_bl
+   5.8. secfilter.del_bl
+   5.9. secfilter.add_wl
+   5.10. secfilter.del_wl
 
 5.1.  secfilter.reload
 
@@ -551,7 +578,7 @@ d in the user-agent header ($ua)");
 
    Example 1.18. secfilter.reload usage
                 ...
-                kamcmd secfilter.reload
+                kamctl rpc secfilter.reload
                 ...
 
 5.2.  secfilter.print
@@ -571,10 +598,10 @@ d in the user-agent header ($ua)");
 
    Example 1.19. secfilter.print usage
                 ...
-                kamcmd secfilter.print
-                kamcmd secfilter.print ua
-                kamcmd secfilter.print country
-                kamcmd secfilter.print dst
+                kamctl rpc secfilter.print
+                kamctl rpc secfilter.print ua
+                kamctl rpc secfilter.print country
+                kamctl rpc secfilter.print dst
                 ...
 
 5.3.  secfilter.stats
@@ -583,7 +610,7 @@ d in the user-agent header ($ua)");
 
    Example 1.20. secfilter.stats usage
                 ...
-                kamcmd secfilter.stats
+                kamctl rpc secfilter.stats
                 ...
 
 5.4.  secfilter.stats_reset
@@ -592,7 +619,7 @@ d in the user-agent header ($ua)");
 
    Example 1.21. secfilter.stats_reset usage
                 ...
-                kamcmd secfilter.stats_reset
+                kamctl rpc secfilter.stats_reset
                 ...
 
 5.5.  secfilter.add_dst
@@ -606,10 +633,22 @@ d in the user-agent header ($ua)");
 
    Example 1.22. secfilter.add_dst usage
                 ...
-                kamcmd secfilter.add_dst 555123123
+                kamctl rpc secfilter.add_dst 555123123
                 ...
 
-5.6.  secfilter.add_bl
+5.6.  secfilter.del_dst
+
+   Delete value from destination blacklist.
+
+   Parameters:
+     * number (number to remove from the destination blacklist)
+
+   Example 1.23. secfilter.del_dst usage
+                ...
+                kamctl rpc secfilter.del_dst 555123123
+                ...
+
+5.7.  secfilter.add_bl
 
    Insert values into blacklist.
 
@@ -617,13 +656,27 @@ d in the user-agent header ($ua)");
      * type (must be: ua, country, domain, user or ip)
      * value (value to add to the blacklist)
 
-   Example 1.23. secfilter.add_bl usage
+   Example 1.24. secfilter.add_bl usage
                 ...
-                kamcmd secfilter.add_bl ua friendly-scanner
-                kamcmd secfilter.add_bl user sipvicious
+                kamctl rpc secfilter.add_bl ua friendly-scanner
+                kamctl rpc secfilter.add_bl user sipvicious
                 ...
 
-5.7.  secfilter.add_wl
+5.8.  secfilter.del_bl
+
+   Delete value from blacklist.
+
+   Parameters:
+     * type (must be: ua, country, domain, user or ip)
+     * value (value to remove from the blacklist)
+
+   Example 1.25. secfilter.del_bl usage
+                ...
+                kamctl rpc secfilter.del_bl ua friendly-scanner
+                kamctl rpc secfilter.del_bl user sipvicious
+                ...
+
+5.9.  secfilter.add_wl
 
    Insert values into whitelist.
 
@@ -631,10 +684,24 @@ d in the user-agent header ($ua)");
      * type (must be: ua, country, domain, user or ip)
      * value (value to add to the whitelist)
 
-   Example 1.24. secfilter.add_wl usage
+   Example 1.26. secfilter.add_wl usage
                 ...
-                kamcmd secfilter.add_wl country es
-                kamcmd secfilter.add_wl user trusted_user
+                kamctl rpc secfilter.add_wl country es
+                kamctl rpc secfilter.add_wl user trusted_user
+                ...
+
+5.10.  secfilter.del_wl
+
+   Delete value from whitelist.
+
+   Parameters:
+     * type (must be: ua, country, domain, user or ip)
+     * value (value to remove from the blacklist)
+
+   Example 1.27. secfilter.del_wl usage
+                ...
+                kamctl rpc secfilter.del_wl country es
+                kamctl rpc secfilter.del_wl user trusted_user
                 ...
 
 6. Installation
@@ -644,7 +711,7 @@ d in the user-agent header ($ua)");
 6.1. Database setup
 
    Before running Kamailio with the secfilter module, it is necessary to
-   setup the database table where the module will read the blacklist data
+   set up the database table where the module will read the blacklist data
    from. In order to do that, if the table was not created by the
    installation script or you choose to install everything by yourself you
    can use the secfilter-create.sql SQL script in the database directories
@@ -654,7 +721,7 @@ d in the user-agent header ($ua)");
    the complete database documentation on the project webpage,
    https://www.kamailio.org/docs/db-tables/kamailio-db-devel.html.
 
-   Example 1.25. Example database content - secfilter table
+   Example 1.28. Example database content - secfilter table
                 ...
                 +----+-----------+-----------+------------------+
                 | id | action    | type      | data             |
@@ -692,7 +759,7 @@ d in the user-agent header ($ua)");
 
 7.1. Print data
 
-   Example 1.26. kamcmd secfilter.print ua
+   Example 1.29. kamctl rpc secfilter.print ua
                 ...
 {
         User-Agent: {
@@ -726,7 +793,7 @@ d in the user-agent header ($ua)");
 
 7.2. Statistics
 
-   Example 1.27. kamcmd secfilter.stats
+   Example 1.30. kamctl rpc secfilter.stats
                 ...
 {
         Blacklist: {

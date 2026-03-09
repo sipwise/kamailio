@@ -377,7 +377,7 @@ if(is_method("MESSAGE)
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; imc_list_rooms
+&kamctl; rpc imc_list_rooms
 ...
 		</programlisting>
 	</section>
@@ -400,7 +400,7 @@ if(is_method("MESSAGE)
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; imc_list_members _room_
+&kamctl; rpc imc_list_members _room_
 ...
 	</programlisting>
 	</section>
@@ -541,7 +541,7 @@ if(is_method("MESSAGE)
 	<section>
 	<title>Installation</title>
 		<para>
-		Before running &kamailio; with IMC, you have to setup the database
+		Before running &kamailio; with IMC, you have to set up the database
 		tables where the module will store the data. For that, if the
 		tables were not created by the installation script or you choose
 		to install everything by yourself you can use the imc-create.sql
@@ -553,4 +553,3 @@ if(is_method("MESSAGE)
 	</section>
 
 </chapter>
-

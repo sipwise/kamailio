@@ -88,7 +88,7 @@ void ps_presentity_db_timer_clean(unsigned int ticks, void *param)
 	db_ops[n_db_cols] = OP_LT;
 	db_vals[n_db_cols].type = DB1_INT;
 	db_vals[n_db_cols].nul = 0;
-	db_vals[n_db_cols].val.int_val = (int)time(NULL);
+	db_vals[n_db_cols].val.int_val = ksr_time_sint(NULL, NULL);
 	n_db_cols++;
 
 	db_keys[n_db_cols] = &str_expires_col;
@@ -550,7 +550,7 @@ int ki_handle_publish_uri(struct sip_msg *msg, str *sender_uri)
 
 	/* query the database and update or insert */
 	if(update_presentity(msg, presentity, &body, etag_gen, &sent_reply, sphere,
-			   NULL, NULL, 0)
+			   NULL, NULL, 0, 0)
 			< 0) {
 		LM_ERR("when updating presentity\n");
 		goto error;
@@ -671,12 +671,10 @@ int update_hard_presentity(
 			LM_ERR("bad body format\n");
 			xmlFreeDoc(doc);
 			xmlCleanupParser();
-			xmlMemoryDump();
 			goto done;
 		}
 		xmlFreeDoc(doc);
 		xmlCleanupParser();
-		xmlMemoryDump();
 
 		new_t = 1;
 	} else {
@@ -693,7 +691,7 @@ int update_hard_presentity(
 	}
 
 	if(update_presentity(
-			   NULL, pres, pidf_doc, new_t, NULL, sphere, NULL, NULL, 0)
+			   NULL, pres, pidf_doc, new_t, NULL, sphere, NULL, NULL, 0, 0)
 			< 0) {
 		LM_ERR("updating presentity\n");
 		goto done;

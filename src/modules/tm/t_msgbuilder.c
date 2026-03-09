@@ -35,6 +35,7 @@
 #include "../../core/config.h"
 #include "../../core/parser/parser_f.h"
 #include "../../core/parser/parse_to.h"
+#include "../../core/parser/parse_from.h"
 #include "../../core/ut.h"
 #include "../../core/trim.h"
 #include "../../core/srapi.h"
@@ -73,6 +74,7 @@
 	} while(0)
 
 extern int tm_headers_mode;
+extern int tm_local_ack_branch_mode;
 
 /* Build a local request based on a previous request; main
  * customers of this function are local ACK and local CANCEL
@@ -1223,6 +1225,7 @@ char *build_dlg_ack(struct sip_msg *rpl, struct cell *Trans,
 	str next_hop;
 	str body_len;
 	str _to, *to = &_to;
+	struct dest_info *orig_dst = &Trans->uac[branch].request.dst;
 #ifdef USE_DNS_FAILOVER
 	struct dns_srv_handle dns_h;
 #endif
@@ -1281,7 +1284,7 @@ char *build_dlg_ack(struct sip_msg *rpl, struct cell *Trans,
 	switch(cfg_get(tm, tm_cfg, local_ack_mode)) {
 		case 1:
 			/* send the local 200 ack to the same dst as the corresp. invite*/
-			*dst = Trans->uac[branch].request.dst;
+			*dst = *orig_dst;
 			break;
 		case 2:
 			/* send the local 200 ack to the same dst as the 200 reply source*/
@@ -1291,7 +1294,8 @@ char *build_dlg_ack(struct sip_msg *rpl, struct cell *Trans,
 		case 0:
 		default:
 			/* rfc conformant behaviour: use the next_hop determined from the
-			 * contact and the route set */
+			 * contact and the route set - but still apply a potentially forced
+			 * send_socket (taken from the original/ACK'ed request) */
 #ifdef USE_DNS_FAILOVER
 			if(cfg_get(core, core_cfg, use_dns_failover)) {
 				dns_srv_handle_init(&dns_h);
@@ -1316,11 +1320,17 @@ char *build_dlg_ack(struct sip_msg *rpl, struct cell *Trans,
 				goto error;
 			}
 #endif /* USE_DNS_FAILOVER */
+			if(orig_dst->send_flags.f & SND_F_FORCE_SOCKET) {
+				dst->send_sock = orig_dst->send_sock;
+				dst->proto = orig_dst->proto;
+				dst->send_flags = orig_dst->send_flags;
+				dst->id = orig_dst->id;
+			}
 			break;
 	}
 
 	/* via */
-	if(!t_calc_branch(Trans, branch, branch_buf, &branch_len))
+	if(!t_calc_branch_ack(Trans, rpl, branch, branch_buf, &branch_len))
 		goto error;
 	branch_str.s = branch_buf;
 	branch_str.len = branch_len;
@@ -1813,10 +1823,99 @@ error:
 	return 0;
 }
 
+int t_via_local_branch_val(sip_msg_t *msg, char *sval, char *md5b)
+{
+	int i = 0;
+	int n = 0;
+	str src[6];
+
+	for(i = 0; i < MD5_LEN; i++) {
+		md5b[i] = '0';
+	}
+
+	if(parse_headers(msg,
+			   HDR_VIA_F | HDR_FROM_F | HDR_TO_F | HDR_CALLID_F | HDR_CSEQ_F,
+			   0) < 0
+			|| parse_from_header(msg) < 0 || msg->from == NULL
+			|| msg->from->parsed == NULL || msg->to == NULL
+			|| msg->callid == NULL || msg->cseq == NULL) {
+		LM_ERR("invalid message\n");
+		return -1;
+	}
+
+	src[n] = get_from(msg)->tag_value;
+	n++;
+	if(get_to(msg)->tag_value.s != NULL && get_to(msg)->tag_value.len > 0) {
+		src[n] = get_to(msg)->tag_value;
+		n++;
+	}
+	src[n] = msg->callid->body;
+	n++;
+	if(sval != NULL) {
+		src[n].s = sval;
+		src[n].len = strlen(sval);
+		n++;
+	}
+	src[n] = get_cseq(msg)->number;
+	n++;
+
+	if(msg->via1 != NULL && msg->via1->branch != NULL) {
+		src[n] = msg->via1->branch->value;
+		n++;
+	}
+
+	MD5StringArray(md5b, src, n);
+
+	return 0;
+}
 
 int t_calc_branch(struct cell *t, int b, char *branch, int *branch_len)
 {
-	return branch_builder(t->hash_index, 0, t->md5, b, branch, branch_len);
+	return branch_builder(
+			t->hash_index, 0, t->md5, NULL, b, branch, branch_len);
+}
+
+int t_calc_branch_ack(
+		struct cell *t, sip_msg_t *rpl, int b, char *branch, int *branch_len)
+{
+	char md5b[MD5_LEN + 1];
+	int i = 0;
+	int k = 0;
+
+	if(tm_local_ack_branch_mode == 0) {
+		return branch_builder(
+				t->hash_index, 0, t->md5, NULL, b, branch, branch_len);
+	}
+
+	if(tm_local_ack_branch_mode == 2) {
+		if(t_via_local_branch_val(rpl, "ACK", md5b) == 0) {
+			k = 1;
+		}
+	}
+
+	if(k == 0) {
+		/* tm_local_ack_branch_mode != 2 or t_via_local_branch_val() failed */
+		memcpy(md5b, t->md5, MD5_LEN);
+		md5b[MD5_LEN] = '\0';
+		for(k = 0; k < 4; k++) {
+			i = MD5_LEN - 1 - k;
+			if(md5b[i] >= '0' && md5b[i] < '9') {
+				md5b[i] = md5b[i] + 1;
+			} else if(md5b[i] == '9') {
+				md5b[i] = '0';
+			} else if(md5b[i] >= 'a' && md5b[i] < 'z') {
+				md5b[i] = md5b[i] + 1;
+			} else if(md5b[i] == 'z') {
+				md5b[i] = 'a';
+			} else if(md5b[i] >= 'A' && md5b[i] < 'Z') {
+				md5b[i] = md5b[i] + 1;
+			} else if(md5b[i] == 'z') {
+				md5b[i] = 'A';
+			}
+		}
+	}
+
+	return branch_builder(t->hash_index, 0, md5b, NULL, b, branch, branch_len);
 }
 
 /**

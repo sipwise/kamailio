@@ -73,6 +73,7 @@ int goto_on_local_req = -1; /* default disabled */
 static char from_tag[FROM_TAG_LEN + 1];
 
 extern str tm_event_callback;
+extern str tm_evcb_local_ack_sent;
 /*
  * Initialize UAC
  */
@@ -361,7 +362,7 @@ static inline int t_run_local_req(char **buf, int *buf_len, int buf_offset,
 		if(buf_offset == 0) {
 			LM_DBG("apply new updates with Via to sip msg\n");
 			buf1 = build_req_buf_from_sip_req(&lreq, (unsigned int *)&buf_len1,
-					&request->dst, BUILD_NEW_LOCAL_VIA | BUILD_IN_SHM);
+					&request->dst, BUILD_NEW_LOCAL_VIA | BUILD_IN_SHM, NULL);
 			if(likely(buf1)) {
 				shm_free(*buf);
 				*buf = buf1;
@@ -373,7 +374,7 @@ static inline int t_run_local_req(char **buf, int *buf_len, int buf_offset,
 			LM_DBG("apply new updates with Via to sip msg, preserving "
 				   "prefix\n");
 			buf1 = build_req_buf_from_sip_req(&lreq, (unsigned int *)&buf_len1,
-					&request->dst, BUILD_NEW_LOCAL_VIA);
+					&request->dst, BUILD_NEW_LOCAL_VIA, NULL);
 			if(likely(buf1)) {
 				buf2 = shm_malloc(buf_offset + buf_len1);
 				if(unlikely(!buf2)) {
@@ -399,7 +400,8 @@ static inline int t_run_local_req(char **buf, int *buf_len, int buf_offset,
 				buf1 = build_req_buf_from_sip_req(&lreq,
 						(unsigned int *)&buf_len1, &request->dst,
 						BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE
-								| BUILD_IN_SHM);
+								| BUILD_IN_SHM,
+						NULL);
 				if(likely(buf1)) {
 					shm_free(*buf);
 					*buf = buf1;
@@ -412,7 +414,7 @@ static inline int t_run_local_req(char **buf, int *buf_len, int buf_offset,
 					   "prefix\n");
 				buf1 = build_req_buf_from_sip_req(&lreq,
 						(unsigned int *)&buf_len1, &request->dst,
-						BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE);
+						BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE, NULL);
 				if(likely(buf1)) {
 					buf2 = shm_malloc(buf_offset + buf_len1);
 					if(unlikely(!buf2)) {
@@ -563,8 +565,12 @@ static inline int t_uac_prepare(
 	 * we can't call init_new_t() because we don't have a sip msg
 	 * => we'll ignore t_set_fr() or avp timer value and will use directly the
 	 * module params fr_inv_timer and fr_timer -- andrei */
-	new_cell->fr_timeout = cfg_get(tm, tm_cfg, fr_timeout);
-	new_cell->fr_inv_timeout = cfg_get(tm, tm_cfg, fr_inv_timeout);
+	new_cell->fr_timeout = (uac_r->fr_timeout > 0)
+								   ? uac_r->fr_timeout
+								   : cfg_get(tm, tm_cfg, fr_timeout);
+	new_cell->fr_inv_timeout = (uac_r->fr_inv_timeout > 0)
+									   ? uac_r->fr_inv_timeout
+									   : cfg_get(tm, tm_cfg, fr_inv_timeout);
 	new_cell->end_of_life = get_ticks_raw() + lifetime;
 	/* same as above for retransmission intervals */
 	new_cell->rt_t1_timeout_ms = cfg_get(tm, tm_cfg, rt_t1_timeout_ms);
@@ -952,6 +958,46 @@ void free_local_ack_unsafe(struct retr_buf *lack)
 	shm_free_unsafe(lack);
 }
 
+int uac_evrt_local_ack_sent(sip_msg_t *rpl)
+{
+	int route_no;
+	run_act_ctx_t ctx;
+	int rtb;
+	str evname = str_init("tm:local-ack-sent");
+	sr_kemi_eng_t *keng = NULL;
+
+	route_no = route_lookup(&event_rt, "tm:local-ack-sent");
+	if(route_no >= 0) {
+		if(event_rt.rlist[route_no] == 0) {
+			LM_WARN("event_route[tm:local-ack-sent] is empty\n");
+			return -1;
+		}
+	} else {
+		keng = sr_kemi_eng_get();
+		if(keng == NULL || tm_evcb_local_ack_sent.len <= 0) {
+			LM_DBG("event route not defined and no kemi engine\n");
+			return -2;
+		}
+	}
+
+	rtb = get_route_type();
+	set_route_type(EVENT_ROUTE);
+	init_run_actions_ctx(&ctx);
+	if(route_no >= 0) {
+		run_top_route(event_rt.rlist[route_no], rpl, &ctx);
+	} else {
+		if(sr_kemi_ctx_route(keng, &ctx, rpl, EVENT_ROUTE,
+				   &tm_evcb_local_ack_sent, &evname)
+				< 0) {
+			LM_ERR("error running event route kemi callback\n");
+			return -1;
+		}
+	}
+	set_route_type(rtb);
+
+	return 0;
+}
+
 /**
  * @return:
  * 	0: success
@@ -1030,6 +1076,7 @@ int ack_local_uac(struct cell *trans, str *hdrs, str *body)
 				TMCB_LOCAL_F, 0 /* branch */, TYPE_LOCAL_ACK);
 		run_trans_callbacks_off_params(
 				TMCB_REQUEST_SENT, trans, &onsend_params);
+		uac_evrt_local_ack_sent(trans->uac[0].reply);
 	}
 
 	ret = 0;
@@ -1191,7 +1238,11 @@ int request(uac_req_t *uac_r, str *ruri, str *to, str *from, str *next_hop)
 	else
 		callid = *uac_r->callid;
 	cseqno = (uac_r->cseqno > 0) ? uac_r->cseqno : DEFAULT_CSEQ;
-	generate_fromtag(&fromtag, &callid, ruri);
+	if(uac_r->fromtag == NULL || uac_r->fromtag->len <= 0) {
+		generate_fromtag(&fromtag, &callid, ruri);
+	} else {
+		fromtag = *uac_r->fromtag;
+	}
 
 	if(new_dlg_uac(&callid, &fromtag, cseqno, from, to, &dialog) < 0) {
 		LM_ERR("Error while creating temporary dialog\n");

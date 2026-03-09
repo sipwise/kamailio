@@ -509,6 +509,27 @@ int pv_get_to_attr(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 	return pv_get_xto_attr(msg, param, res, get_to(msg), 0);
 }
 
+int pv_get_totagstate(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
+{
+	if(msg == NULL)
+		return pv_get_uintval(msg, param, res, 0);
+
+	if(msg->to == NULL && parse_headers(msg, HDR_TO_F, 0) == -1) {
+		LM_ERR("cannot parse To header\n");
+		return pv_get_uintval(msg, param, res, 0);
+	}
+	if(msg->to == NULL || get_to(msg) == NULL) {
+		LM_DBG("no To header\n");
+		return pv_get_uintval(msg, param, res, 0);
+	}
+
+	if(get_to(msg)->tag_value.s != NULL && get_to(msg)->tag_value.len > 0) {
+		return pv_get_uintval(msg, param, res, 1);
+	}
+
+	return pv_get_uintval(msg, param, res, 0);
+}
+
 int pv_get_from_attr(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 {
 	if(msg == NULL)
@@ -3636,6 +3657,7 @@ int pv_set_xto_attr(struct sip_msg *msg, pv_param_t *param, int op,
 	int llen = 0;
 	int llen_uri = 0;
 	int is_enclosed = 0;
+	char *p;
 
 	if(msg == NULL || param == NULL) {
 		LM_ERR("bad parameters\n");
@@ -3653,13 +3675,28 @@ int pv_set_xto_attr(struct sip_msg *msg, pv_param_t *param, int op,
 				return -1;
 			}
 
-			buf.s = pkg_malloc(val->rs.len);
+			buf.len = val->rs.len;
+			if(!(tb->style & TBS_URI_ENCLOSED)) {
+				/* existing uri not enclosed - check if new one has parameters */
+				for(p = val->rs.s + val->rs.len - 1; p > val->rs.s; p--) {
+					if(*p == ';') {
+						buf.len += 2;
+						break;
+					}
+				}
+			}
+			buf.s = pkg_malloc(buf.len);
 			if(buf.s == NULL) {
 				LM_ERR("no more pkg mem\n");
 				goto error;
 			}
-			buf.len = val->rs.len;
-			memcpy(buf.s, val->rs.s, val->rs.len);
+			if(buf.len == val->rs.len + 2) {
+				buf.s[0] = '<';
+				memcpy(buf.s + 1, val->rs.s, val->rs.len);
+				buf.s[buf.len - 1] = '>';
+			} else {
+				memcpy(buf.s, val->rs.s, val->rs.len);
+			}
 			loffset = tb->uri.s - msg->buf;
 			llen = tb->uri.len;
 			break;

@@ -871,14 +871,19 @@ static inline str *shm_str_dup_block(const str *src)
  *        The copy will be zero-terminated
  * \param dst destination
  * \param src source
+ * \param mode if 1, free destination buffer if set
  * \return 0 on success, -1 on failure
  */
-static inline int shm_str_dup(str *dst, const str *src)
+static inline int shm_str_dup_mode(str *dst, const str *src, int mode)
 {
 	/* NULL checks */
 	if(dst == NULL || src == NULL) {
 		LM_ERR("NULL src or dst\n");
 		return -1;
+	}
+
+	if(mode == 1 && dst->s != NULL) {
+		shm_free(dst->s);
 	}
 
 	/**
@@ -906,6 +911,7 @@ static inline int shm_str_dup(str *dst, const str *src)
 	/* avoid memcpy from NULL source - undefined behaviour */
 	if(src->s == NULL) {
 		LM_WARN("shm_str_dup fallback; skip memcpy for src->s == NULL\n");
+		dst->s[0] = 0;
 		return 0;
 	}
 
@@ -914,6 +920,9 @@ static inline int shm_str_dup(str *dst, const str *src)
 
 	return 0;
 }
+
+#define shm_str_dup(dst, src) shm_str_dup_mode(dst, src, 0)
+#define shm_str_update(dst, src) shm_str_dup_mode(dst, src, 1)
 
 /**
  * \brief Make a copy of a char pointer to a char pointer using shm_malloc
@@ -1004,6 +1013,11 @@ static inline int pkg_str_dup(str *dst, const str *src)
 	if(dst->s == NULL) {
 		PKG_MEM_ERROR;
 		return -1;
+	}
+
+	if(dst->len == 0) {
+		dst->s[0] = 0;
+		return 0;
 	}
 
 	/* avoid memcpy from NULL source - undefined behaviour */
@@ -1156,6 +1170,60 @@ static inline int strno2int(str *val, unsigned int *mask)
 	}
 }
 
+/**
+ * split time value in two (upper and lower 4-bytes) unsigned int values
+ * - time value representation on 8 bytes: UUUULLLL
+ * - lower 4 bytes are returned (LLLL)
+ * - upper 4 bytes can be stored in second paramter (UUUU)
+ */
+static inline unsigned int ksr_time_uint(time_t *tv, unsigned int *tu)
+{
+	unsigned int tl; /* lower 4 bytes */
+	unsigned long long v64;
+	time_t t;
+
+	if(tv != NULL) {
+		t = *tv;
+	} else {
+		t = time(NULL);
+	}
+	v64 = (unsigned long long)t;
+	tl = (unsigned int)(v64 & 0xFFFFFFFFULL);
+	if(tu != NULL) {
+		/* upper 4 bytes */
+		*tu = (unsigned int)((v64 >> 32) & 0xFFFFFFFFULL);
+	}
+
+	return tl;
+}
+
+/**
+ * split time value in two (upper and lower 4-bytes) signed int values
+ * - time value representation on 8 bytes: UUUULLLL
+ * - lower 4 bytes are returned (LLLL)
+ * - upper 4 bytes can be stored in second paramter (UUUU)
+ */
+static inline int ksr_time_sint(time_t *tv, int *tu)
+{
+	int tl; /* lower 4 bytes */
+	long long v64;
+	time_t t;
+
+	if(tv != NULL) {
+		t = *tv;
+	} else {
+		t = time(NULL);
+	}
+	v64 = (long long)t;
+	tl = (int)(v64 & 0xFFFFFFFFLL);
+	if(tu != NULL) {
+		/* upper 4 bytes */
+		*tu = (int)((v64 >> 32) & 0xFFFFFFFFLL);
+	}
+
+	return tl;
+}
+
 /* converts a username into uid:gid,
  * returns -1 on error & 0 on success */
 int user2uid(int *uid, int *gid, char *user);
@@ -1243,5 +1311,7 @@ void *ser_memmem(const void *b1, const void *b2, size_t len1, size_t len2);
  * NULL if none is found.
  */
 void *ser_memrmem(const void *b1, const void *b2, size_t len1, size_t len2);
+
+int ksr_hex_decode_ws(str *shex, str *sraw);
 
 #endif

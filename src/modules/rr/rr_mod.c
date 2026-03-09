@@ -49,12 +49,6 @@
 #include "rr_cb.h"
 #include "api.h"
 
-#ifdef ENABLE_USER_CHECK
-#include <string.h>
-#include "../../core/str.h"
-str i_user = {0, 0};
-#endif
-
 int append_fromtag = 1;		  /*!< append from tag by default */
 int enable_double_rr = 1;	  /*!< enable using of 2 RR by default */
 int enable_full_lr = 0;		  /*!< compatibilty mode disabled by default */
@@ -65,6 +59,7 @@ static str custom_user_spec = {NULL, 0};
 pv_spec_t custom_user_avp;
 int rr_ignore_sips = 0;	  /*!< ignore sips schema when building record-route */
 int rr_sockname_mode = 0; /*!< add socket name to R-R header */
+int rr_loose_route_mode = 0; /*!< modes for loose_route() */
 
 ob_api_t rr_obb;
 
@@ -135,9 +130,6 @@ static param_export_t params[] = {
 	{"append_fromtag", PARAM_INT, &append_fromtag},
 	{"enable_double_rr", PARAM_INT, &enable_double_rr},
 	{"enable_full_lr", PARAM_INT, &enable_full_lr},
-#ifdef ENABLE_USER_CHECK
-	{"ignore_user", PARAM_STR, &i_user},
-#endif
 	{"add_username", PARAM_INT, &add_username},
 	{"enable_socket_mismatch_warning", PARAM_INT,
 			&enable_socket_mismatch_warning},
@@ -145,6 +137,7 @@ static param_export_t params[] = {
 	{"force_send_socket", PARAM_INT, &rr_force_send_socket},
 	{"ignore_sips", PARAM_INT, &rr_ignore_sips},
 	{"sockname_mode", PARAM_INT, &rr_sockname_mode},
+	{"loose_route_mode", PARAM_INT, &rr_loose_route_mode},
 	{0, 0, 0}
 };
 
@@ -185,13 +178,6 @@ static int mod_init(void)
 		LM_INFO("outbound module not available\n");
 		memset(&rr_obb, 0, sizeof(ob_api_t));
 	}
-
-#ifdef ENABLE_USER_CHECK
-	if(i_user.s && rr_obb.use_outbound) {
-		LM_ERR("cannot use \"ignore_user\" with outbound\n");
-		return -1;
-	}
-#endif
 
 	if(add_username != 0 && rr_obb.use_outbound) {
 		LM_ERR("cannot use \"add_username\" with outbound\n");
@@ -275,7 +261,7 @@ static int direction_fixup(void **param, int param_no)
  */
 static int w_loose_route(struct sip_msg *msg, char *p1, char *p2)
 {
-	return loose_route_mode(msg, 0);
+	return loose_route_mode(msg, rr_loose_route_mode);
 }
 
 /**

@@ -56,6 +56,7 @@
 
 #include "parser/msg_parser.h"
 #include "ip_addr.h"
+#include "flags.h"
 
 /* point to some remarkable positions in a SIP message */
 struct bookmark
@@ -70,6 +71,20 @@ struct hostport
 	str *port;
 };
 
+typedef struct viabranch
+{
+	str cookie;
+	str shashidx;
+	unsigned int vhashidx;
+	str transid;
+	str sbranchidx;
+	unsigned int vbranchidx;
+} viabranch_t;
+
+typedef struct ksr_msgbuild
+{
+	flag_t tvbflags;
+} ksr_msgbuild_t;
 
 #define set_hostport(hp, msg)                                              \
 	do {                                                                   \
@@ -85,7 +100,7 @@ struct hostport
 
 char *build_req_buf_from_sip_req(struct sip_msg *msg,
 		unsigned int *returned_len, struct dest_info *send_info,
-		unsigned int mode);
+		unsigned int mode, ksr_msgbuild_t *mbd);
 
 char *build_res_buf_from_sip_res(
 		struct sip_msg *msg, unsigned int *returned_len);
@@ -116,11 +131,14 @@ char *via_builder(unsigned int *len, sip_msg_t *msg,
 /* creates a via header honoring the protocol of the incoming socket
  * msg is an optional parameter */
 char *create_via_hf(unsigned int *len, struct sip_msg *msg,
-		struct dest_info *send_info /* where to send the reply */, str *branch);
+		struct dest_info *send_info /* where to send the reply */, str *branch,
+		ksr_msgbuild_t *mbd);
+
+int via_branch_parser(str *vbranch, viabranch_t *vb);
 
 int branch_builder(unsigned int hash_index,
 		/* only either parameter useful */
-		unsigned int label, char *char_v, int branch,
+		unsigned int label, char *char_v, str *xval, int branch,
 		/* output value: string and actual length */
 		char *branch_str, int *len);
 
@@ -184,5 +202,7 @@ int sip_msg_eval_changes(sip_msg_t *msg, str *obuf);
  * apply changes to sip msg buffer and reparse
  */
 int sip_msg_apply_changes(sip_msg_t *msg);
+
+int sip_msg_apply_changes_now(sip_msg_t *msg);
 
 #endif

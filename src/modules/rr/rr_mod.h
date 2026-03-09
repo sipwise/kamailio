@@ -31,10 +31,10 @@
 
 #include "../outbound/api.h"
 
-#ifdef ENABLE_USER_CHECK
-#include "../../core/str.h"
-extern str i_user;
-#endif
+/*! bit to force loose mode in loose_route_mode() */
+#define RR_LR_MODE_LOOSE_ONLY 1
+/*! bit to skip outbound processing in after_loose() */
+#define RR_LR_MODE_SKIP_OUTBOUND 2
 
 /*! should request's from-tag is appended to record-route */
 extern int append_fromtag;

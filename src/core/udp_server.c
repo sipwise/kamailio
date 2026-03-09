@@ -547,6 +547,23 @@ int udp_init(struct socket_info *sock_info)
 	}
 #endif
 
+#if defined(__OS_linux)
+	if(sock_info->vrfinfo.name.s != NULL && sock_info->vrfinfo.name.len > 0) {
+		if(setsockopt(sock_info->socket, SOL_SOCKET, SO_BINDTODEVICE,
+				   sock_info->vrfinfo.name.s, sock_info->vrfinfo.name.len)
+				== -1) {
+			LM_ERR("setsockopt SO_BINDTODEVICE on %.*s failed: %s\n",
+					STR_FMT(&sock_info->vrfinfo.name), strerror(errno));
+			goto error;
+		}
+	}
+#else
+	if(sock_info->vrfinfo.name.s != NULL && sock_info->vrfinfo.name.len > 0) {
+		LM_WARN("VRF only supported on linux, skip SO_BINDTODEVICE for %.*s\n",
+				STR_FMT(&sock_info->vrfinfo.name));
+	}
+#endif
+
 #if defined(IP_FREEBIND)
 	/* allow bind to non local address.
 	 * useful when daemon started before network initialized */
@@ -721,6 +738,14 @@ int udp_rcv_loop()
 		rcvi.src_su = *fromaddr;
 		su2ip_addr(&rcvi.src_ip, fromaddr);
 		rcvi.src_port = su_getport(fromaddr);
+
+		if(ksr_evrt_received_mode & KSR_EVRT_RECEIVED_DATAIN) {
+			if(ksr_evrt_received(buf, &len, &rcvi, KSR_EVRT_RECEIVED_DATAIN)
+					< 0) {
+				LM_DBG("dropping the received data\n");
+				continue;
+			}
+		}
 
 		if(unlikely(sr_event_enabled(SREV_NET_DGRAM_IN))) {
 			void *sredp[3];

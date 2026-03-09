@@ -60,6 +60,16 @@
 		</itemizedlist>
 	</section>
 
+	<section id="tm.rpc.t_uac_start_hex">
+		<title>
+		<function moreinfo="none">tm.t_uac_start_hex</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_start, but with hexa-encoded body. The whitespaces
+		are ignored when decoding the body.
+		</para>
+	</section>
+
 	<section id="tm.rpc.t_uac_wait">
 		<title>
 		<function moreinfo="none">tm.t_uac_wait</function>
@@ -67,6 +77,16 @@
 		<para>
 		Similar to tm.t_uac_start, but waits asynchronously for the SIP response
 		and tries to provide its details via RPC response.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_wait_hex">
+		<title>
+		<function moreinfo="none">tm.t_uac_wait_hex</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_wait, but with hexa-encoded body. The whitespaces
+		are ignored when decoding the body.
 		</para>
 	</section>
 
@@ -81,6 +101,125 @@
 		code. While waiting, the RPC process cannot handle other RPC commands.
 		</para>
 	</section>
+
+	<section id="tm.rpc.t_uac_wait_block_hex">
+		<title>
+		<function moreinfo="none">tm.t_uac_wait_block_hex</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_wait_block, but with hexa-encoded body. The whitespaces
+		are ignored when decoding the body.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_start_noack">
+		<title>
+		<function moreinfo="none">tm.t_uac_start_noack</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_start, but do not automatically send ACK for local
+		INVITE requests.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_start_noack_hex">
+		<title>
+		<function moreinfo="none">tm.t_uac_start_noack_hex</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_start_noack, but with hexa-encoded body. The whitespaces
+		are ignored when decoding the body.
+		</para>
+	</section>
+
+
+	<section id="tm.rpc.t_uac_wait_noack">
+		<title>
+		<function moreinfo="none">tm.t_uac_wait_noack</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_wait, but do not automatically send ACK for local
+		INVITE requests.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_wait_noack_hex">
+		<title>
+		<function moreinfo="none">tm.t_uac_wait_noack_hex</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_wait_noack, but with hexa-encoded body. The whitespaces
+		are ignored when decoding the body.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_wait_block_noack">
+		<title>
+		<function moreinfo="none">tm.t_uac_wait_block_noack</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_wait_block, but do not automatically send ACK for
+		local INVITE requests.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_wait_block_noack_hex">
+		<title>
+		<function moreinfo="none">tm.t_uac_wait_block_noack_hex</function>
+		</title>
+		<para>
+		Similar to tm.t_uac_wait_block_noack, but with hexa-encoded body.
+		The whitespaces are ignored when decoding the body.
+		</para>
+	</section>
+
+	<section id="tm.rpc.t_uac_attrs">
+		<title>
+		<function moreinfo="none">tm.t_uac_attrs</function>
+		</title>
+		<para>
+		Combine the tm.t_uac_* variants, by providing the first parameter with
+		attributes, then the other parameters are like for tm.t_uac_start.
+		</para>
+		<para>
+		The attributes are in the format "name1=value1;...;nameX=valueX". The
+		name of the attribute can be:
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>mode</emphasis> - control how the command is done. If
+				not provided or the value is "start", acts like tm.t_uac_start.
+				The other values can be: "wait" - act like tm.t_uac_wait;
+				"block" - act like tm.t_uac_wait_block.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>cbflags</emphasis> - the transaction callback flags. The
+				values can be: "noack" - to not automatically send ACK for local
+				INVITE requests
+			</para></listitem>
+			<listitem><para>
+				<emphasis>rpflags</emphasis> - RPC parameters flags. The values
+				can be: 1 - the body is hexa-encoded value.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>fr_timeout</emphasis> - the fr_timeout value for the
+				local transaction.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>fr_inv_timeout</emphasis> - the fr_inv_timeout value
+				for the local transaction.
+			</para></listitem>
+		</itemizedlist>
+		<example>
+		<title>Using <quote>tm.t_uac_attrs</quote></title>
+		<programlisting format="linespecific">
+...
+kamcli rpc tm.t_uac_attrs 'reply=wait;cbflags=noack;rpflags=1' 'INVITE' ...
+...
+</programlisting>
+		</example>
+	</section>
+
 
 	<section id="tm.rpc.cancel">
 		<title>
@@ -189,6 +328,57 @@
 			</para></listitem>
 		</itemizedlist>
 	</section>
+
+	<section id="tm.rpc.retransmit_reply">
+		<title>
+		<function moreinfo="none">tm.retransmit_reply</function>
+		</title>
+		<para>
+		Retransmit the reply for an existing SIP transaction.
+		</para>
+		<para>Parameters: </para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>trans_id</emphasis> - transaction identifier
+				(has the hash_entry:label format)
+			</para></listitem>
+		</itemizedlist>
+		<example>
+		<title>Using <quote>tm.retransmit_reply</quote></title>
+		<programlisting format="linespecific">
+...
+kamcli rpc tm.retransmit_reply 1234:5678
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="tm.rpc.retransmit_reply_callid">
+		<title>
+		<function moreinfo="none">tm.retransmit_reply_callid</function>
+		</title>
+		<para>
+		Retransmit the reply for an existing SIP transaction.
+		</para>
+		<para>Parameters: </para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>callid</emphasis> - SIP Call-ID header
+			</para></listitem>
+			<listitem><para>
+				<emphasis>cseq</emphasis> - SIP CSeq header
+			</para></listitem>
+		</itemizedlist>
+		<example>
+		<title>Using <quote>tm.retransmit_reply_callid</quote></title>
+		<programlisting format="linespecific">
+...
+kamcli rpc tm.retransmit_reply_callid "abc-xyz" "10 INVITE"
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="tm.rpc.clean">
 		<title>
 		<function moreinfo="none">tm.clean</function>

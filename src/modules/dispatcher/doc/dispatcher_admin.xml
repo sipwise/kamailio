@@ -577,6 +577,28 @@ modparam("dispatcher", "ds_ping_interval", 30)
 		</example>
 	</section>
 
+
+	<section id="dispatcher.p.ds_ping_fr_timer">
+		<title><varname>ds_ping_fr_timer</varname> (int)</title>
+		<para>
+		If greater than 0, its value is used to set the "fr_timer" value for
+		the local transactions created to send out the OPTIONS pings.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote> (not set).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set the <quote>ds_ping_fr_timer</quote> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("dispatcher", "ds_ping_fr_timer", 10)
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="dispatcher.p.ds_probing_threshold">
 		<title><varname>ds_probing_threshold</varname> (int)</title>
 		<para>
@@ -727,7 +749,7 @@ modparam("dispatcher", "ds_probing_mode", 1)
 		<title>accessing the metrics</title>
 <programlisting format="linespecific">
 # using the command :
-kamcmd dispatcher.list
+kamctl rpc dispatcher.list
 ...
 DEST: {
 	URI: sip:1.2.3.4
@@ -964,6 +986,22 @@ modparam("dispatcher", "ds_default_sockname", "sock1")
 		</example>
 	</section>
 
+	<section id="dispatcher.p.ds_ping_socket">
+		<title><varname>ds_ping_socket</varname> (str)</title>
+		<para>
+			Default socket to be used for sending ping requests
+			when a gateway has no "ping_socket" configured.
+		</para>
+		<example>
+		<title>Set the <quote>ds_ping_socket</quote> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("dispatcher", "ds_ping_socket", "udp:192.168.0.125:5060")
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="dispatcher.p.ds_timer_mode">
 		<title><varname>ds_timer_mode</varname> (int)</title>
 		<para>
@@ -1034,6 +1072,43 @@ end
 		</example>
 	</section>
 
+	<section id="dispatcher.p.event_callback_mode">
+		<title><varname>event_callback_mode</varname> (int)</title>
+		<para>
+			Controls when the event_route or the KEMI event callback function
+			are executed. If set to 0, they are executed when the destination
+			state changes based on OPTIONS keepalives or the use of config
+			functions to set the state (e.g., ds_mark_dst(...)). If set to 1,
+			they are executed only on state change due to OPTIONS keepalives.
+			If set to 2, the event routes will always be executed when a state
+			change occurs, even if no previous state exists (for example, on
+			startup or reload).
+		</para>
+		<para>
+			Note that event routes are not executed on RPC commands setting
+			the destination state.
+		</para>
+		<para>
+		<emphasis>
+			Default value is '0'.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>event_callback_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dispatcher", "event_callback_mode", 1)
+...
+-- event callback function implemented in Lua
+function ksr_dispatcher_event(evname)
+	KSR.info("===== dispatcher module triggered event: " .. evname .. "\n");
+	return 1;
+end
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="dispatcher.p.ds_attrs_none">
 		<title><varname>ds_attrs_none</varname> (int)</title>
 		<para>
@@ -1066,7 +1141,9 @@ modparam("dispatcher", "ds_attrs_none", 1)
 		<para>
 		The 'anameX' is the attribute name and 'cnameX' is column name. The
 		additional columns must be added to database dispatcher table and their
-		type must be VARCHAR (string).
+		type must be a string type (VARCHAR, etc..) or integer type (UNSIGNED INT,
+		BIGINT, etc..). These fields can be a convenient way of loading IDs, or
+		additional related info into the 'attrs' XAVP when matching a dispatcher set.
 		</para>
 		<para>
 		<emphasis>
@@ -1432,6 +1509,13 @@ With congestion control the formula becomes :
 			</listitem>
 			<listitem>
 				<para>
+				<quote>14</quote> - round-robin (4) if all the destinations
+				in the group have the same priority and the priority is greater
+				than 0, otherise serial dispatching (8).
+				</para>
+			</listitem>
+			<listitem>
+				<para>
 				<quote>X</quote> - if the algorithm is not implemented, the
 				first entry in set is chosen.
 				</para>
@@ -1481,7 +1565,7 @@ modparam("dispatcher", "ds_latency_estimator_alpha", 900)
 ...
 if (!ds_select_dst("1", "11")) { # use relative weight based load distribution
 ...
-# sample of output from 'kamcmd dispatcher.list'
+# sample of output from 'kamctl rpc dispatcher.list'
 DEST: {
 	URI: sip:192.168.0.1:5060
 	FLAGS: AP
@@ -1753,6 +1837,27 @@ failure_route[tryagain] {
 </programlisting>
 		</example>
 	</section>
+	<section id="dispatcher.f.ds_mark_addr">
+		<title>
+		<function moreinfo="none">ds_mark_addr(state, setid, uri)</function>
+		</title>
+		<para>
+			Set the state to the target specified by setid and uri. The parameter
+			state can have same value as for ds_mark_dst(). All parameters can
+			contain variables.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>ds_mark_addr</function> usage</title>
+		<programlisting format="linespecific">
+...
+    ds_mark_addr("ip", "1", "sip:127.0.0.1:5080"); # set to inactive and probing
+...
+</programlisting>
+		</example>
+	</section>
 	<section  id="dispatcher.f.ds_list_exists">
 		<title>
 		<function moreinfo="none">ds_list_exists(groupid)</function>
@@ -1844,6 +1949,15 @@ if(ds_list_exists("10")) {
 		be set to groupid of matching address and the attributes will be set in
 		variable specified by 'attrs_pvname'.
 		</para>
+
+		<note> Note on default transport (RFC 3263 See 4.1 Selecting a Transport Protocol):
+		The dispatcher module normalizes the transport protocol of destination URIs
+		according to RFC 3263 default transport rules. When a destination in the
+		dispatcher list does not contain an explicit ;transport= URI parameter, the
+		module derives and sets the transport based on the SIP URI scheme and RFC
+		3263 resolution procedures (in short, UDP for 'sip:' and TCP for 'sips:').
+		</note>
+
 		<para>
 		Note that for backward compatibility mode, when no parameter is given
 		or only groupid is given, the matching is done only for IP address
@@ -2049,7 +2163,7 @@ onreply_route {
 		<function moreinfo="none">ds_oc_set_attrs(setid, uri, rval, tval, sval)</function>
 		</title>
 		<para>
-		Sets the overload control rate, time internval limit and sequence number
+		Sets the overload control rate, time interval limit and sequence number
 		for the destination record (setid, uri) following RFC7339 specifications.
 		</para>
 		<para>Description of parameters:</para>
@@ -2252,8 +2366,8 @@ DEST: {
 		</para>
 <programlisting  format="linespecific">
 ...
-# prototype: &kamcmd; dispatcher.ping_active _state_
-&kamcmd; dispatcher.ping_active 0
+# prototype: &kamctl; rpc dispatcher.ping_active _state_
+&kamctl; rpc dispatcher.ping_active 0
 ...
 </programlisting>
 	</section>
@@ -2412,8 +2526,9 @@ kamcli dispatcher.oclist 1
 		<itemizedlist>
 			<listitem>
 			<para>flags - control the mode of using the destination address and
-			sending keepalives. It is a bitwise value that can be built using
-			the following flags:
+			sending keepalives. The value is a decimal number (inside the text
+			file it can be also provided as hexadecimal number). It is a bitwise
+			value that can be built using the following flags:
 			<itemizedlist>
 				<listitem><para>1 (bit at index 0 - 1 &lt;&lt;0) - inactive destination</para>
 				</listitem>
@@ -2486,6 +2601,10 @@ kamcli dispatcher.oclist 1
 								keepalives.</para>
 						</listitem>
 						<listitem>
+							<para>'ping_socket' - used to set the sending socket for ping requests.
+								It overwrites the general ds_ping_socket parameter.</para>
+						</listitem>
+						<listitem>
 							<para>'sockname' - used to set by name the sending socket for the
 								gateway. It is used for sending the SIP traffic as well as OPTIONS
 								keepalives and has priority over 'socket' attribute.</para>
@@ -2524,11 +2643,12 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 </programlisting>
 
 		<para>
-		Full line example:
+		Full line examples:
 		</para>
 		<programlisting format="linespecific">
 ...
-1 sip:127.0.0.1:5080 0 0 duid=abc;socket=udp:192.168.0.125:5060;my=xyz;ping_from=sip:myproxy.com
+1 sip:127.0.0.1:5080 0 0 duid=abc;socket=udp:127.0.0.1:5060;my=xyz;ping_from=sip:myproxy.com
+1 sip:127.0.0.1:5090 0x8 0 socket=udp:127.0.0.1:5060;prefix=49
 ...
 </programlisting>
 
@@ -2566,39 +2686,45 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
         <section id="dispatcher.ex.event_routes">
         <title>Event routes</title>
         <section>
-                <title>
-                <function moreinfo="none">dispatcher:dst-down</function>
-                </title>
-                <para>
+            <title>
+            <function moreinfo="none">dispatcher:dst-down</function>
+            </title>
+            <para>
 			When defined, the module calls event_route[dispatcher:ds-down]
 			when a destination goes down (becomes probing). A typical use
 			case is to update NMC equipment as to the status of a destination.
-                </para>
+            </para>
+            <para>
+            Its execution is controlled by event_callback_mode parameter.
+            </para>
         <programlisting  format="linespecific">
 ...
 event_route[dispatcher:dst-down] {
     xlog("L_ERR", "Destination down: $rm $ru ($du)\n");
 }
 ...
-                </programlisting>
+</programlisting>
 	</section>
         <section>
-                <title>
-                <function moreinfo="none">dispatcher:dst-up</function>
-                </title>
-                <para>
+            <title>
+            <function moreinfo="none">dispatcher:dst-up</function>
+            </title>
+            <para>
 			When defined, the module calls event_route[dispatcher:ds-up]
 			when a destination that was previously down (probing) comes up.
 			A typical use case is to update NMC equipment as to the status
 			of a destination.
-                </para>
+            </para>
+            <para>
+            Its execution is controlled by event_callback_mode parameter.
+            </para>
         <programlisting  format="linespecific">
 ...
 event_route[dispatcher:dst-up] {
     xlog("L_ERR", "Destination up: $rm $ru\n");
 }
 ...
-                </programlisting>
+</programlisting>
     </section>
     </section>
 

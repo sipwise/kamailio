@@ -38,10 +38,10 @@ static str dmq_400_rpl = str_init("Bad Request");
 static str dmq_500_rpl = str_init("Server Internal Error");
 
 static int *usrloc_dmq_recv = 0;
+static struct socket_info *dmq_server_socket_local = 0;
 
 dmq_api_t usrloc_dmqb;
 dmq_peer_t *usrloc_dmq_peer = NULL;
-dmq_resp_cback_t usrloc_dmq_resp_callback = {&usrloc_dmq_resp_callback_f, 0};
 
 int usrloc_dmq_send_all();
 int usrloc_dmq_request_sync();
@@ -59,12 +59,14 @@ static void srjson_to_xavp(srjson_t *json, sr_xavp_t **xavp);
 
 extern int _dmq_usrloc_sync;
 extern int _dmq_usrloc_replicate_socket_info;
+extern int _dmq_usrloc_replicate_cflags;
 extern int _dmq_usrloc_batch_msg_contacts;
 extern int _dmq_usrloc_batch_msg_size;
 extern int _dmq_usrloc_batch_size;
 extern int _dmq_usrloc_batch_usleep;
 extern str _dmq_usrloc_domain;
 extern int _dmq_usrloc_delete;
+extern int _dmq_usrloc_delete_expired;
 
 static int add_contact(str aor, ucontact_info_t *ci)
 {
@@ -100,15 +102,12 @@ static int add_contact(str aor, ucontact_info_t *ci)
 
 	dmq_ul.lock_udomain(_d, &aor);
 	res = dmq_ul.get_urecord(_d, &aor, &r);
-	if(res < 0) {
-		LM_ERR("failed to retrieve record from usrloc\n");
-		goto error;
-	} else if(res == 0) {
+	if(res == 0) {
 		LM_DBG("'%.*s' found in usrloc\n", aor.len, ZSW(aor.s));
 		res = dmq_ul.get_ucontact(r, ci->c, ci->callid, ci->path, ci->cseq, &c);
 		LM_DBG("get_ucontact = %d\n", res);
-		if(res == -1) {
-			LM_ERR("Invalid cseq\n");
+		if(res < 0) {
+			LM_ERR("Invalid cseq res=%d\n", res);
 			goto error;
 		} else if(res > 0) {
 			LM_DBG("Not found contact\n");
@@ -121,8 +120,14 @@ static int add_contact(str aor, ucontact_info_t *ci)
 		}
 	} else {
 		LM_DBG("'%.*s' Not found in usrloc\n", aor.len, ZSW(aor.s));
-		dmq_ul.insert_urecord(_d, &aor, &r);
-		LM_DBG("Insert record\n");
+		// will take care of free mem by itself, if any issues
+		res = dmq_ul.insert_urecord(_d, &aor, &r);
+		if(res == 0) {
+			LM_DBG("Insert urecord for new aor\n");
+		} else {
+			LM_ERR("Failed to insert urecord for new aor\n");
+			goto error;
+		}
 		contact.s = ci->c->s;
 		contact.len = ci->c->len;
 		dmq_ul.insert_ucontact(r, &contact, ci, &c);
@@ -287,6 +292,7 @@ done:
 int usrloc_dmq_initialize()
 {
 	dmq_peer_t not_peer;
+	str dmq_server_socket;
 
 	/* load the DMQ API */
 	if(dmq_load_api(&usrloc_dmqb) != 0) {
@@ -308,6 +314,15 @@ int usrloc_dmq_initialize()
 	} else {
 		LM_DBG("dmq peer registered\n");
 	}
+
+	/* get local socket from DMQ API */
+	dmq_server_socket = usrloc_dmqb.get_dmq_server_socket();
+	dmq_server_socket_local = lookup_local_socket(&dmq_server_socket);
+	if(dmq_server_socket_local == 0) {
+		LM_WARN("dmq local server socket <%.*s> not found ...ignoring\n",
+				dmq_server_socket.len, dmq_server_socket.s);
+	}
+
 	return 0;
 error:
 	return -1;
@@ -322,12 +337,12 @@ int usrloc_dmq_send(str *body, dmq_node_t *node)
 	}
 	if(node) {
 		LM_DBG("sending dmq message ...\n");
-		usrloc_dmqb.send_message(usrloc_dmq_peer, body, node,
-				&usrloc_dmq_resp_callback, 1, &usrloc_dmq_content_type);
+		usrloc_dmqb.send_message(
+				usrloc_dmq_peer, body, node, NULL, 1, &usrloc_dmq_content_type);
 	} else {
 		LM_DBG("sending dmq broadcast...\n");
-		usrloc_dmqb.bcast_message(usrloc_dmq_peer, body, 0,
-				&usrloc_dmq_resp_callback, 1, &usrloc_dmq_content_type);
+		usrloc_dmqb.bcast_message(
+				usrloc_dmq_peer, body, 0, NULL, 1, &usrloc_dmq_content_type);
 	}
 	return 0;
 }
@@ -409,7 +424,12 @@ static int usrloc_dmq_execute_action(srjson_t *jdoc_action, dmq_node_t *node)
 		} else if(strcmp(it->string, "flags") == 0) {
 			flags = SRJSON_GET_UINT(it);
 		} else if(strcmp(it->string, "cflags") == 0) {
-			cflags = SRJSON_GET_UINT(it);
+			if(_dmq_usrloc_replicate_cflags == 1) {
+				cflags = SRJSON_GET_UINT(it);
+			} else if(_dmq_usrloc_replicate_cflags > 1) {
+				cflags = _dmq_usrloc_replicate_cflags;
+			}
+			// else don't replicate cflags
 		} else if(strcmp(it->string, "q") == 0) {
 			q = SRJSON_GET_UINT(it);
 		} else if(strcmp(it->string, "last_modified") == 0) {
@@ -430,8 +450,10 @@ static int usrloc_dmq_execute_action(srjson_t *jdoc_action, dmq_node_t *node)
 	ci.ruid = ruid;
 	ci.c = &c;
 	ci.received = received;
-	if(_dmq_usrloc_replicate_socket_info
-			& (DMQ_USRLOC_REPLICATE_SOCKET | DMQ_USRLOC_REPLICATE_SOCKNAME))
+	if(_dmq_usrloc_replicate_socket_info == DMQ_USRLOC_REPLICATE_SOCKET_LOCAL) {
+		sock = dmq_server_socket_local;
+	}
+	if(_dmq_usrloc_replicate_socket_info != 0)
 		ci.sock = sock;
 	ci.path = &path;
 	ci.expires = expires;
@@ -996,13 +1018,6 @@ void srjson_to_xavp(srjson_t *json, sr_xavp_t **xavp)
 	}
 }
 
-int usrloc_dmq_resp_callback_f(
-		struct sip_msg *msg, int code, dmq_node_t *node, void *param)
-{
-	LM_DBG("dmq response callback triggered [%p %d %p]\n", msg, code, param);
-	return 0;
-}
-
 void dmq_ul_cb_contact(ucontact_t *ptr, int type, void *param)
 {
 	str aor;
@@ -1030,7 +1045,9 @@ void dmq_ul_cb_contact(ucontact_t *ptr, int type, void *param)
 				}
 				break;
 			case UL_CONTACT_EXPIRE:
-				//usrloc_dmq_send_contact(ptr, aor, DMQ_UPDATE);
+				if(_dmq_usrloc_delete_expired >= 1) {
+					usrloc_dmq_send_contact(ptr, aor, DMQ_RM, 0);
+				}
 				LM_DBG("Contact <%.*s> expired\n", aor.len, aor.s);
 				break;
 		}

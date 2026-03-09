@@ -207,11 +207,11 @@ typedef int (*db_raw_query_f)(
  * escape_common and unescape_common functions in the core for this task.
  * \see escape_common
  * \see unescape_common
- * \param _h structure representing database connection
+ * \param _u the database URL
  * \param _s the SQL query
  * \return returns 0 if everything is OK, otherwise returns value < 0
  */
-typedef int (*db_raw_query_async_f)(const db1_con_t *_h, const str *_s);
+typedef int (*db_raw_query_async_f)(const str *_u, const str *_s);
 
 
 /**
@@ -485,6 +485,11 @@ db1_con_t *db_do_init(const str *url, void *(*new_connection)(struct db_id *));
 db1_con_t *db_do_init2(const str *url, void *(*new_connection)(struct db_id *),
 		db_pooling_t pooling);
 
+
+/*! \brief
+ * free database connection
+ */
+void db_do_con_free(db1_con_t *_h);
 
 /**
  * \brief Helper for db_close function.

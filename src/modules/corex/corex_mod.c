@@ -79,6 +79,13 @@ static int w_via_reply_add_xavp_params(sip_msg_t *msg, char *pflags, char *p2);
 static int w_is_faked_msg(sip_msg_t *msg, char *p1, char *p2);
 static int w_is_socket_name(sip_msg_t *msg, char *psockname, char *p2);
 
+static int w_msg_vbflag_set(sip_msg_t *msg, char *pflag, char *p2);
+static int w_msg_vbflag_reset(sip_msg_t *msg, char *pflag, char *p2);
+static int w_msg_vbflag_is_set(sip_msg_t *msg, char *pflag, char *p2);
+static int w_msg_vbflag_parse(sip_msg_t *msg, char *p1, char *p2);
+
+static int w_add_tcp_alias(sip_msg_t *msg, char *pport, char *s2);
+
 static int fixup_file_op(void **param, int param_no);
 static int fixup_free_file_op(void **param, int param_no);
 
@@ -185,7 +192,16 @@ static cmd_export_t cmds[] = {
 	{"is_faked_msg", (cmd_function)w_is_faked_msg, 0, 0, 0, ANY_ROUTE},
 	{"is_socket_name", (cmd_function)w_is_socket_name, 1,
 		fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
-
+	{"msg_vbflag_set", (cmd_function)w_msg_vbflag_set, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+	{"msg_vbflag_reset", (cmd_function)w_msg_vbflag_reset, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+	{"msg_vbflag_is_set", (cmd_function)w_msg_vbflag_is_set, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
+	{"msg_vbflag_parse", (cmd_function)w_msg_vbflag_parse, 1,
+		0, 0, ANY_ROUTE},
+	{"add_tcp_alias", (cmd_function)w_add_tcp_alias, 1,
+		fixup_igp_null, fixup_free_igp_null, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -644,7 +660,7 @@ error:
 typedef struct _msg_iflag_name
 {
 	str name;
-	int value;
+	msg_flags_t value;
 } msg_iflag_name_t;
 
 /* clang-format off */
@@ -652,6 +668,7 @@ static msg_iflag_name_t _msg_iflag_list[] = {
 	{str_init("USE_UAC_FROM"), FL_USE_UAC_FROM},
 	{str_init("USE_UAC_TO"), FL_USE_UAC_TO},
 	{str_init("UAC_AUTH"), FL_UAC_AUTH},
+	{str_init("MSG_APPLY_CHANGES"), FL_MSG_APPLY_CHANGES},
 	{{0, 0}, 0}
 };
 /* clang-format on */
@@ -660,7 +677,7 @@ static msg_iflag_name_t _msg_iflag_list[] = {
 /**
  *
  */
-static unsigned long long msg_lookup_flag(str *fname)
+static msg_flags_t msg_lookup_flag(str *fname)
 {
 	int i;
 
@@ -694,7 +711,7 @@ static unsigned long long msg_lookup_flag(str *fname)
  */
 static int w_msg_iflag_set(sip_msg_t *msg, char *pflag, char *p2)
 {
-	unsigned long long fv;
+	msg_flags_t fv;
 	str fname;
 	if(fixup_get_svalue(msg, (gparam_t *)pflag, &fname)) {
 		LM_ERR("cannot get the msg flag name parameter\n");
@@ -714,7 +731,7 @@ static int w_msg_iflag_set(sip_msg_t *msg, char *pflag, char *p2)
  */
 static int w_msg_iflag_reset(sip_msg_t *msg, char *pflag, char *p2)
 {
-	unsigned long long fv;
+	msg_flags_t fv;
 	str fname;
 	if(fixup_get_svalue(msg, (gparam_t *)pflag, &fname)) {
 		LM_ERR("cannot get the msg flag name parameter\n");
@@ -734,7 +751,7 @@ static int w_msg_iflag_reset(sip_msg_t *msg, char *pflag, char *p2)
  */
 static int w_msg_iflag_is_set(sip_msg_t *msg, char *pflag, char *p2)
 {
-	unsigned long long fv;
+	msg_flags_t fv;
 	str fname;
 	if(fixup_get_svalue(msg, (gparam_t *)pflag, &fname)) {
 		LM_ERR("cannot get the msg flag name parameter\n");
@@ -748,6 +765,161 @@ static int w_msg_iflag_is_set(sip_msg_t *msg, char *pflag, char *p2)
 	if(msg->msg_flags & fv)
 		return 1;
 	return -2;
+}
+
+/**
+ *
+ */
+static int ki_msg_vbflag_is_set(sip_msg_t *msg, int fval)
+{
+	if((flag_t)fval > MAX_FLAG)
+		return -1;
+	if(msg->vbflags & (fval << 1)) {
+		return 1;
+	}
+	return -1;
+}
+
+/**
+ *
+ */
+static int w_msg_vbflag_is_set(sip_msg_t *msg, char *flag, char *s2)
+{
+	int fval = 0;
+	if(fixup_get_ivalue(msg, (gparam_t *)flag, &fval) != 0) {
+		LM_ERR("no flag value\n");
+		return -1;
+	}
+	return ki_msg_vbflag_is_set(msg, fval);
+}
+
+/**
+ *
+ */
+static int ki_msg_vbflag_reset(sip_msg_t *msg, int fval)
+{
+	if((flag_t)fval > MAX_FLAG)
+		return -1;
+	msg->vbflags &= ~(1 << fval);
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_msg_vbflag_reset(sip_msg_t *msg, char *flag, char *s2)
+{
+	int fval = 0;
+	if(fixup_get_ivalue(msg, (gparam_t *)flag, &fval) != 0) {
+		LM_ERR("no flag value\n");
+		return -1;
+	}
+	return ki_msg_vbflag_reset(msg, fval);
+}
+
+/**
+ *
+ */
+static int ki_msg_vbflag_set(sip_msg_t *msg, int fval)
+{
+	if((flag_t)fval > MAX_FLAG)
+		return -1;
+	msg->vbflags |= (1 << fval);
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_msg_vbflag_set(sip_msg_t *msg, char *flag, char *s2)
+{
+	int fval = 0;
+	if(fixup_get_ivalue(msg, (gparam_t *)flag, &fval) != 0) {
+		LM_ERR("no flag value\n");
+		return -1;
+	}
+	return ki_msg_vbflag_set(msg, fval);
+}
+
+extern str _ksr_via_body_flags;
+
+/**
+ *
+ */
+static int ki_msg_vbflag_parse(sip_msg_t *msg)
+{
+	via_param_t *vp;
+
+	if(parse_headers(msg, HDR_EOH_F, HDR_VIA_T) < 0) {
+		LM_DBG("failed to parse sip headers\n");
+		return -1;
+	}
+	if(msg->via1 == NULL) {
+		LM_DBG("no via headers\n");
+		return -1;
+	}
+	for(vp = msg->via1->param_lst; vp != NULL; vp = vp->next) {
+		if(vp->name.len == _ksr_via_body_flags.len
+				&& strncasecmp(vp->name.s, _ksr_via_body_flags.s,
+						   _ksr_via_body_flags.len)
+						   == 0) {
+			if(vp->value.len > 0) {
+				hexstr2int(vp->value.s, vp->value.len, &msg->vbflags);
+				return 1;
+			}
+		}
+	}
+	return -1;
+}
+
+/**
+ *
+ */
+static int w_msg_vbflag_parse(sip_msg_t *msg, char *p1, char *p2)
+{
+	return ki_msg_vbflag_parse(msg);
+}
+
+/**
+ *
+ */
+static int ki_add_tcp_alias(sip_msg_t *msg, int port)
+{
+	if(!(msg->rcv.proto == PROTO_TCP || msg->rcv.proto == PROTO_TLS
+			   || msg->rcv.proto == PROTO_WS || msg->rcv.proto == PROTO_WSS)) {
+		return -1;
+	}
+
+	if(port <= 0) {
+		if(parse_headers(msg, HDR_VIA1_F, 0) < 0) {
+			LM_DBG("failed to parse sip headers\n");
+			return -1;
+		}
+		if(msg->via1 == NULL) {
+			LM_DBG("no via headers\n");
+			return -1;
+		}
+		port = msg->via1->port;
+	}
+	if(tcpconn_add_alias(msg->rcv.proto_reserved1, port, msg->rcv.proto) != 0) {
+		LM_ERR("adding tcp alias failed\n");
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_add_tcp_alias(sip_msg_t *msg, char *pport, char *s2)
+{
+	int pval = 0;
+	if(fixup_get_ivalue(msg, (gparam_t *)pport, &pval) != 0) {
+		LM_ERR("no port value\n");
+		return -1;
+	}
+	return ki_add_tcp_alias(msg, pval);
 }
 
 /**

@@ -523,7 +523,7 @@ int parse_record_route_headers(sip_msg_t *msg)
 	hf = msg->record_route;
 	while(hf) {
 		if(parse_rr(hf) < 0) {
-			LM_ERR("failed to parse Record-Route\n");
+			LM_ERR("failed to parse Record-Route headers\n");
 			return -1;
 		}
 
@@ -546,11 +546,34 @@ int parse_route_headers(sip_msg_t *msg)
 	hf = msg->route;
 	while(hf) {
 		if(parse_rr(hf) < 0) {
-			LM_ERR("failed to parse Record-Route\n");
+			LM_ERR("failed to parse Route headers\n");
 			return -1;
 		}
 
 		hf = next_sibling_hdr(hf);
 	}
 	return 0;
+}
+
+/*!
+ * \brief Parse the message and find first occurrence of Route header field.
+ * \param _m SIP message
+ * \return -1 or -2 on a parser error, 0 if there is a Route header field
+ *    and 1 if there is no Route header field
+ */
+int has_route_header(sip_msg_t *msg)
+{
+	if(parse_headers(msg, HDR_ROUTE_F, 0) == -1) {
+		LM_ERR("failed to parse headers\n");
+		return -1;
+	}
+	if(msg->route) {
+		if(parse_rr(msg->route) < 0) {
+			LM_ERR("failed to parse Route header\n");
+			return -2;
+		}
+		return 0;
+	}
+	LM_DBG("No Route headers found\n");
+	return 1;
 }

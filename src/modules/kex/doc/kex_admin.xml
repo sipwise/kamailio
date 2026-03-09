@@ -493,7 +493,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.arg
+&kamctl; rpc core.arg
 ...
 		</programlisting>
     </section>
@@ -546,7 +546,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.kill
+&kamctl; rpc core.kill
 ...
 		</programlisting>
     </section>
@@ -598,7 +598,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.pwd
+&kamctl; rpc core.pwd
 ...
 		</programlisting>
     </section>
@@ -668,7 +668,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.uptime
+&kamctl; rpc core.uptime
 ...
 		</programlisting>
     </section>
@@ -688,7 +688,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.version
+&kamctl; rpc core.version
 ...
 		</programlisting>
     </section>
@@ -708,7 +708,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.ppdefines
+&kamctl; rpc core.ppdefines
 ...
 		</programlisting>
     </section>
@@ -728,7 +728,92 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; core.modules
+&kamctl; rpc core.modules
+...
+		</programlisting>
+    </section>
+	<section id="kex.r.modparam.getn">
+		<title>
+		<function moreinfo="none">modparam.getn</function>
+		</title>
+		<para>
+		Get the value of a module parameter with integer value.
+		</para>
+		<para>
+		Name: <emphasis>modparam.getn</emphasis>
+		</para>
+		<para>Parameters: <emphasis>module_name</emphasis> and
+		<emphasis>parameter_name</emphasis>.</para>
+		<para>
+		RPC Command Format:
+		</para>
+		<programlisting  format="linespecific">
+...
+kamcli rpc modparam.getn tls keylog_mode
+...
+		</programlisting>
+    </section>
+	<section id="kex.r.modparam.gets">
+		<title>
+		<function moreinfo="none">modparam.gets</function>
+		</title>
+		<para>
+		Get the value of a module parameter with string value.
+		</para>
+		<para>
+		Name: <emphasis>modparam.gets</emphasis>
+		</para>
+		<para>Parameters: <emphasis>module_name</emphasis> and
+		<emphasis>parameter_name</emphasis>.</para>
+		<para>
+		RPC Command Format:
+		</para>
+		<programlisting  format="linespecific">
+...
+kamcli rpc modparam.gets tls config
+...
+		</programlisting>
+    </section>
+	<section id="kex.r.modparam.setn">
+		<title>
+		<function moreinfo="none">modparam.setn</function>
+		</title>
+		<para>
+		Set the value of a module parameter with integer value stored in shared
+		memory.
+		</para>
+		<para>
+		Name: <emphasis>modparam.setn</emphasis>
+		</para>
+		<para>Parameters: <emphasis>module_name</emphasis>,
+		<emphasis>parameter_name</emphasis> and <emphasis>value</emphasis>.</para>
+		<para>
+		RPC Command Format:
+		</para>
+		<programlisting  format="linespecific">
+...
+kamcli rpc modparam.setn tls keylog_mode 15
+...
+		</programlisting>
+    </section>
+	<section id="kex.r.modparam.list">
+		<title>
+		<function moreinfo="none">modparam.list</function>
+		</title>
+		<para>
+		List the parameters of the loaded modules.
+		</para>
+		<para>
+		Name: <emphasis>modparam.list</emphasis>
+		</para>
+		<para>Parameters: <emphasis>module_name</emphasis> (optional).</para>
+		<para>
+		RPC Command Format:
+		</para>
+		<programlisting  format="linespecific">
+...
+kamcli rpc modparam.list
+kamcli rpc modparam.list tls
 ...
 		</programlisting>
     </section>
@@ -768,10 +853,10 @@ resetdebug();
 		Examples:
 		</para>
         <programlisting  format="linespecific">
-		&kamcmd; pkg.stats
-		&kamcmd; pkg.stats pid 1234
-		&kamcmd; pkg.stats rank 1
-		&kamcmd; pkg.stats index 10
+		&kamctl; rpc pkg.stats
+		&kamctl; rpc pkg.stats pid 1234
+		&kamctl; rpc pkg.stats rank 1
+		&kamctl; rpc pkg.stats index 10
 		</programlisting>
     </section>
 	<section id="kex.r.pkg.info">
@@ -804,10 +889,10 @@ resetdebug();
 		is printed.</para>
 		<para>Examples:</para>
         <programlisting  format="linespecific">
-		&kamcmd; stats.get_statistics all
-		&kamcmd; stats.get_statistics core:
-		&kamcmd; stats.get_statistics unsupported_methods
-		&kamcmd; stats.get_statistics shmem: fwd_requests fwd_replies
+		&kamctl; rpc stats.get_statistics all
+		&kamctl; rpc stats.get_statistics core:
+		&kamctl; rpc stats.get_statistics unsupported_methods
+		&kamctl; rpc stats.get_statistics shmem: fwd_requests fwd_replies
 		</programlisting>
     </section>
 	<section id="kex.r.stats.fetch">
@@ -826,11 +911,11 @@ resetdebug();
 		'statsgroup:statsname').</para>
 		<para>Examples:</para>
         <programlisting  format="linespecific">
-		&kamcmd; stats.fetch all
-		&kamcmd; stats.fetch core:
-		&kamcmd; stats.fetch unsupported_methods
-		&kamcmd; stats.fetch shmem.free_size
-		&kamcmd; stats.fetch shmem: fwd_requests fwd_replies
+		&kamctl; rpc stats.fetch all
+		&kamctl; rpc stats.fetch core:
+		&kamctl; rpc stats.fetch unsupported_methods
+		&kamctl; rpc stats.fetch shmem.free_size
+		&kamctl; rpc stats.fetch shmem: fwd_requests fwd_replies
 		</programlisting>
 	</section>
 	<section id="kex.r.stats.fetchn">
@@ -849,11 +934,11 @@ resetdebug();
 		'statsgroup:statsname').</para>
 		<para>Examples:</para>
         <programlisting  format="linespecific">
-		&kamcmd; stats.fetchn all
-		&kamcmd; stats.fetchn core:
-		&kamcmd; stats.fetchn unsupported_methods
-		&kamcmd; stats.fetchn shmem.free_size
-		&kamcmd; stats.fetchn shmem: fwd_requests fwd_replies
+		&kamctl; rpc stats.fetchn all
+		&kamctl; rpc stats.fetchn core:
+		&kamctl; rpc stats.fetchn unsupported_methods
+		&kamctl; rpc stats.fetchn shmem.free_size
+		&kamctl; rpc stats.fetchn shmem: fwd_requests fwd_replies
 		</programlisting>
     </section>
 	<section id="kex.r.stats.reset_statistics">
@@ -866,10 +951,10 @@ resetdebug();
 		</para>
 		<para>Examples:</para>
         <programlisting  format="linespecific">
-		&kamcmd; stats.reset_statistics all
-		&kamcmd; stats.reset_statistics core:
-		&kamcmd; stats.reset_statistics unsupported_methods
-		&kamcmd; stats.reset_statistics shmem: fwd_requests fwd_replies
+		&kamctl; rpc stats.reset_statistics all
+		&kamctl; rpc stats.reset_statistics core:
+		&kamctl; rpc stats.reset_statistics unsupported_methods
+		&kamctl; rpc stats.reset_statistics shmem: fwd_requests fwd_replies
 		</programlisting>
     </section>
 	<section id="kex.r.stats.clear_statistics">
@@ -882,10 +967,10 @@ resetdebug();
 		</para>
 		<para>Examples:</para>
         <programlisting  format="linespecific">
-		&kamcmd; stats.reset_statistics all
-		&kamcmd; stats.reset_statistics core:
-		&kamcmd; stats.reset_statistics unsupported_methods
-		&kamcmd; stats.reset_statistics shmem: fwd_requests fwd_replies
+		&kamctl; rpc stats.reset_statistics all
+		&kamctl; rpc stats.reset_statistics core:
+		&kamctl; rpc stats.reset_statistics unsupported_methods
+		&kamctl; rpc stats.reset_statistics shmem: fwd_requests fwd_replies
 		</programlisting>
     </section>
 	<section id="kex.r.system.listMethods">
@@ -904,7 +989,7 @@ resetdebug();
 		</para>
 		<programlisting  format="linespecific">
 ...
-&kamcmd; system.listMethods
+&kamctl; rpc system.listMethods
 ...
 		</programlisting>
     </section>
@@ -977,10 +1062,10 @@ resetdebug();
 		Examples:
 		</para>
         <programlisting  format="linespecific">
-		&kamcmd; mod.stats core all
-		&kamcmd; mod.stats tm shm
-		&kamcmd; mod.stats kex pkg
-		&kamcmd; mod.stats all all
+		&kamctl; rpc mod.stats core all
+		&kamctl; rpc mod.stats tm shm
+		&kamctl; rpc mod.stats kex pkg
+		&kamctl; rpc mod.stats all all
 		</programlisting>
 		<para>
 		Output:

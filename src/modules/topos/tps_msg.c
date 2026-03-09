@@ -53,6 +53,7 @@ extern int _tps_contact_mode;
 extern str _tps_cparam_name;
 extern int _tps_rr_update;
 extern int _tps_header_mode;
+extern unsigned int _tps_methods_update_time;
 
 extern str _tps_context_param;
 extern str _tps_context_value;
@@ -254,7 +255,7 @@ char *tps_msg_update(sip_msg_t *msg, unsigned int *olen)
 	init_dest_info(&dst);
 	dst.proto = PROTO_UDP;
 	return build_req_buf_from_sip_req(
-			msg, olen, &dst, BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE);
+			msg, olen, &dst, BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE, NULL);
 }
 
 /**
@@ -1013,7 +1014,7 @@ int tps_request_received(sip_msg_t *msg, int dialog)
 				goto error;
 			}
 		}
-		if(metid & METHOD_SUBSCRIBE) {
+		if(metid & _tps_methods_update_time) {
 			if(tps_storage_update_dialog(
 					   msg, &mtsd, &stsd, TPS_DBU_CONTACT | TPS_DBU_TIME)
 					< 0) {

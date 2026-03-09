@@ -709,15 +709,16 @@ void callback_pcscf_contact_cb(struct pcontact *c, int type, void *param)
 	LM_DBG("PCSCF Contact Callback!\n");
 	LM_DBG("Contact AOR: [%.*s]\n", c->aor.len, c->aor.s);
 	LM_DBG("Callback type [%d]\n", type);
-
+	LM_DBG("Reg state [%s]\n", reg_state_to_string(c->reg_state));
 
 	if(type == PCSCF_CONTACT_EXPIRE || type == PCSCF_CONTACT_DELETE) {
 		// we don't need to send STR if no QoS was ever successfully registered!
 		if(must_send_str && (c->reg_state != PCONTACT_REG_PENDING)
 				&& (c->reg_state != PCONTACT_REG_PENDING_AAR)) {
-			LM_DBG("Received notification of contact (in state [%d] deleted "
+			LM_DBG("Received notification of contact (in state [%s] deleted "
 				   "for signalling bearer with  with Rx session ID: [%.*s]\n",
-					c->reg_state, c->rx_session_id.len, c->rx_session_id.s);
+					reg_state_to_string(c->reg_state), c->rx_session_id.len,
+					c->rx_session_id.s);
 			LM_DBG("Sending STR\n");
 			rx_send_str(&c->rx_session_id);
 		}
@@ -757,26 +758,35 @@ static int get_identifier(str *src)
 
 uint16_t check_ip_version(str ip)
 {
+	int getaddrret;
+	uint16_t ret = 0;
 	struct addrinfo hint, *res = NULL;
+	char *s = pkg_malloc(ip.len + 1);
+
+	if(!s) {
+		PKG_MEM_ERROR;
+		return ret;
+	}
+	memcpy(s, ip.s, ip.len);
+	s[ip.len] = '\0';
 	memset(&hint, '\0', sizeof(hint));
 	hint.ai_family = AF_UNSPEC;
 	hint.ai_flags = AI_NUMERICHOST;
-	int getaddrret = getaddrinfo(ip.s, NULL, &hint, &res);
+	getaddrret = getaddrinfo(s, NULL, &hint, &res);
+	pkg_free(s);
 	if(getaddrret) {
 		LM_ERR("GetAddrInfo returned an error !\n");
-		return 0;
+		return ret;
 	}
 	if(res->ai_family == AF_INET) {
-		freeaddrinfo(res);
-		return AF_INET;
+		ret = AF_INET;
 	} else if(res->ai_family == AF_INET6) {
-		freeaddrinfo(res);
-		return AF_INET6;
+		ret = AF_INET6;
 	} else {
-		freeaddrinfo(res);
-		LM_ERR("unknown IP format \n");
-		return 0;
+		LM_ERR("unknown IP format\n");
 	}
+	freeaddrinfo(res);
+	return ret;
 }
 
 /* Wrapper to send AAR from config file - this only allows for AAR for calls - not register, which uses r_rx_aar_register
@@ -1569,9 +1579,8 @@ static int w_rx_aar_register(
 	LM_DBG("Message via is [%d://%.*s:%d]\n", vb->proto, vb->host.len,
 			vb->host.s, via_port);
 
-	lock_get(
-			saved_t_data
-					->lock); //we lock here to make sure we send all requests before processing replies asynchronously
+	//we lock here to make sure we send all requests before processing replies asynchronously
+	lock_get(saved_t_data->lock);
 	for(h = msg->contact; h; h = h->next) {
 		if(h->type == HDR_CONTACT_T && h->parsed) {
 			for(c = ((contact_body_t *)h->parsed)->contacts; c; c = c->next) {
@@ -1596,9 +1605,10 @@ static int w_rx_aar_register(
 				} else if(pcontact->reg_state == PCONTACT_REG_PENDING
 						  || pcontact->reg_state
 									 == PCONTACT_REGISTERED) { //NEW reg request
-					LM_DBG("Contact [%.*s] exists and is in state "
-						   "PCONTACT_REG_PENDING or PCONTACT_REGISTERED\n",
-							pcontact->aor.len, pcontact->aor.s);
+					LM_DBG("Contact [%.*s] exists and is in state %s or %s\n",
+							pcontact->aor.len, pcontact->aor.s,
+							reg_state_to_string(PCONTACT_REG_PENDING),
+							reg_state_to_string(PCONTACT_REGISTERED));
 
 					//check for existing Rx session
 					if(pcontact->rx_session_id.len > 0

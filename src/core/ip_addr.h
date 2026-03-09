@@ -133,6 +133,11 @@ typedef struct advertise_info
 	str sock_str;			/* Socket proto, ip, and port as string */
 } advertise_info_t;
 
+typedef struct vrf_info
+{
+	str name;
+} vrf_info_t;
+
 #define KSR_AGROUP_NAME_SIZE 64
 
 typedef struct action_group
@@ -164,6 +169,7 @@ typedef struct socket_info
 	str sockname;		/* socket name given in config listen value */
 	struct advertise_info useinfo; /* details to be used in SIP msg */
 	action_group_t agroup;		   /* action group attributes */
+	struct vrf_info vrfinfo;	   /* vrf details */
 #ifdef USE_MCAST
 	str mcast; /* name of interface that should join multicast group*/
 #endif		   /* USE_MCAST */
@@ -182,6 +188,7 @@ typedef struct socket_attrs
 	int workers;
 	int sflags;
 	str agname;
+	str vrf;
 } socket_attrs_t;
 
 /* send flags */
@@ -245,23 +252,13 @@ typedef struct dest_info
 #endif
 } dest_info_t;
 
-
-typedef struct ksr_coninfo
-{
-	ip_addr_t src_ip;
-	ip_addr_t dst_ip;
-	unsigned short src_port; /* host byte order */
-	unsigned short dst_port; /* host byte order */
-	int proto;
-	socket_info_t *csocket;
-} ksr_coninfo_t;
-
 typedef struct sr_net_info
 {
 	str data;
 	unsigned int bufsize;
 	receive_info_t *rcv;
 	dest_info_t *dst;
+	unsigned int evtype;
 } sr_net_info_t;
 
 sr_net_info_t *ksr_evrt_rcvnetinfo_get(void);

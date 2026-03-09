@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "../../core/dprint.h"
 #include "../../core/ut.h"
@@ -32,6 +33,8 @@
 #include "../../core/pt.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
+#include "../../core/cfg/cfg_struct.h"
+#include "../../core/utils/mtops.h"
 
 #include "sipdump_write.h"
 
@@ -48,6 +51,38 @@ static str _sipdump_fpath_prefix = {0, 0};
 
 static FILE *_sipdump_text_file = NULL;
 static FILE *_sipdump_pcap_file = NULL;
+
+/**
+ *
+ */
+static ksr_sigsem_t *_ksr_sdsem = NULL;
+
+int ksr_sdsem_init(void)
+{
+	if(_ksr_sdsem != NULL) {
+		return 0;
+	}
+	_ksr_sdsem = ksr_sigsem_xalloc();
+
+	if(_ksr_sdsem == NULL) {
+		SHM_MEM_ERROR;
+		return -1;
+	}
+	return 0;
+}
+
+
+/**
+ *
+ */
+void ksr_sdsem_destroy(void)
+{
+	if(_ksr_sdsem == NULL) {
+		return;
+	}
+	ksr_sigsem_xfree(_ksr_sdsem);
+	_ksr_sdsem = NULL;
+}
 
 /**
  *
@@ -114,6 +149,9 @@ int sipdump_list_add(sipdump_data_t *sdd)
 	}
 	_sipdump_list->last = sdd;
 	lock_release(&_sipdump_list->lock);
+	if(_ksr_sdsem != NULL) {
+		ksr_sigsem_signal(_ksr_sdsem);
+	}
 	return 0;
 }
 
@@ -337,19 +375,11 @@ int sipdump_data_print(sipdump_data_t *sd, str *obuf)
 /**
  *
  */
-void sipdump_timer_exec(unsigned int ticks, void *param)
+void sipdump_write_exec(void)
 {
 	sipdump_data_t *sdd = NULL;
 	str odata = str_init("");
 	int cnt = 0;
-
-	if(_sipdump_list == NULL || _sipdump_list->first == NULL)
-		return;
-
-	if(sipdump_rotate_file() < 0) {
-		LM_ERR("sipdump rotate file failed\n");
-		return;
-	}
 
 	while(1) {
 		lock_get(&_sipdump_list->lock);
@@ -395,6 +425,48 @@ void sipdump_timer_exec(unsigned int ticks, void *param)
 		shm_free(sdd);
 	}
 }
+
+/**
+ *
+ */
+void sipdump_timer_exec(unsigned int ticks, void *param)
+{
+
+	if(_sipdump_list == NULL || _sipdump_list->first == NULL)
+		return;
+
+	if(sipdump_rotate_file() < 0) {
+		LM_ERR("sipdump rotate file failed\n");
+		return;
+	}
+	cfg_update();
+	sipdump_write_exec();
+}
+
+/**
+ *
+ */
+void sipdump_process_exec(void)
+{
+	int cnt = 0;
+
+	if(sipdump_rotate_file() < 0) {
+		LM_ERR("sipdump rotate file failed\n");
+	}
+	while(1) {
+		ksr_sigsem_wait(_ksr_sdsem);
+		cnt++;
+		if(cnt > 2000) {
+			if(sipdump_rotate_file() < 0) {
+				LM_ERR("sipdump rotate file failed\n");
+			}
+			cnt = 0;
+		}
+		cfg_update();
+		sipdump_write_exec();
+	}
+}
+
 
 static const char *sipdump_rpc_enable_doc[2] = {
 		"Command to control sipdump enable value", 0};

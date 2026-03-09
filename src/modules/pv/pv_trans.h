@@ -41,19 +41,25 @@ enum _tr_type
 	TR_TOBODY,
 	TR_LINE,
 	TR_URIALIAS,
-	TR_VAL
+	TR_VAL,
+	TR_NUM
 };
 enum _tr_s_subtype
 {
 	TR_S_NONE = 0,
 	TR_S_LEN,
 	TR_S_INT,
+	TR_S_INTV,
 	TR_S_MD5,
+	TR_S_SHA1,
 	TR_S_SHA256,
 	TR_S_SHA384,
 	TR_S_SHA512,
+	TR_S_SHA3,
+	TR_S_KECCAK,
 	TR_S_SUBSTR,
 	TR_S_SELECT,
+	TR_S_SELECTWS,
 	TR_S_ENCODEHEXA,
 	TR_S_DECODEHEXA,
 	TR_S_ENCODE7BIT,
@@ -105,7 +111,10 @@ enum _tr_s_subtype
 	TR_S_RBEFORE,
 	TR_S_RAFTER,
 	TR_S_FMTLINES,
-	TR_S_FMTLINET
+	TR_S_FMTLINET,
+	TR_S_CRC32,
+	TR_S_CHARAT,
+	TR_S_BYTEAT
 };
 enum _tr_uri_subtype
 {
@@ -128,7 +137,8 @@ enum _tr_uri_subtype
 	TR_URI_TOSOCKET,
 	TR_URI_SAOR,
 	TR_URI_DURI,
-	TR_URI_SURI
+	TR_URI_SURI,
+	TR_URI_RMPARAM
 };
 enum _tr_param_subtype
 {
@@ -169,7 +179,6 @@ enum _tr_urialias_subtype
 	TR_URIALIAS_ENCODE,
 	TR_URIALIAS_DECODE
 };
-
 enum _tr_val_subtype
 {
 	TR_VAL_NONE = 0,
@@ -178,7 +187,12 @@ enum _tr_val_subtype
 	TR_VAL_JSON,
 	TR_VAL_JSONQE
 };
-
+enum _tr_num_subtype
+{
+	TR_NUM_NONE = 0,
+	TR_NUM_FDIGIT,
+	TR_NUM_LDIGIT
+};
 
 char *tr_parse_string(str *in, trans_t *tr);
 char *tr_parse_uri(str *in, trans_t *tr);
@@ -188,6 +202,7 @@ char *tr_parse_tobody(str *in, trans_t *t);
 char *tr_parse_line(str *in, trans_t *t);
 char *tr_parse_urialias(str *in, trans_t *t);
 char *tr_parse_val(str *in, trans_t *t);
+char *tr_parse_num(str *in, trans_t *t);
 
 int tr_init_buffers(void);
 

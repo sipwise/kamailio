@@ -115,7 +115,9 @@ static int append_urihf(struct sip_msg *msg, char *str1, char *str2);
 static int append_time_f(struct sip_msg *msg, char *, char *);
 static int append_time_request_f(struct sip_msg *msg, char *, char *);
 static int set_body_f(struct sip_msg *msg, char *, char *);
+static int set_body_hex_f(struct sip_msg *msg, char *, char *);
 static int set_rpl_body_f(struct sip_msg *msg, char *, char *);
+static int set_rpl_body_hex_f(struct sip_msg *msg, char *, char *);
 static int set_multibody_0(struct sip_msg *msg, char *, char *, char *);
 static int set_multibody_1(struct sip_msg *msg, char *, char *, char *);
 static int set_multibody_2(struct sip_msg *msg, char *, char *, char *);
@@ -142,6 +144,7 @@ static int ends_with_f(struct sip_msg *msg, char *str1, char *str2);
 static int str_find_f(sip_msg_t *msg, char *str1, char *str2);
 static int str_ifind_f(sip_msg_t *msg, char *str1, char *str2);
 static int str_any_in_f(sip_msg_t *msg, char *str1, char *str2);
+static int str_all_in_f(struct sip_msg *msg, char *str1, char *str2);
 static int remove_hf_re_f(struct sip_msg *msg, char *key, char *foo);
 static int remove_hf_exp_f(sip_msg_t *msg, char *ematch, char *eskip);
 static int is_present_hf_re_f(struct sip_msg *msg, char *key, char *foo);
@@ -264,8 +267,12 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
 	{"set_body", (cmd_function)set_body_f, 2, fixup_spve_spve, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONREPLY_ROUTE},
+	{"set_body_hex", (cmd_function)set_body_hex_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
 	{"set_reply_body", (cmd_function)set_rpl_body_f, 2, fixup_spve_spve, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
+	{"set_reply_body_hex", (cmd_function)set_rpl_body_hex_f, 2, fixup_spve_spve,
+			0, REQUEST_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE},
 	{"is_method", (cmd_function)is_method_f, 1, fixup_method, 0, ANY_ROUTE},
 	{"has_body", (cmd_function)has_body_f, 0, 0, 0, ANY_ROUTE},
 	{"has_body", (cmd_function)has_body_f, 1, fixup_body_type, 0,
@@ -290,6 +297,8 @@ static cmd_export_t cmds[] = {
 	{"str_ifind", (cmd_function)str_ifind_f, 2, fixup_spve_spve, 0,
 			ANY_ROUTE},
 	{"str_any_in", (cmd_function)str_any_in_f, 2, fixup_spve_spve, 0,
+			ANY_ROUTE},
+	{"str_all_in", (cmd_function)str_all_in_f, 2, fixup_spve_spve, 0,
 			ANY_ROUTE},
 	{"is_audio_on_hold", (cmd_function)is_audio_on_hold_f, 0, 0, 0,
 			ANY_ROUTE},
@@ -2500,7 +2509,6 @@ static int ki_set_body(sip_msg_t *msg, str *nb, str *nc)
 		return -1;
 	}
 
-	body.len = 0;
 	body.s = get_body(msg);
 	if(body.s == 0) {
 		LM_ERR("malformed sip message\n");
@@ -2510,17 +2518,12 @@ static int ki_set_body(sip_msg_t *msg, str *nb, str *nc)
 	del_nonshm_lump(&(msg->body_lumps));
 	msg->body_lumps = NULL;
 
-	if(msg->content_length) {
-		body.len = get_content_length(msg);
-		if(body.len > 0) {
-			if(body.s + body.len > msg->buf + msg->len) {
-				LM_ERR("invalid content length: %d\n", body.len);
-				return -1;
-			}
-			if(del_lump(msg, body.s - msg->buf, body.len, 0) == 0) {
-				LM_ERR("cannot delete existing body");
-				return -1;
-			}
+	/* remove existing body */
+	body.len = msg->buf + msg->len - body.s;
+	if(body.len > 0) {
+		if(del_lump(msg, body.s - msg->buf, body.len, 0) == 0) {
+			LM_ERR("cannot remove body\n");
+			return -1;
 		}
 	}
 
@@ -2632,6 +2635,47 @@ static int set_body_f(struct sip_msg *msg, char *p1, char *p2)
 	return ki_set_body(msg, &nb, &nc);
 }
 
+int ki_set_body_hex(sip_msg_t *msg, str *htxt, str *ct)
+{
+	str sraw = STR_NULL;
+	int ret;
+
+	if(htxt == NULL || htxt->s == NULL || htxt->len == 0) {
+		LM_ERR("invalid body parameter\n");
+		return -1;
+	}
+	if(ksr_hex_decode_ws(htxt, &sraw) < 0) {
+		return -1;
+	}
+	ret = ki_set_body(msg, &sraw, ct);
+	pkg_free(sraw.s);
+
+	return ret;
+}
+
+static int set_body_hex_f(struct sip_msg *msg, char *p1, char *p2)
+{
+	str nb = {0, 0};
+	str nc = {0, 0};
+
+	if(p1 == 0 || p2 == 0) {
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)p1, &nb) != 0) {
+		LM_ERR("unable to get p1\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)p2, &nc) != 0) {
+		LM_ERR("unable to get p2\n");
+		return -1;
+	}
+
+	return ki_set_body_hex(msg, &nb, &nc);
+}
+
 static int ki_set_rpl_body(sip_msg_t *msg, str *nb, str *nc)
 {
 	char *buf;
@@ -2696,6 +2740,44 @@ static int set_rpl_body_f(struct sip_msg *msg, char *p1, char *p2)
 	}
 
 	return ki_set_rpl_body(msg, &nb, &nc);
+}
+
+static int ki_set_rpl_body_hex(sip_msg_t *msg, str *htxt, str *ct)
+{
+	str sraw = STR_NULL;
+
+	if(htxt == NULL || htxt->s == NULL || htxt->len == 0) {
+		LM_ERR("invalid body parameter\n");
+		return -1;
+	}
+	if(ksr_hex_decode_ws(htxt, &sraw) < 0) {
+		return -1;
+	}
+
+	return ki_set_rpl_body(msg, &sraw, ct);
+}
+
+static int set_rpl_body_hex_f(struct sip_msg *msg, char *p1, char *p2)
+{
+	str nb = {0, 0};
+	str nc = {0, 0};
+
+	if(p1 == 0 || p2 == 0) {
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)p1, &nb) != 0) {
+		LM_ERR("unable to get p1\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)p2, &nc) != 0) {
+		LM_ERR("unable to get p2\n");
+		return -1;
+	}
+
+	return ki_set_rpl_body_hex(msg, &nb, &nc);
 }
 
 static str *generate_boundary(str *txt, str *content_type,
@@ -3160,72 +3242,19 @@ int ki_append_multibody(sip_msg_t *msg, str *txt, str *ct)
 
 int ki_append_multibody_hex_cd(sip_msg_t *msg, str *htxt, str *ct, str *cd)
 {
-	str sraw;
-	int i;
+	str sraw = STR_NULL;
 	int ret;
-	char v;
 
 	if(htxt == NULL || htxt->s == NULL || htxt->len == 0) {
 		LM_ERR("invalid body parameter\n");
 		return -1;
 	}
-
-	sraw.len = htxt->len / 2 + 2;
-	sraw.s = pkg_malloc(sraw.len * sizeof(char));
-	if(sraw.s == NULL) {
-		LM_ERR("no more pkg memory\n");
-		return -1;
-	}
-	memset(sraw.s, 0, sraw.len * sizeof(char));
-
-	sraw.len = 0;
-	for(i = 0; i < htxt->len; i++) {
-		if(htxt->s[i] == ' ' || htxt->s[i] == '\t') {
-			continue;
-		}
-		if(i + 1 == htxt->len) {
-			LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len,
-					htxt->s, htxt->len, i);
-			pkg_free(sraw.s);
-			return -1;
-		}
-		v = 0;
-		if(htxt->s[i] >= '0' && htxt->s[i] <= '9') {
-			v = (htxt->s[i] - '0') << 4;
-		} else if(htxt->s[i] >= 'A' && htxt->s[i] <= 'F') {
-			v = (htxt->s[i] - 'A' + 10) << 4;
-		} else if(htxt->s[i] >= 'a' && htxt->s[i] <= 'f') {
-			v = (htxt->s[i] - 'a' + 10) << 4;
-		} else {
-			LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len,
-					htxt->s, htxt->len, i);
-			pkg_free(sraw.s);
-			return -1;
-		}
-		i++;
-		if(htxt->s[i] >= '0' && htxt->s[i] <= '9') {
-			v += (htxt->s[i] - '0');
-		} else if(htxt->s[i] >= 'A' && htxt->s[i] <= 'F') {
-			v += (htxt->s[i] - 'A' + 10);
-		} else if(htxt->s[i] >= 'a' && htxt->s[i] <= 'f') {
-			v += (htxt->s[i] - 'a' + 10);
-		} else {
-			LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len,
-					htxt->s, htxt->len, i);
-			pkg_free(sraw.s);
-			return -1;
-		}
-		sraw.s[sraw.len++] = v;
-	}
-	if(sraw.len == 0) {
-		/* only white spaces */
-		LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len, htxt->s,
-				htxt->len, i);
-		pkg_free(sraw.s);
+	if(ksr_hex_decode_ws(htxt, &sraw) < 0) {
 		return -1;
 	}
 	ret = ki_append_multibody_cd(msg, &sraw, ct, cd);
 	pkg_free(sraw.s);
+
 	return ret;
 }
 
@@ -4630,6 +4659,47 @@ static int str_any_in_f(struct sip_msg *msg, char *str1, char *str2)
 	return ki_str_any_in(msg, &s1, &s2);
 }
 
+static int ki_str_all_in(sip_msg_t *msg, str *txt, str *clist)
+{
+	int i, j, f;
+
+	if(txt == NULL || txt->len <= 0 || clist == NULL || clist->len <= 0) {
+		return -1;
+	}
+
+	for(j = 0; j < clist->len; j++) {
+		f = 0;
+		for(i = 0; i < txt->len; i++) {
+			if(txt->s[i] == clist->s[j]) {
+				f = 1;
+				break;
+			}
+		}
+		if(f == 0) {
+			return -1;
+		}
+	}
+
+	return 1;
+}
+
+static int str_all_in_f(struct sip_msg *msg, char *str1, char *str2)
+{
+	str s1;
+	str s2;
+
+	if(fixup_get_svalue(msg, (gparam_p)str1, &s1) != 0) {
+		LM_ERR("cannot get first parameter\n");
+		return -8;
+	}
+	if(fixup_get_svalue(msg, (gparam_p)str2, &s2) != 0) {
+		LM_ERR("cannot get second parameter\n");
+		return -8;
+	}
+
+	return ki_str_all_in(msg, &s1, &s2);
+}
+
 static int ki_is_audio_on_hold(sip_msg_t *msg)
 {
 	int sdp_session_num = 0, sdp_stream_num;
@@ -5437,8 +5507,18 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("textops"), str_init("set_body_hex"),
+		SR_KEMIP_INT, ki_set_body_hex,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("textops"), str_init("set_reply_body"),
 		SR_KEMIP_INT, ki_set_rpl_body,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("set_reply_body_hex"),
+		SR_KEMIP_INT, ki_set_rpl_body_hex,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
@@ -5509,6 +5589,11 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 	},
 	{ str_init("textops"), str_init("str_any_in"),
 		SR_KEMIP_INT, ki_str_any_in,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("str_all_in"),
+		SR_KEMIP_INT, ki_str_all_in,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

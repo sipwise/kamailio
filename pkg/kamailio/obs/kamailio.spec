@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 6.0.5
+%define ver 6.1.1
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -185,7 +185,7 @@ URL:        https://kamailio.org/
 Vendor:     kamailio.org
 BuildRoot:  %{_tmppath}/%{name}-%{ver}-buildroot
 Conflicts:  kamailio-acc_json < %ver
-Conflicts:  kamailio-auth-ephemeral < %ver, kamailio-bdb < %ver
+Conflicts:  kamailio-auth-ephemeral < %ver
 Conflicts:  kamailio-carrierroute < %ver, kamailio-cpl < %ver
 Conflicts:  kamailio-dialplan < %ver, kamailio-dnssec < %ver
 Conflicts:  kamailio-gcrypt < %ver
@@ -283,22 +283,6 @@ Requires:   kamailio = %ver
 
 %description    auth-xkeys
 Functions for authentication using shared keys.
-
-
-%package    bdb
-Summary:    Berkeley database connectivity for Kamailio
-Group:      %{PKGGROUP}
-Requires:   kamailio = %ver
-%if 0%{?suse_version}
-Requires:   libdb-4_8
-BuildRequires:  libdb-4_8-devel
-%else
-Requires:   libdb
-BuildRequires:  libdb-devel
-%endif
-
-%description    bdb
-Berkeley database connectivity for Kamailio.
 
 
 %package    carrierroute
@@ -644,7 +628,7 @@ MongoDB database connectivity for Kamailio.
 Summary:    Module allows bidirectional publish/subscribe communication by connecting Kamailio to a MQTT Broker
 Group:      %{PKGGROUP}
 Requires:   mosquitto, kamailio = %ver
-BuildRequires:  mosquitto-devel 
+BuildRequires:  mosquitto-devel
 
 %description    mqtt
 Module allows bidirectional publish/subscribe communication by connecting Kamailio to a MQTT Broker.
@@ -1159,9 +1143,6 @@ db2_ldap \
 db_mongodb \
 %endif
 db_mysql \
-%if %{with perl}
-db_perlvdb
-%endif
 db_postgres \
 %if %{with redis}
 db_redis \
@@ -1202,7 +1183,7 @@ ims_usrloc_pcscf \
 ims_usrloc_scscf \
 %endif
 %if %{with jansson}
-jansson db_berkeley \
+jansson \
 janssonrpcc \
 %endif
 %if %{with json}
@@ -1697,17 +1678,6 @@ rm -rf %{buildroot}
 %{_libdir}/kamailio/modules/auth_xkeys.so
 
 
-%files      bdb
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.db_berkeley
-%{_sbindir}/kamdb_recover
-%{_libdir}/kamailio/modules/db_berkeley.so
-%{_libdir}/kamailio/kamctl/kamctl.db_berkeley
-%{_libdir}/kamailio/kamctl/kamdbctl.db_berkeley
-%dir %{_datadir}/kamailio/db_berkeley
-%{_datadir}/kamailio/db_berkeley/*
-
-
 %files      carrierroute
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.carrierroute
@@ -2047,9 +2017,7 @@ rm -rf %{buildroot}
 %files      perl
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_perl
-%doc %{_docdir}/kamailio/modules/README.db_perlvdb
 %{_libdir}/kamailio/modules/app_perl.so
-%{_libdir}/kamailio/modules/db_perlvdb.so
 %dir %{_libdir}/kamailio/perl
 %{_libdir}/kamailio/perl/Kamailio.pm
 %dir %{_libdir}/kamailio/perl/Kamailio

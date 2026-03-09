@@ -385,7 +385,9 @@ inline int rx_add_media_component_description_avp(AAAMessage *msg, int number,
 	AAA_AVP *codec_data1, *codec_data2;
 	AAA_AVP *media_sub_component[PCC_Media_Sub_Components];
 	AAA_AVP *flow_status;
-	AAA_AVP *dl_bw, *ul_bw, *rs_bw, *rr_bw;
+	AAA_AVP *dl_max_bw, *ul_max_bw;
+	AAA_AVP *dl_min_bw, *ul_min_bw;
+	AAA_AVP *rs_bw, *rr_bw;
 
 	int media_sub_component_number = 0;
 	unsigned int bandwidth = 0;
@@ -471,10 +473,15 @@ inline int rx_add_media_component_description_avp(AAAMessage *msg, int number,
 
 		// Add AVP
 		set_4bytes(x, bandwidth);
-		ul_bw = cdpb.AAACreateAVP(AVP_EPC_Max_Requested_Bandwidth_UL,
+		ul_max_bw = cdpb.AAACreateAVP(AVP_EPC_Max_Requested_Bandwidth_UL,
 				AAA_AVP_FLAG_MANDATORY | AAA_AVP_FLAG_VENDOR_SPECIFIC,
 				IMS_vendor_id_3GPP, x, 4, AVP_DUPLICATE_DATA);
-		cdpb.AAAAddAVPToList(&list, ul_bw);
+		cdpb.AAAAddAVPToList(&list, ul_max_bw);
+
+		ul_min_bw = cdpb.AAACreateAVP(AVP_EPC_Min_Requested_Bandwidth_UL,
+				AAA_AVP_FLAG_VENDOR_SPECIFIC, IMS_vendor_id_3GPP, x, 4,
+				AVP_DUPLICATE_DATA);
+		cdpb.AAAAddAVPToList(&list, ul_min_bw);
 
 		// Get bandwidth from SDP:
 		bandwidth = sdp_b_value(rpl_raw_payload, "AS");
@@ -490,10 +497,15 @@ inline int rx_add_media_component_description_avp(AAAMessage *msg, int number,
 
 		// Add AVP
 		set_4bytes(x, bandwidth);
-		dl_bw = cdpb.AAACreateAVP(AVP_EPC_Max_Requested_Bandwidth_DL,
+		dl_max_bw = cdpb.AAACreateAVP(AVP_EPC_Max_Requested_Bandwidth_DL,
 				AAA_AVP_FLAG_MANDATORY | AAA_AVP_FLAG_VENDOR_SPECIFIC,
 				IMS_vendor_id_3GPP, x, 4, AVP_DUPLICATE_DATA);
-		cdpb.AAAAddAVPToList(&list, dl_bw);
+		cdpb.AAAAddAVPToList(&list, dl_max_bw);
+
+		dl_min_bw = cdpb.AAACreateAVP(AVP_EPC_Min_Requested_Bandwidth_DL,
+				AAA_AVP_FLAG_VENDOR_SPECIFIC, IMS_vendor_id_3GPP, x, 4,
+				AVP_DUPLICATE_DATA);
+		cdpb.AAAAddAVPToList(&list, dl_min_bw);
 
 		// Get A=RS-bandwidth from SDP-Reply:
 		bandwidth = sdp_b_value(rpl_raw_payload, "RS");
@@ -672,6 +684,7 @@ AAA_AVP *rx_create_media_subcomponent_avp(int number, str *proto, str *ipA,
 	str data;
 
 	int len, len2;
+	int intportA, intportB;
 	int int_port_rctp_a = 0, int_port_rctp_b = 0;
 	str port_rtcp_a = STR_NULL, port_rtcp_b = STR_NULL;
 	AAA_AVP *flow_description1 = 0, *flow_description2 = 0,
@@ -709,8 +722,14 @@ AAA_AVP *rx_create_media_subcomponent_avp(int number, str *proto, str *ipA,
 	}
 	int proto_len = strlen(proto_nr);
 
-	int intportA = atoi(portA->s);
-	int intportB = atoi(portB->s);
+	if(str2int(portA, (unsigned int *)&intportA) != 0) {
+		LM_ERR("Invalid port A\n");
+		return NULL;
+	}
+	if(str2int(portB, (unsigned int *)&intportB) != 0) {
+		LM_ERR("Invalid port B\n");
+		return NULL;
+	}
 
 	set_4bytes(x, number);
 	flow_number = cdpb.AAACreateAVP(AVP_IMS_Flow_Number,

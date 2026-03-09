@@ -30,23 +30,41 @@
 #include "db_redis_mod.h"
 #include "redis_dbase.h"
 #include "redis_table.h"
+#include "redis_sentinels.h"
 
 #ifdef WITH_SSL
 int db_redis_opt_tls = 0;
 char *db_redis_ca_path = 0;
 #endif
 char *db_redis_db_pass = 0;
+unsigned int db_redis_max_key_len = 0; /* 0 means disabled */
 
 MODULE_VERSION
 
 str redis_keys = str_init("");
 str redis_schema_path = str_init(SHARE_DIR "db_redis/kamailio");
 int db_redis_verbosity = 1;
+int mapping_struct_type = 0;
+str db_redis_hash_value = str_init("DUMMY");
+int db_redis_with_sentinels = 0;
+char *db_redis_master_name = "mymaster";
+
+int db_redis_hash_expires = 0;
+str db_redis_hash_expires_str = str_init("");
+char db_redis_hash_expires_buf[20] = {0};
+
+time_t *db_redis_shared_time = NULL;
+time_t last_seen_time = 0;
+int using_master_read_only = 0;
 
 static int db_redis_bind_api(db_func_t *dbb);
 static int mod_init(void);
 static void mod_destroy(void);
+int use_replicas = 0; // 0 master/RW, 1 replica/RO
 int keys_param(modparam_t type, void *val);
+int sentinels_param(modparam_t type, void *val);
+int recheck_replicas_interval = 120; // seconds
+int min_recheck_interval = 60;		 // seconds
 
 static cmd_export_t cmds[] = {
 		{"db_bind_api", (cmd_function)db_redis_bind_api, 0, 0, 0, 0},
@@ -60,6 +78,16 @@ static param_export_t params[] = {
 		{"keys", PARAM_STRING | PARAM_USE_FUNC, (void *)keys_param},
 		{"schema_path", PARAM_STR, &redis_schema_path},
 		{"verbosity", PARAM_INT, &db_redis_verbosity},
+		{"mapping_struct_type", PARAM_INT, &mapping_struct_type},
+		{"max_key_length", PARAM_INT, &db_redis_max_key_len},
+		{"hash_value", PARAM_STRING, &db_redis_hash_value},
+		{"hash_expires", PARAM_INT, &db_redis_hash_expires},
+		{"with_sentinels", PARAM_INT, &db_redis_with_sentinels},
+		{"sentinels_config", PARAM_STRING | PARAM_USE_FUNC,
+				(void *)sentinels_param},
+		{"use_replicas", PARAM_INT, &use_replicas}, // 0 master/RW, 1 replica/RO
+		{"redis_master_name", PARAM_STR, &db_redis_master_name},
+		{"recheck_replicas_interval", PARAM_INT, &recheck_replicas_interval},
 #ifdef WITH_SSL
 		{"opt_tls", PARAM_INT, &db_redis_opt_tls},
 		{"ca_path", PARAM_STRING, &db_redis_ca_path},
@@ -110,6 +138,11 @@ int keys_param(modparam_t type, void *val)
 		return db_redis_keys_spec((char *)val);
 }
 
+int sentinels_param(modparam_t type, void *val)
+{
+	return parse_sentinel_config((char *)val);
+}
+
 int mod_register(char *path, int *dlflags, void *p1, void *p2)
 {
 	if(db_api_init() < 0)
@@ -117,9 +150,57 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 	return 0;
 }
 
+static void db_redis_timer(unsigned int ticks, void *param)
+{
+	if(db_redis_shared_time) {
+		*db_redis_shared_time = time(NULL);
+	}
+}
+
 static int mod_init(void)
 {
 	LM_DBG("module initializing\n");
+
+	if(db_redis_hash_expires && (mapping_struct_type != MS_HASH)) {
+		LM_ERR("expires parameter is only supported with mapping_struct_type "
+			   "set to 1 (hash)\n");
+		return -1;
+	}
+
+	if(db_redis_hash_expires) {
+		db_redis_hash_expires_str.s = db_redis_hash_expires_buf;
+		db_redis_hash_expires_str.len = snprintf(
+				db_redis_hash_expires_str.s, 20, "%d", db_redis_hash_expires);
+	}
+
+	db_redis_shared_time = shm_malloc(sizeof(time_t));
+	if(db_redis_shared_time == NULL) {
+		SHM_MEM_ERROR;
+		return -1;
+	}
+
+	*db_redis_shared_time = 0;
+
+	if(db_redis_with_sentinels) {
+		if(db_redis_sc.sentinel_list == NULL) {
+			LM_ERR("sentinels_config parameter is required when using "
+				   "sentinels\n");
+			return -1;
+		}
+
+		if(recheck_replicas_interval <= 0) {
+			LM_WARN("Considering replica recheck is not desired.\n");
+			return 0;
+		} else {
+			min_recheck_interval = recheck_replicas_interval / 2;
+			if(register_timer(db_redis_timer, 0, recheck_replicas_interval)
+					< 0) {
+				LM_ERR("Failed to register timer for rechecking replica "
+					   "availability\n");
+				return -1;
+			}
+		}
+	}
 	return 0;
 }
 

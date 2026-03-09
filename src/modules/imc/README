@@ -363,7 +363,7 @@ if(is_method("MESSAGE)
 
    RPC Command Format:
 ...
-kamcmd imc_list_rooms
+kamctl rpc imc_list_rooms
 ...
 
 5.2. imc.list_members
@@ -377,7 +377,7 @@ kamcmd imc_list_rooms
 
    RPC Command Format:
 ...
-kamcmd imc_list_members _room_
+kamctl rpc imc_list_members _room_
 ...
 
 6. Statistics
@@ -501,10 +501,11 @@ kamcmd imc_list_members _room_
 
 8. Installation
 
-   Before running Kamailio with IMC, you have to setup the database tables
-   where the module will store the data. For that, if the tables were not
-   created by the installation script or you choose to install everything
-   by yourself you can use the imc-create.sql SQL script in the database
-   directories in the kamailio/scripts folder as template. You can also
-   find the complete database documentation on the project webpage,
+   Before running Kamailio with IMC, you have to set up the database
+   tables where the module will store the data. For that, if the tables
+   were not created by the installation script or you choose to install
+   everything by yourself you can use the imc-create.sql SQL script in the
+   database directories in the kamailio/scripts folder as template. You
+   can also find the complete database documentation on the project
+   webpage,
    https://www.kamailio.org/docs/db-tables/kamailio-db-devel.html.

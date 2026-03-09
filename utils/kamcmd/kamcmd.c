@@ -43,6 +43,8 @@
 #include <time.h> /* time */
 #include <sys/time.h>
 
+#define KAMCMD_JSONRPC_SOCKET "unixd:" RUN_DIR SRNAME "_rpc.sock"
+
 #ifdef USE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -63,7 +65,7 @@
 #define NAME "kamcmd"
 #endif
 #ifndef VERSION
-#define VERSION "1.5"
+#define VERSION "1.6"
 #endif
 
 #define IOVEC_CNT 20
@@ -77,6 +79,9 @@
 #define UNIX_PATH_MAX 104
 #endif
 
+#define KAMCMD_BINRPC 0
+#define KAMCMD_JSONRPC 1
+
 static char version[] = NAME " " VERSION;
 #ifdef VERSION_NODATE
 static char compiled[] = "";
@@ -87,7 +92,8 @@ static char compiled[] = VERSION_DATE;
 static char compiled[] = __TIME__ " " __DATE__;
 #endif
 #endif
-static char help_msg[] = "\
+static char help_msg[] =
+		"\
 Usage: " NAME " [options][-s address] [ cmd ]\n\
 Options:\n\
     -s address  unix socket name or host name to send the commands on\n\
@@ -98,6 +104,10 @@ Options:\n\
     -f format   print the result using format. Format is a string containing\n\
                 %v at the places where values read from the reply should be\n\
                 substituted. To print '%v', escape it using '%': %%v.\n\
+    -b          use binrpc protocol\n\
+    -j          use jsonrpc protocol\n\
+    -t timeout  timeout in seconds to wait for jsonrpc response\n\
+    -z size     size in kilobytes for jsonrpc response buffer\n\
     -v          Verbose       \n\
     -V          Version number\n\
     -h          This help message\n\
@@ -110,11 +120,13 @@ arg:\n\
      string or number; to force a number to be interpreted as string \n\
      prefix it by \"s:\", e.g. s:1\n\
 Examples:\n\
-        " NAME " -s unixs:/tmp/" NAME "_ctl system.listMethods\n\
-        " NAME " -f \"pid: %v  desc: %v\\n\" -s udp:localhost:2047 core.ps \n\
-        " NAME " ps  # uses default ctl socket \n\
-        " NAME "     # enters interactive mode on the default socket \n\
-        " NAME " -s tcp:localhost # interactive mode, default port \n\
+    " NAME " -s unixs:/tmp/" NAME "_ctl system.listMethods\n\
+    " NAME " -f \"pid: %v  desc: %v\\n\" -s udp:localhost:2047 core.ps \n\
+    " NAME " ps  # uses default ctl socket \n\
+    " NAME "     # enters interactive mode on the default socket \n\
+    " NAME " -s tcp:localhost # interactive mode, default port \n\
+    " NAME
+		" -s unixd:/run/kamailio/kamailio_rpc.sock -j core.psx # jsonrpc mode\n\
 ";
 
 
@@ -125,8 +137,11 @@ char *unix_socket = 0;
 struct sockaddr_un mysun;
 int quit; /* used only in interactive mode */
 
+int _kamcmd_rpc_type = KAMCMD_BINRPC;
+int _kamcmd_read_timeout = 2;
 struct binrpc_val *rpc_array;
 int rpc_no = 0;
+unsigned int _kamcmd_jsonrpc_size = 16 * 1024;
 
 #ifdef USE_CFG_VARS
 
@@ -169,30 +184,6 @@ struct cnt_var_grp *crt_cnt_grp;
 		(vect).iov_base = (str);        \
 		(vect).iov_len = strlen((str)); \
 	} while(0)
-
-
-#define INT2STR_MAX_LEN (19 + 1 + 1) /* 2^64~= 16*10^18 => 19+1 digits + \0 */
-
-/* returns a pointer to a static buffer containing l in asciiz & sets len */
-static inline char *int2str(unsigned int l, int *len)
-{
-	static char r[INT2STR_MAX_LEN];
-	int i;
-
-	i = INT2STR_MAX_LEN - 2;
-	r[INT2STR_MAX_LEN - 1] = 0; /* null terminate */
-	do {
-		r[i] = l % 10 + '0';
-		i--;
-		l /= 10;
-	} while(l && (i >= 0));
-	if(l && (i < 0)) {
-		fprintf(stderr, "BUG: int2str: overflow\n");
-	}
-	if(len)
-		*len = (INT2STR_MAX_LEN - 2) - i;
-	return &r[i + 1];
-}
 
 
 static char *trim_ws(char *l)
@@ -251,31 +242,40 @@ static int kamcmd_quit(int s, struct binrpc_cmd *cmd);
 static int kamcmd_warranty(int s, struct binrpc_cmd *cmd);
 
 
-static struct cmd_alias cmd_aliases[] = {{"ps", "core.ps", "%v\t%v\n"},
-		{"psx", "core.psx", 0}, {"list", "system.listMethods", 0},
-		{"ls", "system.listMethods", 0}, {"ver", "core.version", 0},
-		{"version", "core.version", 0},
-		{"who", "ctl.who", "[%v] %v: %v %v -> %v %v\n"},
-		{"listen", "ctl.listen", "[%v] %v: %v %v\n"},
-		{"dns_mem_info", "dns.mem_info", "%v / %v\n"},
-		{"dns_debug", "dns.debug",
+/* clang-format off */
+static struct cmd_alias cmd_aliases[] = {
+	{"ps", "core.ps", "%v\t%v\n"},
+	{"psx", "core.psx", 0},
+	{"list", "system.listMethods", 0},
+	{"ls", "system.listMethods", 0},
+	{"ver", "core.version", 0},
+	{"version", "core.version", 0},
+	{"who", "ctl.who", "[%v] %v: %v %v -> %v %v\n"},
+	{"listen", "ctl.listen", "[%v] %v: %v %v\n"},
+	{"dns_mem_info", "dns.mem_info", "%v / %v\n"},
+	{"dns_debug", "dns.debug",
 				"%v (%v): size=%v ref=%v expire=%vs last=%vs ago f=%v\n"},
-		{"dns_debug_all", "dns.debug_all",
+	{"dns_debug_all", "dns.debug_all",
 				"%v (%v) [%v]: size=%v ref=%v expire=%vs last=%vs ago f=%v\n"
 				"\t\t%v:%v expire=%vs f=%v\n"},
-		{"dst_blocklist_mem_info", "dst_blocklist.mem_info", "%v / %v\n"},
-		{"dst_blocklist_debug", "dst_blocklist.debug",
+	{"dst_blocklist_mem_info", "dst_blocklist.mem_info", "%v / %v\n"},
+	{"dst_blocklist_debug", "dst_blocklist.debug",
 				"%v:%v:%v expire:%v flags: %v\n"},
-		{0, 0, 0}};
+	{0, 0, 0}
+};
 
 
-static struct kamcmd_builtin builtins[] = {{"?", kamcmd_help, "help"},
-		{"help", kamcmd_help, "displays help for a command"},
-		{"version", kamcmd_ver, "displays " NAME "version"},
-		{"quit", kamcmd_quit, "exits " NAME},
-		{"exit", kamcmd_quit, "exits " NAME},
-		{"warranty", kamcmd_warranty, "displays " NAME "'s warranty info"},
-		{"license", kamcmd_warranty, "displays " NAME "'s license"}, {0, 0}};
+static struct kamcmd_builtin builtins[] = {
+	{"?", kamcmd_help, "help"},
+	{"help", kamcmd_help, "displays help for a command"},
+	{"version", kamcmd_ver, "displays " NAME "version"},
+	{"quit", kamcmd_quit, "exits " NAME},
+	{"exit", kamcmd_quit, "exits " NAME},
+	{"warranty", kamcmd_warranty, "displays " NAME "'s warranty info"},
+	{"license", kamcmd_warranty, "displays " NAME "'s license"},
+	{0, 0}
+};
+/* clang-format on */
 
 
 #ifdef USE_READLINE
@@ -301,23 +301,37 @@ static enum complete_states attempted_completion_state;
 static int crt_param_no;
 
 /* commands for which we complete the params to other method names */
+/* clang-format off */
 char *complete_params_methods[] = {
-		"?", "h", "help", "system.methodSignature", "system.methodHelp", 0};
+		"?", "h", "help", "system.methodSignature", "system.methodHelp", 0
+};
+/* clang-format on */
 
 #ifdef USE_CFG_VARS
 /* commands for which we complete the first param with a cfg var grp*/
-char *complete_params_cfg_var[] = {"cfg.get", "cfg.help", "cfg.set_delayed_int",
-		"cfg.set_delayed_string", "cfg.set_now_int", "cfg.set_now_string", 0};
+/* clang-format off */
+char *complete_params_cfg_var[] = {
+	"cfg.get", "cfg.help", "cfg.set_delayed_int", "cfg.set_delayed_string",
+	"cfg.set_now_int", "cfg.set_now_string", 0
+};
+/* clang-format on */
 #endif /* USE_CFG_VARS */
 
 #ifdef USE_COUNTERS
 /* commands for which we complete the first param with a counter group */
-char *complete_param1_counter_grp[] = {"cnt.get", "cnt.get_raw",
-		"cnt.grp_get_all", "cnt.reset", "cnt.var_list", "cnt.help", 0};
+/* clang-format off */
+char *complete_param1_counter_grp[] = {
+	"cnt.get", "cnt.get_raw", "cnt.grp_get_all", "cnt.reset", "cnt.var_list",
+	"cnt.help", 0
+};
+/* clang-format on */
 
 /* commands for which we completed the 2nd param with a counter name */
+/* clang-format off */
 char *complete_param2_counter_name[] = {
-		"cnt.get", "cnt.get_raw", "cnt.reset", "cnt.help", 0};
+		"cnt.get", "cnt.get_raw", "cnt.reset", "cnt.help", 0
+};
+/* clang-format on */
 #endif /* USE_COUNTERS */
 
 #endif /* USE_READLINE */
@@ -1993,6 +2007,259 @@ end:
 #endif /* USE_READLINE */
 
 
+/*! \brief
+ *  escape input string to prepare it for use as json value
+ */
+void kamcmd_json_escape_str(str *s_in, str *s_out, int *emode)
+{
+	char *p1, *p2;
+	int len = 0;
+	char token;
+	int i;
+
+	s_out->len = 0;
+	if(!s_in || !s_in->s) {
+		s_out->s = strdup("");
+		*emode = 1;
+		return;
+	}
+	for(i = 0; i < s_in->len; i++) {
+		if(strchr("\"\\\b\f\n\r\t", s_in->s[i])) {
+			len += 2;
+		} else if(s_in->s[i] < 32) {
+			len += 6;
+		} else {
+			len++;
+		}
+	}
+	if(len == s_in->len) {
+		s_out->s = s_in->s;
+		s_out->len = s_in->len;
+		*emode = 0;
+		return;
+	}
+
+	s_out->s = (char *)malloc(len + 2);
+	if(!s_out->s) {
+		return;
+	}
+	*emode = 1;
+
+	p2 = s_out->s;
+	p1 = s_in->s;
+	while(p1 < s_in->s + s_in->len) {
+		if((unsigned char)*p1 > 31 && *p1 != '\"' && *p1 != '\\') {
+			*p2++ = *p1++;
+		} else {
+			*p2++ = '\\';
+			switch(token = *p1++) {
+				case '\\':
+					*p2++ = '\\';
+					break;
+				case '\"':
+					*p2++ = '\"';
+					break;
+				case '\b':
+					*p2++ = 'b';
+					break;
+				case '\f':
+					*p2++ = 'f';
+					break;
+				case '\n':
+					*p2++ = 'n';
+					break;
+				case '\r':
+					*p2++ = 'r';
+					break;
+				case '\t':
+					*p2++ = 't';
+					break;
+				default:
+					/* escape and print */
+					snprintf(p2, 6, "u%04x", token);
+					p2 += 5;
+					break;
+			}
+		}
+	}
+	*p2++ = 0;
+	s_out->len = len;
+	return;
+}
+
+#define KAMCMD_JSONCMDBUF_SIZE 2048
+
+static int kamcmd_append_strz(str *obuf, str *pbuf, char *val)
+{
+	int len;
+
+	len = strlen(val);
+	if(len >= pbuf->len - 1) {
+		fprintf(stderr, "exceeding the buffer\n");
+		return -1;
+	}
+	memcpy(pbuf->s, val, len);
+	obuf->len += len;
+	obuf->s[obuf->len] = '\0';
+	pbuf->s += len;
+	pbuf->len -= len;
+
+	return 0;
+}
+
+/* runs json command */
+static int run_json_cmd(int s, struct binrpc_cmd *cmd)
+{
+	char jcbuf[KAMCMD_JSONCMDBUF_SIZE];
+	char *jrbuf = NULL;
+	struct timeval tv;
+	str jcmd;
+	str pbuf;
+	str sval;
+	int len;
+	int i;
+	int emode;
+	int ret = 0;
+	fd_set fds;
+
+	jcbuf[0] = '\0';
+	jcmd.s = jcbuf;
+	jcmd.len = 0;
+	pbuf.s = jcbuf;
+	pbuf.len = KAMCMD_JSONCMDBUF_SIZE;
+
+	if(kamcmd_append_strz(
+			   &jcmd, &pbuf, "{ \"jsonrpc\": \"2.0\", \"method\": \"")
+			< 0) {
+		return -1;
+	}
+
+	len = snprintf(pbuf.s, pbuf.len, "%s\", ", cmd->method);
+	if(len < 0 || len >= pbuf.len) {
+		fprintf(stderr, "command is too long\n");
+		goto error;
+	}
+	jcmd.len += len;
+	jcmd.s[jcmd.len] = '\0';
+	pbuf.s += len;
+	pbuf.len -= len;
+
+	jrbuf = (char *)malloc(_kamcmd_jsonrpc_size);
+	if(jrbuf == NULL) {
+		fprintf(stderr, "failed to allocate the buffer for response\n");
+		return -1;
+	}
+	if(cmd->argc > 0) {
+		if(kamcmd_append_strz(&jcmd, &pbuf, "\"params\": [") < 0) {
+			goto error;
+		}
+		for(i = 0; i < cmd->argc; i++) {
+			switch(cmd->argv[i].type) {
+				case BINRPC_T_INT:
+					len = snprintf(pbuf.s, pbuf.len, "%s%d",
+							(i == 0) ? "" : ", ", cmd->argv[i].u.intval);
+					break;
+				case BINRPC_T_DOUBLE:
+					len = snprintf(pbuf.s, pbuf.len, "%s%.3f",
+							(i == 0) ? "" : ", ", cmd->argv[i].u.fval);
+					break;
+				default:
+					emode = 0;
+					kamcmd_json_escape_str(
+							&cmd->argv[i].u.strval, &sval, &emode);
+					if(sval.s == NULL) {
+						fprintf(stderr, "failed to escape string parameter\n");
+						return -1;
+					}
+					len = snprintf(pbuf.s, pbuf.len, "%s\"%.*s\"",
+							(i == 0) ? "" : ", ", sval.len, sval.s);
+					if(emode == 1) {
+						free(sval.s);
+					}
+			}
+			if(len < 0 || len >= pbuf.len) {
+				fprintf(stderr, "command is too long\n");
+				goto error;
+			}
+			jcmd.len += len;
+			jcmd.s[jcmd.len] = '\0';
+			pbuf.s += len;
+			pbuf.len -= len;
+		}
+		if(kamcmd_append_strz(&jcmd, &pbuf, "], ") < 0) {
+			goto error;
+		}
+	}
+
+	len = snprintf(pbuf.s, pbuf.len, "\"id\": %d }", (rand() % 4000000) + 1);
+	if(len < 0 || len >= pbuf.len) {
+		fprintf(stderr, "command is too long\n");
+		goto error;
+	}
+	jcmd.len += len;
+	jcmd.s[jcmd.len] = '\0';
+	pbuf.s += len;
+	pbuf.len -= len;
+	// ret = run_binrpc_cmd(s, cmd, fmt);
+
+	if(verbose > 0) {
+		fprintf(stderr, "command is [%.*s]/%d\n", jcmd.len, jcmd.s, jcmd.len);
+	}
+
+	tv.tv_sec = 5;
+	tv.tv_usec = 0;
+	setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof tv);
+	len = write(s, jcmd.s, jcmd.len);
+	if(len <= 0) {
+		fprintf(stderr, "error sending the command (%d/%s)\n", errno,
+				strerror(errno));
+		goto error;
+	}
+
+	i = _kamcmd_read_timeout;
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+	do {
+		i--;
+		FD_ZERO(&fds);
+		FD_SET(s, &fds);
+		ret = select(s + 1, &fds, NULL, NULL, &tv);
+		if(ret < 0) {
+			fprintf(stderr, "select error (%d/%s)\n", errno, strerror(errno));
+			goto error;
+		} else if(ret == 0) {
+			/* timeout */
+			if(i <= 0) {
+				break;
+			}
+			continue;
+		}
+		len = read(s, jrbuf, _kamcmd_jsonrpc_size - 1);
+		if(len < 0) {
+			if(errno == EINTR) {
+				continue;
+			}
+			fprintf(stderr, "error reading the response (%d/%s) %d\n", errno,
+					strerror(errno), ETIMEDOUT);
+			goto error;
+		}
+		jrbuf[len] = 0x00;
+		printf("%s", jrbuf);
+		if(i <= 0 || len < _kamcmd_jsonrpc_size / 2) {
+			/* expect it is finished */
+			break;
+		}
+	} while(1);
+	printf("\n");
+	return 0;
+
+error:
+	if(jrbuf != NULL) {
+		free(jrbuf);
+	}
+	return -1;
+}
+
 /* on exit cleanup */
 static void cleanup()
 {
@@ -2024,7 +2291,7 @@ int main(int argc, char **argv)
 	sock_name = 0;
 	sock_type = UNIXS_SOCK;
 	opterr = 0;
-	while((c = getopt(argc, argv, "UVhs:D:R:vf:")) != -1) {
+	while((c = getopt(argc, argv, "UVhbjs:D:R:vf:t:z:")) != -1) {
 		switch(c) {
 			case 'V':
 				printf("version: %s\n", version);
@@ -2047,6 +2314,26 @@ int main(int argc, char **argv)
 				break;
 			case 'U':
 				sock_type = UDP_SOCK;
+				break;
+			case 'b':
+				_kamcmd_rpc_type = KAMCMD_BINRPC;
+				break;
+			case 'j':
+				_kamcmd_rpc_type = KAMCMD_JSONRPC;
+				break;
+			case 't':
+				_kamcmd_read_timeout = (int)atol(optarg);
+				if(_kamcmd_read_timeout < 0) {
+					_kamcmd_read_timeout = 2;
+				}
+				break;
+			case 'z':
+				_kamcmd_jsonrpc_size = (unsigned int)atol(optarg);
+				if(_kamcmd_jsonrpc_size == 0) {
+					_kamcmd_jsonrpc_size = 16 * 1024;
+				} else {
+					_kamcmd_jsonrpc_size *= 1024;
+				}
 				break;
 			case 'v':
 				verbose++;
@@ -2073,7 +2360,11 @@ int main(int argc, char **argv)
 		}
 	}
 	if(sock_name == 0) {
-		sock_name = DEFAULT_CTL_SOCKET;
+		if(_kamcmd_rpc_type == KAMCMD_JSONRPC) {
+			sock_name = KAMCMD_JSONRPC_SOCKET;
+		} else {
+			sock_name = DEFAULT_CTL_SOCKET;
+		}
 	}
 
 	/* init the random number generator */
@@ -2127,11 +2418,22 @@ int main(int argc, char **argv)
 	if(optind >= argc) {
 		/*fprintf(stderr, "ERROR: no command specified\n");
 			goto error; */
+		if(_kamcmd_rpc_type == KAMCMD_JSONRPC) {
+			fprintf(stderr, "jsonrpc does not work in interactive mode\n");
+			goto error;
+		}
 	} else {
 		if(parse_cmd(&cmd, &argv[optind], argc - optind) < 0)
 			goto error;
-		if(run_cmd(s, &cmd, format) < 0)
-			goto error;
+		if(_kamcmd_rpc_type == KAMCMD_JSONRPC) {
+			if(run_json_cmd(s, &cmd) < 0) {
+				goto error;
+			}
+		} else {
+			if(run_cmd(s, &cmd, format) < 0) {
+				goto error;
+			}
+		}
 		goto end;
 	}
 	/* interactive mode */

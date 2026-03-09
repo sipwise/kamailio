@@ -171,7 +171,7 @@ modparam("registrar", "default_expires", 1800)
 		<title>Set <varname>default_expires_range</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("registrar", "default_expires_range", 30) # +- 30% from default_expires
+modparam("registrar", "default_expires_range", 30) # expires within [0.7*default_expires .. default_expires]
 ...
 </programlisting>
 		</example>
@@ -1209,8 +1209,8 @@ request_route {
 modparam("registrar", "use_expired_contacts", 1)
 ...
 
-kamcmd cfg.set_now_int registrar use_expired_contacts 1
-kamcmd cfg.set_now_int registrar use_expired_contacts 0
+kamctl rpc cfg.set_now_int registrar use_expired_contacts 1
+kamctl rpc cfg.set_now_int registrar use_expired_contacts 0
 		</programlisting>
 		</example>
 	</section>
@@ -1496,6 +1496,11 @@ lookup_branches("location");
 				<emphasis>aor</emphasis> - the address of record.
 				</para>
 			</listitem>
+			<listitem>
+				<para>
+				<emphasis>count</emphasis> - the number of contacts.
+				</para>
+			</listitem>
 			</itemizedlist>
 		</listitem>
 		<listitem>
@@ -1533,9 +1538,9 @@ lookup_branches("location");
 ...
 lookup_xavp("location", "$fu", "rul", "cul");
 xinfo("aor: $xavp(rul=&gt;aor)\n");
-xinfo("number of contacts: $xavp(rul&gt;count)\n");
-xinfo("first contact record - uri: $xavp(cul&gt;uri)\n");
-xinfo("first contact record - socket: $xavp(cul&gt;socket)\n");
+xinfo("number of contacts: $xavp(rul=&gt;count)\n");
+xinfo("first contact record - uri: $xavp(cul=&gt;uri)\n");
+xinfo("first contact record - socket: $xavp(cul=&gt;socket)\n");
 ...
 </programlisting>
 		</example>
@@ -2086,4 +2091,3 @@ if(reg_fetch_contacts("location", "$fu", "caller"))
 	</section>
 
 </chapter>
-

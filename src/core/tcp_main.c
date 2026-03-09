@@ -97,6 +97,7 @@
 
 #include "tcp_info.h"
 #include "tcp_options.h"
+#include "tcp_mtops.h"
 #include "ut.h"
 #include "events.h"
 #include "cfg/cfg_struct.h"
@@ -165,15 +166,15 @@ struct fd_cache_entry
 static struct fd_cache_entry fd_cache[TCP_FD_CACHE_SIZE];
 #endif /* TCP_FD_CACHE */
 
-static int is_tcp_main = 0;
-
+static int _is_tcp_main = 0;
 
 enum poll_types tcp_poll_method = 0; /* by default choose the best method */
 int tcp_main_max_fd_no = 0;
 int tcp_max_connections = DEFAULT_TCP_MAX_CONNECTIONS;
 int tls_max_connections = DEFAULT_TLS_MAX_CONNECTIONS;
 int tcp_accept_unique = 0;
-
+int ksr_tcp_main_threads = 0;
+int ksr_tcp_listen_backlog = TCP_LISTEN_BACKLOG;
 int tcp_connection_match = TCPCONN_MATCH_DEFAULT;
 
 static union sockaddr_union tcp_source_ipv4_addr; /* saved bind/srv v4 addr. */
@@ -216,6 +217,14 @@ static ticks_t tcpconn_main_timeout(ticks_t, struct timer_ln *, void *);
 inline static int _tcpconn_add_alias_unsafe(struct tcp_connection *c, int port,
 		struct ip_addr *l_ip, int l_port, int flags);
 
+
+/**
+ *
+ */
+int is_tcp_main(void)
+{
+	return _is_tcp_main;
+}
 
 /* sets source address used when opening new sockets and no source is specified
  *  (by default the address is choosen by the kernel)
@@ -690,7 +699,7 @@ inline static int _wbufq_add(
 		q->wr_timeout = get_ticks_raw()
 						+ ((c->state == S_CONN_CONNECT)
 										? S_TO_TICKS(cfg_get(tcp, tcp_cfg,
-												connect_timeout_s))
+												  connect_timeout_s))
 										: cfg_get(tcp, tcp_cfg, send_timeout));
 	} else {
 		wb = q->last;
@@ -1243,7 +1252,9 @@ struct tcp_connection *tcpconn_new(int sock, union sockaddr_union *su,
 	atomic_set(&c->refcnt, 0);
 	local_timer_init(&c->timer, tcpconn_main_timeout, c, 0);
 
-	if(unlikely(ksr_tcp_accept_haproxy && state == S_CONN_ACCEPT)) {
+	if(unlikely((ksr_tcp_accept_haproxy
+						|| (ksr_tcp_accept_protocols & KSR_TCPAP_HAPROXY))
+				&& state == S_CONN_ACCEPT)) {
 		ret = tcpconn_read_haproxy(c);
 		if(ret == -1) {
 			LM_ERR("invalid PROXY protocol header\n");
@@ -1768,6 +1779,12 @@ struct tcp_connection *_tcpconn_find(int id, struct ip_addr *ip, int port,
 					&& (proto == PROTO_NONE || a->parent->rcv.proto == proto)) {
 				LM_DBG("found connection by peer address (id: %d)\n",
 						a->parent->id);
+
+#ifdef USE_TLS
+				if(tls_connection_match_domain
+						&& !tls_hook_call(match_domain, 1, a->parent, ip, port))
+					continue;
+#endif
 				return a->parent;
 			}
 		}
@@ -1887,6 +1904,14 @@ inline static int _tcpconn_add_alias_unsafe(struct tcp_connection *c, int port,
 							|| ip_addr_cmp(&a->parent->rcv.dst_ip, l_ip))) {
 				/* found */
 				if(unlikely(a->parent != c)) {
+#ifdef USE_TLS
+					if(tls_connection_match_domain && c->type == PROTO_TLS
+							&& a->parent->type == PROTO_TLS
+							&& !tls_hook_call(
+									match_connections_domain, 1, c, a->parent))
+						continue;
+#endif
+
 					if(flags & TCP_ALIAS_FORCE_ADD)
 						/* still have to walk the whole list to check if
 						 * the alias was not already added */
@@ -3226,6 +3251,23 @@ int tcp_init(struct socket_info *sock_info)
 	}
 #endif
 
+#if defined(__OS_linux)
+	if(sock_info->vrfinfo.name.s != NULL && sock_info->vrfinfo.name.len > 0) {
+		if(setsockopt(sock_info->socket, SOL_SOCKET, SO_BINDTODEVICE,
+				   sock_info->vrfinfo.name.s, sock_info->vrfinfo.name.len)
+				== -1) {
+			LM_ERR("setsockopt SO_BINDTODEVICE on %.*s failed: %s\n",
+					STR_FMT(&sock_info->vrfinfo.name), strerror(errno));
+			goto error;
+		}
+	}
+#else
+	if(sock_info->vrfinfo.name.s != NULL && sock_info->vrfinfo.name.len > 0) {
+		LM_WARN("VRF only supported on linux, skip SO_BINDTODEVICE for %.*s\n",
+				STR_FMT(&sock_info->vrfinfo.name));
+	}
+#endif
+
 	/* tos */
 	optval = tos;
 	if(sock_info->address.af == AF_INET) {
@@ -3318,7 +3360,7 @@ int tcp_init(struct socket_info *sock_info)
 		}
 		goto error;
 	}
-	if(listen(sock_info->socket, TCP_LISTEN_BACKLOG) == -1) {
+	if(listen(sock_info->socket, ksr_tcp_listen_backlog) == -1) {
 		LM_ERR("listen(%x, %p, %d) on %s: %s\n", sock_info->socket, &addr->s,
 				(unsigned)sockaddru_len(*addr), sock_info->address_str.s,
 				strerror(errno));
@@ -4926,7 +4968,7 @@ static inline void tcpconn_destroy_all(void)
 		c = tcpconn_id_hash[h];
 		while(c) {
 			next = c->id_next;
-			if(is_tcp_main) {
+			if(_is_tcp_main) {
 				/* we cannot close or remove the fd if we are not in the
 					 * tcp main proc.*/
 				if((c->flags & F_CONN_MAIN_TIMER)) {
@@ -4971,7 +5013,7 @@ void tcp_main_loop()
 	struct socket_info *si;
 	int r;
 
-	is_tcp_main = 1; /* mark this process as tcp main */
+	_is_tcp_main = 1; /* mark this process as tcp main */
 
 	tcp_main_max_fd_no = get_max_open_fds();
 	/* init send fd queues (here because we want mem. alloc only in the tcp
@@ -4998,6 +5040,16 @@ void tcp_main_loop()
 	if(cfg_get(tcp, tcp_cfg, fd_cache))
 		tcp_fd_cache_init();
 #endif /* TCP_FD_CACHE */
+
+	if(ksr_tcp_main_threads != 0) {
+		if(ksr_tcpx_proc_list_prepare() < 0) {
+			LM_ERR("failed to prepare multi-thread processing list\n");
+			goto error;
+		}
+		LM_INFO("tcp main processing threads prepared\n");
+	} else {
+		LM_INFO("tcp main processing threads not enabled\n");
+	}
 
 	/* add all the sockets we listen on for connections */
 	for(si = tcp_listen; si; si = si->next) {

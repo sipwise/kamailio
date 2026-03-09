@@ -80,7 +80,7 @@
               <emphasis>a database module</emphasis>,
               when a database is used as configuration data source.
               Only SQL based databases are supported, as this module needs the capability to
-              issue raw queries. It is not possible to use the dbtext or db_berkeley module at the moment.
+              issue raw queries. It is not possible to use the dbtext module at the moment.
             </para>
           </listitem>
           <listitem>
@@ -806,7 +806,7 @@ domain register {
     <section>
       <title>Database setup</title>
       <para>
-        Before running &kamailio; with carrierroute, you have to setup the database
+        Before running &kamailio; with carrierroute, you have to set up the database
         table where the module will store the routing data. For that, if
         the table was not created by the installation script or you choose
         to install everything by yourself you can use the carrierroute-create.sql

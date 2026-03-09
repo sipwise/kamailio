@@ -19,11 +19,16 @@ Andrei Pelinescu-Onciul
               2.3. message (int)
               2.4. message_data (str)
               2.5. message_file (str)
+              2.6. lock_threads_mode (int)
 
         3. Functions
 
               3.1. mt_mem_alloc(size)
               3.2. mt_mem_free()
+              3.3. mt_tcp_thread_exec(text)
+              3.4. mt_lock_test(count)
+              3.5. mt_lock_threads(nrthreads)
+              3.6. mt_unlock_threads(nrops)
 
         4. RPC Commands
 
@@ -38,26 +43,32 @@ Andrei Pelinescu-Onciul
               4.7. mt.mem_test_destroy id
               4.8. mt.mem_test_destroy_all id
               4.9. mt.mem_test_list [id] [unit]
+              4.10. mt.lock_test [executions]
 
    List of Examples
 
    1.1. Set memory in the config file
    1.2. Set mem_check_content in the config file
-   1.3. Set mem_check_content at runtime via kamcmd
+   1.3. Set mem_check_content at runtime via kamctl
    1.4. Set message in the config file
    1.5. Set message_data in the config file
    1.6. Set message_file in the config file
-   1.7. men_alloc usage
-   1.8. mem_free usage
-   1.9. mt.mem_alloc usage
-   1.10. mt.mem_free usage
-   1.11. mt.mem_used usage
-   1.12. mt.mem_rnd_alloc usage
-   1.13. mt.mem_test_start usage
-   1.14. mt.mem_test_stop usage
-   1.15. mt.mem_test_destroy usage
-   1.16. mt.mem_test_destroy_all usage
-   1.17. mt.mem_test_list usage
+   1.7. Set lock_threads_mode in the config file
+   1.8. men_alloc usage
+   1.9. mem_free usage
+   1.10. mt_tcp_thread_exec usage
+   1.11. mt_lock_test usage
+   1.12. mt_lock_threads usage
+   1.13. mt_lock_threads usage
+   1.14. mt.mem_alloc usage
+   1.15. mt.mem_free usage
+   1.16. mt.mem_used usage
+   1.17. mt.mem_rnd_alloc usage
+   1.18. mt.mem_test_start usage
+   1.19. mt.mem_test_stop usage
+   1.20. mt.mem_test_destroy usage
+   1.21. mt.mem_test_destroy_all usage
+   1.22. mt.mem_test_list usage
 
 Chapter 1. Admin Guide
 
@@ -71,11 +82,16 @@ Chapter 1. Admin Guide
         2.3. message (int)
         2.4. message_data (str)
         2.5. message_file (str)
+        2.6. lock_threads_mode (int)
 
    3. Functions
 
         3.1. mt_mem_alloc(size)
         3.2. mt_mem_free()
+        3.3. mt_tcp_thread_exec(text)
+        3.4. mt_lock_test(count)
+        3.5. mt_lock_threads(nrthreads)
+        3.6. mt_unlock_threads(nrops)
 
    4. RPC Commands
 
@@ -90,6 +106,7 @@ Chapter 1. Admin Guide
         4.7. mt.mem_test_destroy id
         4.8. mt.mem_test_destroy_all id
         4.9. mt.mem_test_list [id] [unit]
+        4.10. mt.lock_test [executions]
 
 1. Overview
 
@@ -108,6 +125,7 @@ Warning
    2.3. message (int)
    2.4. message_data (str)
    2.5. message_file (str)
+   2.6. lock_threads_mode (int)
 
 2.1. memory (int)
 
@@ -136,9 +154,9 @@ modparam("misctest", "memory", 1)
 modparam("misctest", "mem_check_content", 1)
 ...
 
-   Example 1.3.  Set mem_check_content at runtime via kamcmd
+   Example 1.3.  Set mem_check_content at runtime via kamctl
 ...
-$ kamcmd cfg.seti misctest mem_check_content 1
+$ kamctl rpc cfg.seti misctest mem_check_content 1
 ...
 
 2.3. message (int)
@@ -174,10 +192,25 @@ modparam("misctest", "message_data", "...")
 modparam("misctest", "message_file", "/tmp/sip-data.txt")
 ...
 
+2.6. lock_threads_mode (int)
+
+   Initialize (1) or not (0) the internal lock for pthreads testing.
+
+   Default: 0 (no initialization).
+
+   Example 1.7.  Set lock_threads_mode in the config file
+...
+modparam("misctest", "lock_threads_mode", 1)
+...
+
 3. Functions
 
    3.1. mt_mem_alloc(size)
    3.2. mt_mem_free()
+   3.3. mt_tcp_thread_exec(text)
+   3.4. mt_lock_test(count)
+   3.5. mt_lock_threads(nrthreads)
+   3.6. mt_unlock_threads(nrops)
 
 3.1. mt_mem_alloc(size)
 
@@ -188,7 +221,7 @@ Note
    This is a debugging function for simulating memory leaks or stressing
    the memory allocator. It should not be used in production setups
 
-   Example 1.7. men_alloc usage
+   Example 1.8. men_alloc usage
 ...
 mem_alloc(1048576); # 1MB
 ...
@@ -202,9 +235,67 @@ Note
    This is a debugging function for simulating memory leaks or stressing
    the memory allocator. It should not be used in production setups
 
-   Example 1.8. mem_free usage
+   Example 1.9. mem_free usage
 ...
 mem_free();
+...
+
+3.3. mt_tcp_thread_exec(text)
+
+   Print the text via the tcp main process threads.
+
+Note
+
+   This is a debugging function for simulating execution on tcp main
+   process threads. It should not be used in production setups
+
+   Example 1.10. mt_tcp_thread_exec usage
+...
+mt_tcp_thread_exec("request $rm uri $ru");
+...
+
+3.4.  mt_lock_test(count)
+
+   Lock and unlock the global lock count times.
+
+Note
+
+   This is a debugging function for simulating locking and unlocking of
+   global lock. It should not be used in production setups
+
+   Example 1.11.  mt_lock_test usage
+...
+mt_lock_test(100000000);
+...
+
+3.5.  mt_lock_threads(nrthreads)
+
+   Creates a set of threads that try to use the internal lock (see also
+   lock_threads_mode parameter).
+
+Note
+
+   This is a debugging function to do locking and unlocking of an internal
+   global lock from threads. It should not be used in production setups.
+
+   Example 1.12.  mt_lock_threads usage
+...
+mt_lock_threads("4");
+...
+
+3.6.  mt_unlock_threads(nrops)
+
+   Unlock the internal global lock used by mt_lock_threads(). It is done
+   nrops-times.
+
+Note
+
+   This is a debugging function to do locking and unlocking of an internal
+   global lock from threads. It should not be used in production setups.
+
+   Example 1.13.  mt_lock_threads usage
+...
+mt_unlock_threads("4");
 ...
 
 4. RPC Commands
@@ -218,6 +309,7 @@ mem_free();
    4.7. mt.mem_test_destroy id
    4.8. mt.mem_test_destroy_all id
    4.9. mt.mem_test_list [id] [unit]
+   4.10. mt.lock_test [executions]
 
 4.1.  mt.mem_alloc size [unit]
 
@@ -228,8 +320,8 @@ mem_free();
      * m - MB
      * g - GB
 
-   Example 1.9. mt.mem_alloc usage
- $ kamcmd mt.mem_alloc 10 k
+   Example 1.14.  mt.mem_alloc usage
+ $ kamctl rpc mt.mem_alloc 10 k
 
 4.2.  mt.mem_free [size] [unit]
 
@@ -244,8 +336,8 @@ mem_free();
      * m - MB
      * g - GB
 
-   Example 1.10. mt.mem_free usage
- $ kamcmd mt.mem_free 1 m
+   Example 1.15.  mt.mem_free usage
+ $ kamctl rpc mt.mem_free 1 m
 
 4.3.  mt.mem_used [unit]
 
@@ -258,18 +350,18 @@ mem_free();
      * m - MB
      * g - GB
 
-   Example 1.11. mt.mem_used usage
- $ kamcmd mt.mem_used
+   Example 1.16.  mt.mem_used usage
+ $ kamctl rpc mt.mem_used
 9221460
 
-4.4. mt.mem_rnd_alloc min max total [unit]
+4.4.  mt.mem_rnd_alloc min max total [unit]
 
    Allocates total_size memory, in pieces of random size between min ..
    max (inclusive). unit is optional and represents the unit for all the
    given sizes (see above).
 
-   Example 1.12. mt.mem_rnd_alloc usage
- $ kamcmd mt.mem_rnd_alloc 1 64 10240 k
+   Example 1.17.  mt.mem_rnd_alloc usage
+ $ kamctl rpc mt.mem_rnd_alloc 1 64 10240 k
 
 4.5.  mt.mem_test_start min max total min_int max_int total_time [unit]
 
@@ -285,30 +377,30 @@ mem_free();
 
    Returns the test id.
 
-   Example 1.13. mt.mem_test_start usage
- $ kamcmd mt.mem_test_start 15 64 25000 128 1500 3600000 k
+   Example 1.18.  mt.mem_test_start usage
+ $ kamctl rpc mt.mem_test_start 15 64 25000 128 1500 3600000 k
 1
 
 4.6.  mt.mem_test_stop id
 
    Stops the test identified by id.
 
-   Example 1.14. mt.mem_test_stop usage
- $ kamcmd mt.mem_test_stop 1
+   Example 1.19.  mt.mem_test_stop usage
+ $ kamctl rpc mt.mem_test_stop 1
 
 4.7.  mt.mem_test_destroy id
 
    Destroys the test identified by id (besides stopping it, it also frees
    all the data, including the statistics).
 
-   Example 1.15. mt.mem_test_destroy usage
+   Example 1.20.  mt.mem_test_destroy usage
  $ kamcmd mt.mem_test_destroy 1
 
 4.8.  mt.mem_test_destroy_all id
 
    Destroys all the running or stopped tests.
 
-   Example 1.16. mt.mem_test_destroy_all usage
+   Example 1.21.  mt.mem_test_destroy_all usage
  $ kamcmd mt.mem_test_destroy_all
 
 4.9.  mt.mem_test_list [id] [unit]
@@ -319,7 +411,7 @@ mem_free();
    unit is optional. The default is is bytes (for all the possible units
    see above).
 
-   Example 1.17. mt.mem_test_list usage
+   Example 1.22.  mt.mem_test_list usage
  $ kamcmd mt.mem_test_list
 {
         ID           : 2
@@ -345,3 +437,22 @@ mem_free();
         max          : 65536
         total        : 29696000
 }
+
+4.10.  mt.lock_test [executions]
+
+   The mt.lock_test RPC command performs a lock/unlock stress test using a
+   global lock. It is primarily intended for debugging and performance
+   testing of the locking subsystem.
+
+   Usage:
+        kamctl rpc mt.lock_test [executions]
+
+     * executions (integer): Number of times to lock and unlock.
+
+   If the argument is provided, it must be a positive integer. If if the
+   argument is not a positive integer, the command will return an error.
+
+   Example:
+        kamctl rpc mt.lock_test 10000
+
+   This will perform 10,000 lock/unlock operations.

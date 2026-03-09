@@ -137,7 +137,7 @@ $ cat /usr/local/etc/kamailio/dbtext/htable
 3:key:1:0:value1:0
 
 # The array key will be loaded in memory in the following format:
-$ kamcmd htable.dump htable
+$ kamctl rpc htable.dump htable
 {
         entry: 35
         size: 1
@@ -180,10 +180,10 @@ $ kamcmd htable.dump htable
 }
 
 # Now let's delete a particular entry in the array: key[0].
-$ kamcmd htable.delete htable key[0]
+$ kamctl rpc htable.delete htable key[0]
 
 # The array key will look like this after a key was deleted:
-$ kamcmd htable.dump htable
+$ kamctl rpc htable.dump htable
 {
         entry: 50
         size: 1
@@ -1423,7 +1423,118 @@ if(sht_match_str_value("ha", "eq", "alice")) {
 			Alias for sht_match_str_value().
 		</para>
 	</section>
-	</section>
+    <section id="htable.f.sht_is_null">
+        <title>
+            <function moreinfo="none">sht_is_null(htname, itname)</function>
+        </title>
+        <para>
+            Check if the item with the name 'itname' from hash table 'htname' exists.
+            This API function is equivalent to '($sht(htname=&gt;itname) == $null)'.
+        </para>
+        <para>
+            This function returns:
+        </para>
+		<itemizedlist>
+            <listitem>
+                <para>
+                    <emphasis>3</emphasis> - if parameters could not be parsed
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    <emphasis>2</emphasis> - if hash table is null
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    <emphasis>1</emphasis> - if the value is null
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    <emphasis>-1</emphasis> - if hash table default is non null
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    <emphasis>-2</emphasis> - if the value is not null
+                </para>
+            </listitem>
+		</itemizedlist>
+		<para>
+			All parameters can be static strings or contain variables.
+		</para>
+        <para>
+            This function can be used from ANY_ROUTE.
+        </para>
+        <example>
+            <title><function>sht_is_null</function> usage</title>
+            <programlisting format="linespecific">
+...
+if (sht_is_null("my_ht", "my_key")) {
+    xlog("L_ERR", "could not find my_key in my_ht\n");
+}
+...
+</programlisting>
+        </example>
+    </section>
+    <section id="htable.f.sht_inc">
+        <title>
+            <function moreinfo="none">sht_inc(htname, itname)</function>
+        </title>
+        <para>
+            Atomically increment the value of 'itname' in hash table 'htname'.
+            This API function is similar to '$shtinc(htname=&gt;itname)', without returning the value.
+        </para>
+        <para>
+            This function returns 1 on successful increment or -1 otherwise.
+        </para>
+        <para>
+            All parameters can be static strings or contain variables.
+        </para>
+        <para>
+            This function can be used from ANY_ROUTE.
+        </para>
+        <example>
+            <title><function>sht_inc</function> usage</title>
+            <programlisting format="linespecific">
+...
+if (!sht_inc("my_ht", "my_key")) {
+    xlog("L_ERR", "could not increment my_key\n");
+}
+...
+</programlisting>
+        </example>
+    </section>
+    <section id="htable.f.sht_dec">
+        <title>
+            <function moreinfo="none">sht_dec(htname, itname)</function>
+        </title>
+        <para>
+            Atomically decrement the value of 'itname' in hash table 'htname'.
+            This API function is similar to '$sht_dec(htname=&gt;itname)', without returning the value.
+        </para>
+        <para>
+            This function returns 1 on successful decrement or -1 otherwise.
+        </para>
+        <para>
+            All parameters can be static strings or contain variables.
+        </para>
+        <para>
+            This function can be used from ANY_ROUTE.
+        </para>
+        <example>
+            <title><function>sht_dec</function> usage</title>
+            <programlisting format="linespecific">
+...
+if (!sht_dec("my_ht", "my_key")) {
+    xlog("L_ERR", "could not decrement my_key\n");
+}
+...
+</programlisting>
+        </example>
+    </section>
+    </section>
 		<section>
 		<title>Exported pseudo-variables</title>
 		<itemizedlist>
@@ -1442,6 +1553,9 @@ if(sht_match_str_value("ha", "eq", "alice")) {
 			<listitem><para>
 				<emphasis>$shtinc(htable=>key)</emphasis>
 			</para></listitem>
+            <listitem><para>
+                <emphasis>$shtdec(htable=>key)</emphasis>
+            </para></listitem>
 			<listitem><para>
 				<emphasis>$shtitkey(iname)</emphasis>
 			</para></listitem>
@@ -1481,13 +1595,13 @@ if(sht_match_str_value("ha", "eq", "alice")) {
 <programlisting  format="linespecific">
 ...
 # Dump $sht(students=>alice)
-kamcmd htable.get students alice
+kamctl rpc htable.get students alice
 
 # Dump $sht(students=>15)
-kamcmd htable.get students s:15
+kamctl rpc htable.get students s:15
 
 # Dump first entry in array key course $sht(students=>course[0])
-kamcmd htable.get students course[0]
+kamctl rpc htable.get students course[0]
 ...
 </programlisting>
 	</section>
@@ -1514,13 +1628,13 @@ kamcmd htable.get students course[0]
 <programlisting  format="linespecific">
 ...
 # Delete $sht(students=>alice)
-kamcmd htable.delete students alice
+kamctl rpc htable.delete students alice
 
 # Delete $sht(students=>15)
-kamcmd htable.delete students s:15
+kamctl rpc htable.delete students s:15
 
 # Delete first entry in array key course $sht(students=>course[0])
-kamcmd htable.delete students course[0]
+kamctl rpc htable.delete students course[0]
 ...
 </programlisting>
 	</section>
@@ -1549,13 +1663,13 @@ kamcmd htable.delete students course[0]
 <programlisting  format="linespecific">
 ...
 # Set $sht(test=>x) as string
-kamcmd htable.sets test x abc
+kamctl rpc htable.sets test x abc
 
 # Set $sht(test=>5) as string
-kamcmd htable.sets test s:5 abc
+kamctl rpc htable.sets test s:5 abc
 
 # Set firsti entry in array key x $sht(test=>x[0]) as string
-kamcmd htable.sets test x[0] abc
+kamctl rpc htable.sets test x[0] abc
 ...
 </programlisting>
 	</section>
@@ -1584,13 +1698,13 @@ kamcmd htable.sets test x[0] abc
 <programlisting  format="linespecific">
 ...
 # Set $sht(test=>x) as integer
-kamcmd htable.seti test x 123
+kamctl rpc htable.seti test x 123
 
 # Set $sht(test=>5) as integer
-kamcmd htable.seti test s:5 123
+kamctl rpc htable.seti test s:5 123
 
 # Set first entry in array key x $sht(test=>x[0]) as integer
-kamcmd htable.seti test x[0] 123
+kamctl rpc htable.seti test x[0] 123
 ...
 </programlisting>
 	</section>
@@ -1714,7 +1828,7 @@ kamctl rpc htable.setxi test s:5 10 120
                 </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.dump ipban
+kamctl rpc htable.dump ipban
 ...
 </programlisting>
 	</section>
@@ -1738,7 +1852,7 @@ kamcmd htable.dump ipban
                 </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.reload ipban
+kamctl rpc htable.reload ipban
 ...
 </programlisting>
 	</section>
@@ -1762,7 +1876,7 @@ kamcmd htable.reload ipban
                 </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.store ipban
+kamctl rpc htable.store ipban
 ...
 </programlisting>
 	</section>
@@ -1785,7 +1899,7 @@ kamcmd htable.store ipban
           </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.flush ipban
+kamctl rpc htable.flush ipban
 ...
 </programlisting>
 	</section>
@@ -1809,7 +1923,7 @@ kamcmd htable.flush ipban
                 </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.listTables
+kamctl rpc htable.listTables
 ...
 </programlisting>
 	</section>
@@ -1835,7 +1949,7 @@ kamcmd htable.listTables
                 </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.stats
+kamctl rpc htable.stats
 ...
 </programlisting>
 	</section>
@@ -1860,8 +1974,8 @@ kamcmd htable.stats
           </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.dmqsync
-kamcmd htable.dmqsync ipban
+kamctl rpc htable.dmqsync
+kamctl rpc htable.dmqsync ipban
 ...
 </programlisting>
 	</section>
@@ -1885,7 +1999,7 @@ kamcmd htable.dmqsync ipban
           </para>
 <programlisting  format="linespecific">
 ...
-kamcmd htable.dmqresync ipban
+kamctl rpc htable.dmqresync ipban
 ...
 </programlisting>
 	</section>

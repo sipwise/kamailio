@@ -42,7 +42,6 @@
  * - \ref auth
  *
  * Implemented modules
- * - \ref ../modules/db_berkeley
  * - \ref ../modules/db_flatstore
  * - \ref ../modules/db_text
  * - \ref ../modules/db_mysql
@@ -344,6 +343,15 @@ err:
 	return 0;
 }
 
+/*! \brief
+ * free database connection
+ */
+void db_do_con_free(db1_con_t *_h)
+{
+	if(_h) {
+		pkg_free(_h);
+	}
+}
 
 /*! \brief
  * Shut down database module

@@ -40,6 +40,7 @@
 #include "../../core/events.h"
 #include "../../core/kemi.h"
 #include "../../core/pass_fd.h"
+#include "../../core/parser/parse_uri.h"
 
 #include "tcpops.h"
 
@@ -61,6 +62,7 @@ static int w_tcpops_enable_closed_event1(sip_msg_t *msg, char *con, char *p2);
 static int w_tcpops_enable_closed_event0(sip_msg_t *msg, char *p1, char *p2);
 static int w_tcp_conid_state(sip_msg_t *msg, char *con, char *p2);
 static int w_tcp_conid_alive(sip_msg_t *msg, char *con, char *p2);
+static int w_tcp_con_alive(sip_msg_t *msg, char *paddr, char *p2);
 static int w_tcp_get_conid(sip_msg_t *msg, char *paddr, char *pvn);
 static int w_tcp_set_otcpid(sip_msg_t *msg, char *conid, char *p2);
 static int w_tcp_set_otcpid_flag(sip_msg_t *msg, char *mode, char *p2);
@@ -106,6 +108,8 @@ static cmd_export_t cmds[] = {
 			fixup_free_spve_pvar, ANY_ROUTE},
 	{"tcp_conid_alive", (cmd_function)w_tcp_conid_alive, 1, fixup_igp_all,
 			fixup_free_igp_all, ANY_ROUTE},
+	{"tcp_con_alive", (cmd_function)w_tcp_con_alive, 1, fixup_spve_null,
+			fixup_free_spve_null, ANY_ROUTE},
 	{"tcp_set_otcpid", (cmd_function)w_tcp_set_otcpid, 1, fixup_igp_all,
 			fixup_free_igp_all, ANY_ROUTE},
 	{"tcp_set_otcpid_flag", (cmd_function)w_tcp_set_otcpid_flag, 1,
@@ -546,28 +550,41 @@ static int ki_tcp_get_conid_helper(sip_msg_t *msg, str *saddr, pv_spec_t *pvs)
 	int port;
 	pv_value_t val;
 
-	if(pvs->setf == NULL) {
+	if(pvs != NULL && pvs->setf == NULL) {
 		LM_ERR("output variable is read only\n");
 		return -1;
 	}
 
 	init_dest_info(&dst);
 
-	u = &uaddr;
-	u->port_no = 5060;
-	u->host = *saddr;
-	/* detect ipv6 */
-	p = memchr(saddr->s, ']', saddr->len);
-	if(p) {
-		p++;
-		p = memchr(p, ':', saddr->s + saddr->len - p);
+	if((saddr->len > 5)
+			&& (strncmp(saddr->s, "sips:", 5) == 0
+					|| strncmp(saddr->s, "sip:", 4) == 0)) {
+		if(parse_uri(saddr->s, saddr->len, &uaddr) < 0) {
+			LM_ERR("failed to parse uri [%.*s]\n", saddr->len, saddr->s);
+			return -1;
+		}
+		u = &uaddr;
+		if(u->port_no == 0) {
+			u->port_no = 5060;
+		}
 	} else {
-		p = memchr(saddr->s, ':', saddr->len);
-	}
-	if(p) {
-		u->host.len = p - saddr->s;
-		p++;
-		u->port_no = str2s(p, saddr->len - (p - saddr->s), NULL);
+		u = &uaddr;
+		u->port_no = 5060;
+		u->host = *saddr;
+		/* detect ipv6 */
+		p = memchr(saddr->s, ']', saddr->len);
+		if(p) {
+			p++;
+			p = memchr(p, ':', saddr->s + saddr->len - p);
+		} else {
+			p = memchr(saddr->s, ':', saddr->len);
+		}
+		if(p) {
+			u->host.len = p - saddr->s;
+			p++;
+			u->port_no = str2s(p, saddr->len - (p - saddr->s), NULL);
+		}
 	}
 
 	ret = sip_hostport2su(&dst.to, &u->host, u->port_no, &dst.proto);
@@ -583,21 +600,23 @@ static int ki_tcp_get_conid_helper(sip_msg_t *msg, str *saddr, pv_spec_t *pvs)
 	port = su_getport(&dst.to);
 	c = tcpconn_get(dst.id, &ip, port, NULL, clifetime);
 
-	if(unlikely(c == 0)) {
+	if(unlikely(c <= 0)) {
 		goto setvalue;
 	}
 	conid = c->id;
 	tcpconn_put(c);
 
 setvalue:
-	memset(&val, 0, sizeof(pv_value_t));
-	val.ri = conid;
-	val.flags = PV_VAL_INT | PV_TYPE_INT;
-	if(pvs->setf(msg, &pvs->pvp, (int)EQ_T, &val) < 0) {
-		LM_ERR("failed to set the output var\n");
-		return -1;
+	if(pvs != NULL) {
+		memset(&val, 0, sizeof(pv_value_t));
+		val.ri = conid;
+		val.flags = PV_VAL_INT | PV_TYPE_INT;
+		if(pvs->setf(msg, &pvs->pvp, (int)EQ_T, &val) < 0) {
+			LM_ERR("failed to set the output var\n");
+			return -1;
+		}
 	}
-	if(conid == 0) {
+	if(conid <= 0) {
 		return -1;
 	}
 	return 1;
@@ -636,6 +655,29 @@ static int w_tcp_get_conid(sip_msg_t *msg, char *paddr, char *pvn)
 	}
 
 	return ki_tcp_get_conid_helper(msg, &saddr, (pv_spec_t *)pvn);
+}
+
+/**
+ *
+ */
+static int ki_tcp_con_alive(sip_msg_t *msg, str *saddr)
+{
+	return ki_tcp_get_conid_helper(msg, saddr, NULL);
+}
+
+/**
+ *
+ */
+static int w_tcp_con_alive(sip_msg_t *msg, char *paddr, char *p2)
+{
+	str saddr;
+
+	if(fixup_get_svalue(msg, (gparam_t *)paddr, &saddr) < 0) {
+		LM_ERR("failed to get address parameter\n");
+		return -1;
+	}
+
+	return ki_tcp_get_conid_helper(msg, &saddr, NULL);
 }
 
 /**
@@ -921,6 +963,11 @@ static sr_kemi_t sr_kemi_tcpops_exports[] = {
 	{ str_init("tcpops"), str_init("tcp_conid_state"),
 		SR_KEMIP_INT, ki_tcp_conid_state,
 		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tcpops"), str_init("tcp_con_alive"),
+		SR_KEMIP_INT, ki_tcp_con_alive,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("tcpops"), str_init("tcp_get_conid"),
