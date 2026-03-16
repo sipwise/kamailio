@@ -46,6 +46,7 @@ upstream/usrloc-remove-destroy-of-internal-structures-on-mod-.patch
 upstream/htable-remove-destroy-of-internal-structures-on-mod-.patch
 upstream/presence-remove-destroy-of-internal-structures-on-mo.patch
 upstream/pua-remove-destroy-of-internal-structures-on-mod-des.patch
+upstream/tm_drop_stuck_transaction.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
