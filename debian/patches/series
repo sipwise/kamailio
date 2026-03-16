@@ -47,6 +47,7 @@ sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 sipwise/dlg_get_var_error_more_verbose_on_dlg
 sipwise/db_redis_protect_length_overflow.patch
 sipwise/db_redis_support_null_key_values.patch
+sipwise/permissions_consider_db_mode_when_rpc_reload.patch
 
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
