@@ -5,8 +5,6 @@
 /debhelper-build-stamp
 /files
 /ngcp-kamailio-autheph-modules/
-/ngcp-kamailio-berkeley-bin/
-/ngcp-kamailio-berkeley-modules/
 /ngcp-kamailio-carrierroute-modules/
 /ngcp-kamailio-cnxcc-modules/
 /ngcp-kamailio-cpl-modules/

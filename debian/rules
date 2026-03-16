@@ -32,6 +32,7 @@ EXTRA_EXCLUDED_MODULES += mi_xmlrpc
 EXTRA_EXCLUDED_MODULES += oracle
 EXTRA_EXCLUDED_MODULES += pa
 EXTRA_EXCLUDED_MODULES += purple
+EXTRA_EXCLUDED_MODULES += berkeley
 
 # Module groups that are packaged in seperate packages (with the name
 # kamailio-$(group_name)-modules).
@@ -39,7 +40,6 @@ EXTRA_EXCLUDED_MODULES += purple
 # on which other depend first)
 PACKAGE_GROUPS += mysql
 PACKAGE_GROUPS += postgres
-PACKAGE_GROUPS += berkeley
 PACKAGE_GROUPS += unixodbc
 PACKAGE_GROUPS += radius
 PACKAGE_GROUPS += presence
@@ -216,10 +216,6 @@ override_dh_auto_clean:
 	rm -f configure-stamp test_build_all-stamp test_install_all-stamp
 
 override_dh_auto_install: $(INSTALL_MODULES) $(INSTALL_EXTRA)
-	# Move binaries of kamailio-berkeley-modules to kamailio-berkeley-bin.
-	mkdir -p $(D)-berkeley-bin/usr/
-	mv $(D)-berkeley-modules/usr/sbin \
-	   $(D)-berkeley-bin/usr/
 
 override_dh_installexamples:
 	dh_installexamples -Xobsoleted -Xsr

@@ -11,7 +11,6 @@ Build-Depends:
  flex,
  libconfuse-dev,
  libcurl4-openssl-dev,
- libdb-dev (>= 4.6.19),
  libev-dev,
  libevent-dev,
  libexpat1-dev,
@@ -68,7 +67,6 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends},
 Suggests:
- ngcp-kamailio-berkeley-modules,
  ngcp-kamailio-cpl-modules,
  ngcp-kamailio-ldap-modules,
  ngcp-kamailio-lua-modules,
@@ -476,51 +474,6 @@ Description: XML based extensions for Kamailio's Management Interface
  - the XMLRPC transport implementations for Kamailio's
  Management and Control Interface.
  - xmlops module for XPath operations in configuration file
-
-Package: ngcp-kamailio-berkeley-modules
-Architecture: any
-Multi-Arch: same
-Pre-Depends:
- ${misc:Pre-Depends},
-Depends:
- db-util (>= 4.6.19),
- ngcp-kamailio (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Conflicts:
- kamailio-berkeley-modules,
-Replaces:
- kamailio-berkeley-modules,
-Description: Berkeley database module for Kamailio
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package provides the Berkeley database module for Kamailio, a
- high-performance embedded DB kernel. All database tables are stored
- in files, no additional server is necessary.
-
-Package: ngcp-kamailio-berkeley-bin
-Architecture: any
-Multi-Arch: foreign
-Pre-Depends:
- ${misc:Pre-Depends},
-Depends:
- ngcp-kamailio (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Conflicts:
- kamailio-berkeley-bin,
-Replaces:
- kamailio-berkeley-bin,
-Description: Berkeley database module for Kamailio - helper program
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package provides helper modules for the Berkeley database module for
- Kamailio, a high-performance embedded DB kernel. You should normally
- install kamailio-berkeley-modules and not this package directly.
 
 Package: ngcp-kamailio-ldap-modules
 Architecture: any
