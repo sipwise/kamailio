@@ -1,0 +1,11 @@
+--- a/src/modules/tlsa/Makefile
++++ b/src/modules/tlsa/Makefile
+@@ -53,7 +53,7 @@ else
+ 		DEFS += -I$(LIBSSL_STATIC_SRCPATH)/include
+ 	endif
+ 	LIBS += $(LIBSSL_STATIC_SRCPATH)/libssl.a $(LIBSSL_STATIC_SRCPATH)/libcrypto.a \
+-			 -l:libz.a -ldl
++			 -lz -ldl
+ endif # ifneq ($(LIBSSL_STATIC_SRCLIB),yes)
+ 
+ else # ifneq ($(SSL_BUILDER),)
