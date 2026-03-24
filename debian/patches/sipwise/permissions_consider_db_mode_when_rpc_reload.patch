@@ -17,7 +17,7 @@
 +	} else {
 +		LM_DBG("Skip trusted sources reload in hash buckets, caching is "
 +			   "disabled.\n");
-+		rpc->fault(c, 500, "Reload skipped (disabled cache)");
++		rpc->fault(c, 200, "Reload skipped (disabled cache)");
  	}
  
 -	rpc->rpl_printf(c, "Reload OK");
