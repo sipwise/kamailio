@@ -43,6 +43,8 @@ sipwise/lost-add-method-parameter-to-http_connect-calls.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 sipwise/presence_offline_cleanup.patch
 ### active development
+sipwise/db_redis_protect_length_overflow.patch
+sipwise/db_redis_support_null_key_values.patch
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 sipwise/permissions_consider_db_mode_when_rpc_reload.patch
 
