@@ -50,6 +50,7 @@ sipwise/dlg_get_var_error_more_verbose_on_dlg
 sipwise/tlsa_dynamic_linking_libz.patch
 sipwise/permissions_consider_db_mode_when_rpc_reload.patch
 sipwise/dialog_w_dlg_get_var_no_error_msg.patch
+sipwise/redis_dbase_no_error_msg.patch
 
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
