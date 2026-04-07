@@ -1,0 +1,20 @@
+--- a/src/modules/dialog/dialog.c
++++ b/src/modules/dialog/dialog.c
+@@ -1979,7 +1979,7 @@ static int w_dlg_get_var(
+ 		pv_get_null(msg, NULL, &dst_val);
+ 	}
+ 	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
+-		LM_ERR("unable to set value to dst_pv\n");
++		LM_INFO("unable to set value to dst_pv\n");
+ 		if(val)
+ 			goto error;
+ 		else
+@@ -1990,7 +1990,7 @@ static int w_dlg_get_var(
+ error:
+ 	pv_get_null(msg, NULL, &dst_val);
+ 	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
+-		LM_ERR("unable to set null value to dst_pv\n");
++		LM_INFO("unable to set null value to dst_pv\n");
+ 	}
+ 	return -1;
+ }
