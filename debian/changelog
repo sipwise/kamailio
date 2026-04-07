@@ -1,3 +1,13 @@
+ngcp-kamailio (6.1.1-1+0~mr26.1.0.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [fe5208a] MT#64748 tlsa: move static linking to dynamic for libz
+  * [c00fd58] MT#64749 db berkeley: remove fully support of it
+  * [8edd837] MT#63868 permissions: while reloading consider if cache is disabled
+  * [4f9af53] MT#63868 permissions: consider skipped reload as 200
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 07 Apr 2026 12:56:31 +0200
+
 ngcp-kamailio (6.1.1-1+0~mr14.2.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
