@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.6-1+0~mr13.5.1.6) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [061831c] MT#63881 tm: use bitwise check for REQ_ERR_DELAYED in t_unref()
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 24 Apr 2026 08:12:05 +0200
+
 ngcp-kamailio (6.0.6-1+0~mr13.5.1.5) unstable; urgency=medium
 
   [ Donat Zenichev ]
