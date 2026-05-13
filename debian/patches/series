@@ -43,6 +43,7 @@ sipwise/http_client-add-method-parameter-to-http_connect.patch
 sipwise/lost-add-method-parameter-to-http_connect-calls.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 sipwise/presence_offline_cleanup.patch
+sipwise/pvheaders_memleak.patch
 ### active development
 sipwise/db_redis_protect_length_overflow.patch
 sipwise/db_redis_support_null_key_values.patch
