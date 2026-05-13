@@ -62,6 +62,7 @@ sipwise/pua-get_record_puadb-add-pres_uri-to-the-query.patch
 sipwise/pua_dialoginfo-use_uuid.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 sipwise/presence_offline_cleanup.patch
+sipwise/pvheaders_memleak.patch
 ### active development
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 sipwise/permissions_consider_db_mode_when_rpc_reload.patch
