@@ -66,6 +66,7 @@ sipwise/pvheaders_memleak.patch
 ### active development
 sipwise/permissions-don-t-allow-reloads-in-the-middle-of-ong.patch
 sipwise/permissions_consider_db_mode_when_rpc_reload.patch
+sipwise/siputils_tel2sip_check_uri.patch
 
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
