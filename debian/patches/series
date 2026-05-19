@@ -44,6 +44,7 @@ sipwise/lost-add-method-parameter-to-http_connect-calls.patch
 sipwise/usrloc-don-t-synchronize-on-destroy-for-DB_ONLY.patch
 sipwise/presence_offline_cleanup.patch
 sipwise/siputils_tel2sip_check_uri.patch
+sipwise/pvheaders_memleak.patch
 ### active development
 sipwise/dlg_get_var_error_more_verbose_on_dlg
 sipwise/tlsa_dynamic_linking_libz.patch
