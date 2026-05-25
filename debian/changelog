@@ -1,3 +1,11 @@
+ngcp-kamailio (6.0.6-1+0~mr14.1.1.5) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [31fef3f] MT#64451 Kamailio memory leak on pv_headers
+  * [3e03cf0] MT#64451 siputils: validate SIP URI produced by tel2sip and tel2sip2
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 May 2026 10:39:31 +0200
+
 ngcp-kamailio (6.0.6-1+0~mr14.1.1.4) unstable; urgency=medium
 
   [ Marco Capetta ]
