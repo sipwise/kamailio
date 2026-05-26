@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.6-1+0~mr13.5.1.8) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [c5fe799] MT#64566 Adjust log level in Redis dbase from warning to debug
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 26 May 2026 09:31:40 +0200
+
 ngcp-kamailio (6.0.6-1+0~mr13.5.1.7) unstable; urgency=medium
 
   [ Alessio Garzi ]
