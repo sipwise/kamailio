@@ -1,3 +1,18 @@
+ngcp-kamailio (6.1.1-1+0~mr26.1.1.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [383626e] MT#63881 tm: use bitwise check for REQ_ERR_DELAYED in t_unref()
+
+  [ Alessio Garzi ]
+  * [79e4c11] MT#63881 rename tm_drop_stuck_transaction in tm_drop_stuck_transaction.patch
+  * [ec92609] MT#64451 Kamailio memory leak on pv_headers
+  * [11d8e16] MT#64451 siputils: validate SIP URI produced by tel2sip and tel2sip2
+  * [cae2012] MT#64451 Fix wrong debian/patches/series introduced in 11d8e16180e83f403bae84f63cc0d872e0f49b05
+  * [a23d296] MT#64566 Adjust log level in w_dlg_get_var from error to info
+  * [431d99b] MT#64566 Adjust log level in Redis dbase from warning to debug
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 15 Jun 2026 15:31:20 +0200
+
 ngcp-kamailio (6.1.1-1+0~mr26.1.0.0) unstable; urgency=medium
 
   [ Donat Zenichev ]
