@@ -1,0 +1,53 @@
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -111,20 +111,20 @@ int pvh_collect_headers(struct sip_msg *
+ 				val_part.len = strlen(hvals[idx]);
+ 				if(pvh_set_xavi(msg, &_pvh_params.xavi_name, &name, &val_part,
+ 						   SR_XTYPE_STR, 0, 1)
+-						< 0)
++						== NULL)
+ 					return -1;
+ 			}
+ 			continue;
+ 		}
+ 		if(pvh_set_xavi(
+ 				   msg, &_pvh_params.xavi_name, &name, &val, SR_XTYPE_STR, 0, 1)
+-				< 0)
++				== NULL)
+ 			return -1;
+ 	}
+ 
+ 	if(pvh_set_xavi(msg, &_pvh_params.xavi_helper_xname, &xavi_helper_name,
+ 			   &_pvh_params.xavi_name, SR_XTYPE_STR, 0, 0)
+-			< 0)
++			== NULL)
+ 		return -1;
+ 
+ 	pvh_hdrs_set_collected(msg);
+--- a/src/modules/pv_headers/pvh_str.c
++++ b/src/modules/pv_headers/pvh_str.c
+@@ -48,11 +48,12 @@ int pvh_str_free(str *s)
+ 
+ int pvh_str_copy(str *dst, str *src, unsigned int max_size)
+ {
+-	unsigned int src_len = src->len + 1 >= max_size ? max_size - 1 : src->len;
++	unsigned int src_len = 0;
+ 
+ 	if(src == NULL || dst == NULL || src->len <= 0)
+ 		return -1;
+ 
++	src_len = src->len + 1 >= max_size ? max_size - 1 : src->len;
+ 	memset(dst->s, 0, dst->len);
+ 	memcpy(dst->s, src->s, src_len);
+ 	dst->s[src_len] = '\0';
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -518,7 +518,7 @@ int pvh_clone_branch_xavi(struct sip_msg
+ 		if(sub->val.type == SR_XTYPE_DATA)
+ 			continue;
+ 		if(pvh_xavi_append_value(&sub->name, &sub->val, &br_xavi->val.v.xavp)
+-				< 0) {
++				== NULL) {
+ 			LM_ERR("cannot clone xavi %.*s\n", sub->name.len, sub->name.s);
+ 			return -1;
+ 		}

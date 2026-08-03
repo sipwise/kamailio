@@ -46,6 +46,7 @@ upstream/htable-remove-destroy-of-internal-structures-on-mod-.patch
 upstream/presence-remove-destroy-of-internal-structures-on-mo.patch
 upstream/pua-remove-destroy-of-internal-structures-on-mod-des.patch
 upstream/tm_drop_stuck_transaction.patch
+upstream/pv_headers_add_more_guards_from_upstream.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
@@ -68,6 +69,7 @@ sipwise/permissions_consider_db_mode_when_rpc_reload.patch
 sipwise/siputils_tel2sip_check_uri.patch
 sipwise/dialog_w_dlg_get_var_no_error_msg.patch
 sipwise/redis_dbase_no_error_msg.patch
+sipwise/rtpengine_always_add_totag_to_ng_message_when_rtpp_flags.patch
 
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
@@ -85,4 +87,4 @@ sipwise/redis_dbase_no_error_msg.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
-sipwise/rtpengine_always_add_totag_to_ng_message_when_rtpp_flags.patch
+
