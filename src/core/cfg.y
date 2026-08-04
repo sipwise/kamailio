@@ -71,6 +71,7 @@
 #include "config.h"
 #include "daemonize.h"
 #include "cfg_core.h"
+#include "tcp_conn.h"
 #include "cfg/cfg.h"
 #ifdef CORE_TLS
 #include "tls/tls_config.h"
@@ -247,7 +248,6 @@ extern char *default_routename;
 %token STRIP
 %token STRIP_TAIL
 %token SET_USERPHONE
-%token APPEND_BRANCH
 %token REMOVE_BRANCH
 %token CLEAR_BRANCHES
 %token SET_USER
@@ -465,6 +465,7 @@ extern char *default_routename;
 %token TCP_OPT_ACCEPT_NO_CL
 %token TCP_OPT_ACCEPT_HEP3
 %token TCP_OPT_ACCEPT_HAPROXY
+%token TCP_OPT_ACCEPT_PROTOCOLS
 %token TCP_OPT_CLOSE_RST
 %token TCP_CLONE_RCVBUF
 %token TCP_REUSE_PORT
@@ -1413,6 +1414,21 @@ assign_stm:
 		#endif
 	}
 	| TCP_OPT_ACCEPT_HAPROXY EQUAL error { yyerror("boolean value expected"); }
+	| TCP_OPT_ACCEPT_PROTOCOLS EQUAL NUMBER {
+		#ifdef USE_TCP
+			ksr_tcp_accept_protocols=$3;
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_OPT_ACCEPT_PROTOCOLS EQUAL STRING {
+		#ifdef USE_TCP
+			ksr_tcp_parse_accept_protocols($3);
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_OPT_ACCEPT_PROTOCOLS EQUAL error { yyerror("number or string value expected"); }
 	| TCP_OPT_CLOSE_RST EQUAL NUMBER {
          #ifdef USE_TCP
              tcp_default_cfg.close_rst=$3;
@@ -2856,6 +2872,7 @@ fcmd:
 				case MODULE5_T:
 				case MODULE6_T:
 				case MODULEX_T:
+				case ROUTE_T:
 				case SET_FWD_NO_CONNECT_T:
 				case SET_RPL_NO_CONNECT_T:
 				case SET_FWD_CLOSE_T:

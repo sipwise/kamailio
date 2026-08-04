@@ -1227,7 +1227,9 @@ struct tcp_connection *tcpconn_new(int sock, union sockaddr_union *su,
 	atomic_set(&c->refcnt, 0);
 	local_timer_init(&c->timer, tcpconn_main_timeout, c, 0);
 
-	if(unlikely(ksr_tcp_accept_haproxy && state == S_CONN_ACCEPT)) {
+	if(unlikely((ksr_tcp_accept_haproxy
+						|| (ksr_tcp_accept_protocols & KSR_TCPAP_HAPROXY))
+				&& state == S_CONN_ACCEPT)) {
 		ret = tcpconn_read_haproxy(c);
 		if(ret == -1) {
 			LM_ERR("invalid PROXY protocol header\n");
@@ -4402,8 +4404,11 @@ inline static int send2child(struct tcp_connection *tcpconn)
 	   even replaced by another one with the same number) so it
 	   must not be sent to a reader anymore */
 	if(unlikely(tcpconn->state == S_CONN_BAD
-				|| (tcpconn->flags & F_CONN_FD_CLOSED)))
+				|| (tcpconn->flags & F_CONN_FD_CLOSED))) {
+		tcp_children[idx].busy--;
+		tcp_children[idx].n_reqs--;
 		return -1;
+	}
 #ifdef SEND_FD_QUEUE
 	/* if queue full, try to queue the io */
 	if(unlikely(send_fd(tcp_children[idx].unix_sock, &tcpconn, sizeof(tcpconn),
@@ -4418,11 +4423,15 @@ inline static int send2child(struct tcp_connection *tcpconn)
 					   &send2child_q, tcp_children[idx].unix_sock, tcpconn)
 					!= 0) {
 				LM_ERR("queue send op. failed\n");
+				tcp_children[idx].busy--;
+				tcp_children[idx].n_reqs--;
 				return -1;
 			}
 		} else {
 			LM_ERR("send_fd failed for %p (flags 0x%0x), fd %d\n", tcpconn,
 					tcpconn->flags, tcpconn->s);
+			tcp_children[idx].busy--;
+			tcp_children[idx].n_reqs--;
 			return -1;
 		}
 	}
@@ -4432,6 +4441,8 @@ inline static int send2child(struct tcp_connection *tcpconn)
 				<= 0)) {
 		LM_ERR("send_fd failed for %p (flags 0x%0x), fd %d\n", tcpconn,
 				tcpconn->flags, tcpconn->s);
+		tcp_children[idx].busy--;
+		tcp_children[idx].n_reqs--;
 		return -1;
 	}
 #endif
