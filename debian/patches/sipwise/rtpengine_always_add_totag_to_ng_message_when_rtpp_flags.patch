@@ -7,10 +7,10 @@ Subject: rtpengine_always_add_totag_to_ng_message_when_rtpp_flags
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index e26d533..97eff5b 100644
+index 8217cef..47158c5 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -3179,7 +3179,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
+@@ -3183,7 +3183,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf,
  	 */
  
  	/* affects to-tag parsing */
