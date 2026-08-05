@@ -30,8 +30,8 @@
 #include "../../trim.h"
 #include "../../ut.h"
 
-#define LOWER_BYTE(b) ((b) | 0x20)
-#define LOWER_DWORD(d) ((d) | 0x20202020)
+#define LOWER_BYTE(b) (((unsigned char)(b)) | 0x20)
+#define LOWER_DWORD(d) ((d) | 0x20202020U)
 
 /*
  * Parse short (less than 4 bytes) parameter names
@@ -74,8 +74,13 @@
  * does not allow reading 4-bytes at once from unaligned memory position
  * (Sparc for example)
  */
-#define READ(val) \
-	(*(val + 0) + (*(val + 1) << 8) + (*(val + 2) << 16) + (*(val + 3) << 24))
+#define READ(val)                                                 \
+	(((unsigned int)(unsigned char)*((val) + 0))                  \
+			+ (((unsigned int)(unsigned char)*((val) + 1)) << 8)  \
+			+ (((unsigned int)(unsigned char)*((val) + 2)) << 16) \
+			+ (((unsigned int)(unsigned char)*((val) + 3)) << 24))
+
+#define HAVE_CHARS(_p, _n) ((end - (_p)) >= (_n))
 
 
 #define name_CASE                  \
@@ -87,15 +92,21 @@
 	}
 
 
-#define user_CASE  \
-	p += 4;        \
-	val = READ(p); \
-	name_CASE;     \
+#define user_CASE           \
+	p += 4;                 \
+	if(!HAVE_CHARS(p, 4)) { \
+		goto other;         \
+	}                       \
+	val = READ(p);          \
+	name_CASE;              \
 	goto other;
 
 
 #define real_CASE               \
 	p += 4;                     \
+	if(!HAVE_CHARS(p, 1)) {     \
+		goto other;             \
+	}                           \
 	if(LOWER_BYTE(*p) == 'm') { \
 		*_type = PAR_REALM;     \
 		p++;                    \
@@ -105,6 +116,9 @@
 
 #define nonc_CASE               \
 	p += 4;                     \
+	if(!HAVE_CHARS(p, 1)) {     \
+		goto other;             \
+	}                           \
 	if(LOWER_BYTE(*p) == 'e') { \
 		*_type = PAR_NONCE;     \
 		p++;                    \
@@ -121,15 +135,21 @@
 	}
 
 
-#define resp_CASE  \
-	p += 4;        \
-	val = READ(p); \
-	onse_CASE;     \
+#define resp_CASE           \
+	p += 4;                 \
+	if(!HAVE_CHARS(p, 4)) { \
+		goto other;         \
+	}                       \
+	val = READ(p);          \
+	onse_CASE;              \
 	goto other;
 
 
 #define cnon_CASE                   \
 	p += 4;                         \
+	if(!HAVE_CHARS(p, 2)) {         \
+		goto other;                 \
+	}                               \
 	if(LOWER_BYTE(*p) == 'c') {     \
 		p++;                        \
 		if(LOWER_BYTE(*p) == 'e') { \
@@ -143,6 +163,9 @@
 
 #define opaq_CASE                   \
 	p += 4;                         \
+	if(!HAVE_CHARS(p, 2)) {         \
+		goto other;                 \
+	}                               \
 	if(LOWER_BYTE(*p) == 'u') {     \
 		p++;                        \
 		if(LOWER_BYTE(*p) == 'e') { \
@@ -158,6 +181,9 @@
 	switch(LOWER_DWORD(val)) {          \
 		case _rith_:                    \
 			p += 4;                     \
+			if(!HAVE_CHARS(p, 1)) {     \
+				goto other;             \
+			}                           \
 			if(LOWER_BYTE(*p) == 'm') { \
 				*_type = PAR_ALGORITHM; \
 				p++;                    \
@@ -167,10 +193,13 @@
 	}
 
 
-#define algo_CASE  \
-	p += 4;        \
-	val = READ(p); \
-	rith_CASE;     \
+#define algo_CASE           \
+	p += 4;                 \
+	if(!HAVE_CHARS(p, 4)) { \
+		goto other;         \
+	}                       \
+	val = READ(p);          \
+	rith_CASE;              \
 	goto other
 
 
@@ -194,17 +223,16 @@
 int parse_param_name(str *_s, dig_par_t *_type)
 {
 	register char *p;
-	register int val;
+	register unsigned int val;
 	char *end;
 
 	end = _s->s + _s->len;
 
 	p = _s->s;
-	val = READ(p);
-
 	if(_s->len < 4) {
 		goto other;
 	}
+	val = READ(p);
 
 	switch(LOWER_DWORD(val)) {
 		FIRST_QUATERNIONS;
@@ -218,11 +246,14 @@ end:
 	_s->s = p;
 
 	trim_leading(_s);
-	if(_s->s[0] == '=') {
+	if(_s->len > 0 && _s->s[0] == '=') {
 		return 0;
 	}
 
 other:
+	if(unlikely(p > end)) {
+		return -1; /* Parse error */
+	}
 	p = q_memchr(p, '=', end - p);
 	if(!p) {
 		return -1; /* Parse error */
