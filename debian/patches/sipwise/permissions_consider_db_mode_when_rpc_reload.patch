@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 13:02:33 +0200
+Subject: permissions_consider_db_mode_when_rpc_reload
+
+---
+ src/modules/permissions/rpc.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/permissions/rpc.c b/src/modules/permissions/rpc.c
+index 7646ee0..8ff681c 100644
 --- a/src/modules/permissions/rpc.c
 +++ b/src/modules/permissions/rpc.c
-@@ -60,12 +60,19 @@ void rpc_trusted_reload(rpc_t *rpc, void
+@@ -60,12 +60,19 @@ void rpc_trusted_reload(rpc_t *rpc, void *c)
  		return;
  	}
  
