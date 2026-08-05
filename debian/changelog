@@ -1,3 +1,20 @@
+ngcp-kamailio (6.1.3-1+0~mr26.0.1.0) noble; urgency=medium
+
+  [ Donat Zenichev ]
+  * [c16b26d] New upstream version 6.1.3
+  * [8ab2baf] MT#65646 Remove already applied patches and refresh the rest
+
+  [ Marco Capetta ]
+  * [d3b197b] MT#63881 tm: use bitwise check for REQ_ERR_DELAYED in t_unref()
+
+  [ Alessio Garzi ]
+  * [41e1073] MT#64451 Kamailio memory leak on pv_headers
+  * [ae306c6] MT#64451 siputils: validate SIP URI produced by tel2sip and tel2sip2
+  * [ef9262f] MT#64566 Adjust log level in w_dlg_get_var from error to info
+  * [624be0b] MT#64566 Adjust log level in Redis dbase from warning to debug
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Wed, 05 Aug 2026 13:51:53 +0200
+
 ngcp-kamailio (6.1.1-1+0~mr26.0.1.0) unstable; urgency=medium
 
   * New release.
