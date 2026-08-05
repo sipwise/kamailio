@@ -1,3 +1,10 @@
+ngcp-kamailio (5.8.8-1+0~mr12.5.1.15) unstable; urgency=medium
+
+  * [85f3fdd] New upstream version 5.8.8
+  * [f3a1775] MT#65646 Remove already applied patches and refresh the rest
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Wed, 05 Aug 2026 08:37:56 +0200
+
 ngcp-kamailio (5.8.6-1+0~mr12.5.1.15) unstable; urgency=medium
 
   [ Alessio Garzi ]
