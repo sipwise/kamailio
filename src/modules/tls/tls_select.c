@@ -1013,6 +1013,20 @@ static int get_comp(str *res, int local, int issuer, int nid, sip_msg_t *msg)
 		goto err;
 	}
 
+	if(nid == NID_undef) {
+		/* no component requested - return the full subject/issuer oneline */
+		if(X509_NAME_oneline(name, buf, sizeof(buf)) == NULL) {
+			ERR("Error converting X509 name to string\n");
+			goto err;
+		}
+		res->s = buf;
+		res->len = strlen(buf);
+		if(!local)
+			X509_free(cert);
+		tcpconn_put(c);
+		return 0;
+	}
+
 	index = X509_NAME_get_index_by_NID(name, nid, -1);
 	if(index == -1) {
 		switch(nid) {
@@ -1238,8 +1252,8 @@ static int get_alt(str *res, int local, int type, int idx, sip_msg_t *msg)
 				case GEN_EMAIL:
 				case GEN_DNS:
 				case GEN_URI:
-					text.s = (char *)nm->d.ia5->data;
-					text.len = nm->d.ia5->length;
+					text.s = (char *)ASN1_STRING_get0_data(nm->d.ia5);
+					text.len = ASN1_STRING_length(nm->d.ia5);
 					if(text.len >= 1024) {
 						ERR("Alternative subject text too long\n");
 						goto err;
@@ -1249,9 +1263,14 @@ static int get_alt(str *res, int local, int type, int idx, sip_msg_t *msg)
 					res->len = text.len;
 					break;
 				case GEN_IPADD:
-					ip.len = nm->d.iPAddress->length;
+					ip.len = ASN1_STRING_length(nm->d.iPAddress);
+					if(ip.len != 4 && ip.len != 16) {
+						ERR("Invalid ip address length\n");
+						goto err;
+					}
 					ip.af = (ip.len == 16) ? AF_INET6 : AF_INET;
-					memcpy(ip.u.addr, nm->d.iPAddress->data, ip.len);
+					memcpy(ip.u.addr, ASN1_STRING_get0_data(nm->d.iPAddress),
+							ip.len);
 					text.s = ip_addr2a(&ip);
 					text.len = strlen(text.s);
 					memcpy(buf, text.s, text.len);

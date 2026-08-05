@@ -116,6 +116,10 @@ int keyvalue_parse_str(str *data, int type, keyvalue_t *res)
 	res->value.len = s.len;
 	res->type = type;
 	if(type == KEYVALUE_TYPE_PARAMS) {
+		if(s.len <= 0) {
+			LM_ERR("empty params value\n");
+			goto error;
+		}
 		if(s.s[s.len - 1] == ';')
 			s.len--;
 		if(parse_params(&s, CLASS_ANY, &phooks, &res->u.params) < 0) {
@@ -514,7 +518,7 @@ int ht_set_cell_ex(
 						if(exv <= 0) {
 							HT_COPY_EXPIRE(ht, cell, now, it);
 						} else {
-							it->expire = now + exv;
+							cell->expire = now + exv;
 						}
 						if(it->prev)
 							it->prev->next = cell;
@@ -550,7 +554,7 @@ int ht_set_cell_ex(
 					if(exv <= 0) {
 						HT_COPY_EXPIRE(ht, cell, now, it);
 					} else {
-						it->expire = now + exv;
+						cell->expire = now + exv;
 					}
 
 					cell->next = it->next;
@@ -1148,14 +1152,16 @@ void ht_timer(unsigned int ticks, void *param)
 					if(it->expire != 0 && it->expire < now) {
 						/* expired */
 						ht_handle_expired_record(ht, it);
-						if(it->prev == NULL)
-							ht->entries[i].first = it->next;
-						else
-							it->prev->next = it->next;
-						if(it->next)
-							it->next->prev = it->prev;
-						ht->entries[i].esize--;
-						ht_cell_free(it);
+						if(it->expire < now) {
+							if(it->prev == NULL)
+								ht->entries[i].first = it->next;
+							else
+								it->prev->next = it->next;
+							if(it->next)
+								it->next->prev = it->prev;
+							ht->entries[i].esize--;
+							ht_cell_free(it);
+						}
 					}
 					it = it0;
 				}
