@@ -64,7 +64,7 @@ typedef struct _evapi_client
 	unsigned short af;
 	unsigned short src_port;
 	char src_addr[EVAPI_IPADDR_SIZE];
-	char tag[EVAPI_IPADDR_SIZE];
+	char tag[EVAPI_TAG_SIZE];
 	str stag;
 	char rbuffer[CLIENT_BUFFER_SIZE];
 	unsigned int rpos;
@@ -455,6 +455,7 @@ void evapi_recv_client(struct ev_loop *loop, struct ev_io *watcher, int revents)
 	str frame;
 	char *sfp;
 	char *efp;
+	char drainbuf[CLIENT_BUFFER_SIZE];
 
 	if(EV_ERROR & revents) {
 		LM_ERR("received invalid event (%d)\n", revents);
@@ -474,8 +475,7 @@ void evapi_recv_client(struct ev_loop *loop, struct ev_io *watcher, int revents)
 	if(i == EVAPI_MAX_CLIENTS) {
 		LM_ERR("cannot lookup client socket %d\n", watcher->fd);
 		/* try to empty the socket anyhow */
-		rlen = recv(watcher->fd, _evapi_clients[i].rbuffer,
-				CLIENT_BUFFER_SIZE - 1, 0);
+		rlen = recv(watcher->fd, drainbuf, sizeof(drainbuf) - 1, 0);
 		return;
 	}
 
@@ -544,6 +544,14 @@ void evapi_recv_client(struct ev_loop *loop, struct ev_io *watcher, int revents)
 			while(k < _evapi_clients[i].rpos + rlen) {
 				if(_evapi_clients[i].rbuffer[k] >= '0'
 						&& _evapi_clients[i].rbuffer[k] <= '9') {
+					if(frame.len > INT_MAX / 10
+							|| (_evapi_clients[i].rbuffer[k] - '0')
+									   > (INT_MAX - frame.len * 10)) {
+						/* overflow - invalid frame */
+						LM_ERR("frame length overflow. 10+ digits \n");
+						_evapi_clients[i].rpos = 0;
+						return;
+					}
 					frame.len =
 							frame.len * 10 + _evapi_clients[i].rbuffer[k] - '0';
 				} else {

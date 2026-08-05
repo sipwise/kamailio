@@ -176,18 +176,24 @@ int unescape_crlf(str *sin, str *sout)
 /*! \brief Unscape all printable ASCII characters */
 int unescape_user(str *sin, str *sout)
 {
-	char *at, *p, c;
+	char *at, c;
+	int i;
+	unsigned char h1;
+	unsigned char h2;
 
 	if(sin == NULL || sout == NULL || sin->s == NULL || sout->s == NULL
 			|| sin->len < 0 || sout->len < sin->len + 1)
 		return -1;
 
 	at = sout->s;
-	p = sin->s;
-	while(p < sin->s + sin->len) {
-		if(*p == '%') {
-			p++;
-			switch(*p) {
+	for(i = 0; i < sin->len; i++) {
+		if(sin->s[i] == '%') {
+			if(i + 2 >= sin->len) {
+				LM_ERR("incomplete escaped sequence at end of string\n");
+				return -1;
+			}
+			h1 = (unsigned char)sin->s[++i];
+			switch(h1) {
 				case '0':
 				case '1':
 				case '2':
@@ -198,7 +204,7 @@ int unescape_user(str *sin, str *sout)
 				case '7':
 				case '8':
 				case '9':
-					c = (*p - '0') << 4;
+					c = (h1 - '0') << 4;
 					break;
 				case 'a':
 				case 'b':
@@ -206,7 +212,7 @@ int unescape_user(str *sin, str *sout)
 				case 'd':
 				case 'e':
 				case 'f':
-					c = (*p - 'a' + 10) << 4;
+					c = (h1 - 'a' + 10) << 4;
 					break;
 				case 'A':
 				case 'B':
@@ -214,14 +220,14 @@ int unescape_user(str *sin, str *sout)
 				case 'D':
 				case 'E':
 				case 'F':
-					c = (*p - 'A' + 10) << 4;
+					c = (h1 - 'A' + 10) << 4;
 					break;
 				default:
-					LM_ERR("invalid hex digit <%u>\n", (unsigned int)*p);
+					LM_ERR("invalid hex digit <%u>\n", (unsigned int)h1);
 					return -1;
 			}
-			p++;
-			switch(*p) {
+			h2 = (unsigned char)sin->s[++i];
+			switch(h2) {
 				case '0':
 				case '1':
 				case '2':
@@ -232,7 +238,7 @@ int unescape_user(str *sin, str *sout)
 				case '7':
 				case '8':
 				case '9':
-					c = c + (*p - '0');
+					c = c + (h2 - '0');
 					break;
 				case 'a':
 				case 'b':
@@ -240,7 +246,7 @@ int unescape_user(str *sin, str *sout)
 				case 'd':
 				case 'e':
 				case 'f':
-					c = c + (*p - 'a' + 10);
+					c = c + (h2 - 'a' + 10);
 					break;
 				case 'A':
 				case 'B':
@@ -248,10 +254,10 @@ int unescape_user(str *sin, str *sout)
 				case 'D':
 				case 'E':
 				case 'F':
-					c = c + (*p - 'A' + 10);
+					c = c + (h2 - 'A' + 10);
 					break;
 				default:
-					LM_ERR("invalid hex digit <%u>\n", (unsigned int)*p);
+					LM_ERR("invalid hex digit <%u>\n", (unsigned int)h2);
 					return -1;
 			}
 			if((c < 32) || (c > 126)) {
@@ -260,9 +266,8 @@ int unescape_user(str *sin, str *sout)
 			}
 			*at++ = c;
 		} else {
-			*at++ = *p;
+			*at++ = sin->s[i];
 		}
-		p++;
 	}
 
 	*at = 0;
@@ -570,11 +575,14 @@ int cmp_str_params(str *s1, str *s2)
 	param_t *pl2 = NULL;
 	param_hooks_t phooks2;
 	param_t *pit2 = NULL;
+	int ret = 0;
 
 	if(parse_params(s1, CLASS_ANY, &phooks1, &pl1) < 0)
 		return -1;
-	if(parse_params(s2, CLASS_ANY, &phooks2, &pl2) < 0)
+	if(parse_params(s2, CLASS_ANY, &phooks2, &pl2) < 0) {
+		free_params(pl1);
 		return -1;
+	}
 	for(pit1 = pl1; pit1; pit1 = pit1->next) {
 		for(pit2 = pl2; pit2; pit2 = pit2->next) {
 			if(pit1->name.len == pit2->name.len
@@ -583,12 +591,17 @@ int cmp_str_params(str *s1, str *s2)
 				if(pit1->body.len != pit2->body.len
 						|| strncasecmp(
 								   pit1->body.s, pit2->body.s, pit2->body.len)
-								   != 0)
-					return 1;
+								   != 0) {
+					ret = 1;
+					goto done;
+				}
 			}
 		}
 	}
-	return 0;
+done:
+	free_params(pl1);
+	free_params(pl2);
+	return ret;
 }
 
 /**
@@ -894,23 +907,26 @@ int urlencode(str *sin, str *sout)
  */
 int urldecode(str *sin, str *sout)
 {
-	char *at, *p;
+	char *at;
+	int i;
+
+	if(sin == NULL || sout == NULL || sin->s == NULL || sout->s == NULL
+			|| sin->len < 0 || sout->len < sin->len + 1)
+		return -1;
 
 	at = sout->s;
-	p = sin->s;
-
-	while(p < sin->s + sin->len) {
-		if(*p == '%') {
-			if(p[1] && p[2]) {
-				*at++ = hex_to_char(p[1]) << 4 | hex_to_char(p[2]);
-				p += 2;
+	for(i = 0; i < sin->len; i++) {
+		if(sin->s[i] == '%') {
+			if(i + 2 < sin->len) {
+				*at++ = (((unsigned char)hex_to_char(sin->s[i + 1])) << 4)
+						| (unsigned char)hex_to_char(sin->s[i + 2]);
+				i += 2;
 			}
-		} else if(*p == '+') {
+		} else if(sin->s[i] == '+') {
 			*at++ = ' ';
 		} else {
-			*at++ = *p;
+			*at++ = sin->s[i];
 		}
-		p++;
 	}
 
 	*at = 0;
@@ -937,12 +953,22 @@ void ksr_str_json_escape(str *s_in, str *s_out, int *emode)
 		return;
 	}
 	for(i = 0; i < s_in->len; i++) {
-		if(strchr("\"\\\b\f\n\r\t", s_in->s[i])) {
-			len += 2;
-		} else if(s_in->s[i] < 32) {
-			len += 6;
-		} else {
-			len++;
+		switch(s_in->s[i]) {
+			case '\"':
+			case '\\':
+			case '\b':
+			case '\f':
+			case '\n':
+			case '\r':
+			case '\t':
+				len += 2;
+				break;
+			default:
+				if((unsigned char)s_in->s[i] < 32) {
+					len += 6;
+				} else {
+					len++;
+				}
 		}
 	}
 	if(len == s_in->len) {
