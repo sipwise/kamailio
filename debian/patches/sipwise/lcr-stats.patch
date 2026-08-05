@@ -9,7 +9,7 @@ Subject: lcr: add stats per gw
  3 files changed, 828 insertions(+)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 6bf2cea..66dbcdc 100644
+index 015719e..2bcf455 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -68,6 +68,7 @@
@@ -281,7 +281,7 @@ index 6bf2cea..66dbcdc 100644
  	LM_DBG("inserted gw <%u, %.*s, %.*s> at index %u\n", gw_id, gw_name_len,
  			gw_name, gws[i].uri_len, gws[i].uri, i);
  	return 1;
-@@ -2338,6 +2551,65 @@ done:
+@@ -2348,6 +2561,65 @@ done:
  	return j;
  }
  
@@ -347,7 +347,7 @@ index 6bf2cea..66dbcdc 100644
  
  /*
   * Load info of matching GWs into gw_uri_avps
-@@ -3797,3 +4069,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+@@ -3817,3 +4089,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
  	sr_kemi_modules_add(sr_kemi_lcr_exports);
  	return 0;
  }

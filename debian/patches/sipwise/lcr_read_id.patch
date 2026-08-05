@@ -7,7 +7,7 @@ Subject: lcr_read_id
  1 file changed, 72 insertions(+), 19 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 66dbcdc..4ab536c 100644
+index 2bcf455..707406c 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -175,6 +175,7 @@ static char *gw_uri_avp_param = NULL;
@@ -109,7 +109,7 @@ index 66dbcdc..4ab536c 100644
  		value.s = (char *)&(encoded_value[0]);
  		val.s = value;
  		add_avp(gw_uri_avp_type | AVP_VAL_STR, gw_uri_avp, val);
-@@ -2540,9 +2571,9 @@ done:
+@@ -2550,9 +2581,9 @@ done:
  		if(matched_gws[i].duplicate == 1)
  			continue;
  		gw_indexes[j] = matched_gws[i].gw_index;
@@ -121,7 +121,7 @@ index 66dbcdc..4ab536c 100644
  			i = -1;
  		}
  		j++;
-@@ -2574,28 +2605,36 @@ void reset_gw_stats(struct gw_info *gw)
+@@ -2584,28 +2615,36 @@ void reset_gw_stats(struct gw_info *gw)
  
  	gw->rcv_gw_rpl = 0;
  	gw->rcv_gw_rpl_invite = 0;
@@ -166,7 +166,7 @@ index 66dbcdc..4ab536c 100644
  
  	gw->rcv_gw_rpls_1xx = 0;
  	gw->rcv_gw_rpls_18x = 0;
-@@ -2807,7 +2846,7 @@ done:
+@@ -2827,7 +2866,7 @@ done:
  			} else if(matched_gws[i].stopper == 1) {
  				stopper_flag = 1;
  				LM_DBG("lcr_rule[%d] has stopper, skip the rest\n",
@@ -175,7 +175,7 @@ index 66dbcdc..4ab536c 100644
  			}
  		}
  	}
-@@ -2906,7 +2945,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
+@@ -2926,7 +2965,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
  static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
  		unsigned int *r_uri_len, char *dst_uri, unsigned int *dst_uri_len,
  		struct ip_addr *addr, unsigned int *gw_index, unsigned int *flags,
@@ -184,7 +184,7 @@ index 66dbcdc..4ab536c 100644
  {
  	int_str gw_uri_val;
  	struct usr_avp *gu_avp;
-@@ -2932,7 +2971,7 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
+@@ -2952,7 +2991,7 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
  
  	decode_avp_value(gw_uri_val.s.s, gw_index, &scheme, &strip, &prefix,
  			&tmp_tag, addr, &hostname, &port, &uparams, &transport, flags,
@@ -193,7 +193,7 @@ index 66dbcdc..4ab536c 100644
  
  	if(addr->af != 0) {
  		addr_str.s = ip_addr2a(addr);
-@@ -3291,7 +3330,7 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3311,7 +3350,7 @@ static int ki_next_gw(sip_msg_t *_m)
  	int rval;
  	str uri_str, tag_str;
  	char tag[MAX_TAG_LEN];
@@ -202,7 +202,7 @@ index 66dbcdc..4ab536c 100644
  	char r_uri[MAX_URI_LEN], dst_uri[MAX_URI_LEN];
  	struct ip_addr addr;
  
-@@ -3313,7 +3352,8 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3333,7 +3372,8 @@ static int ki_next_gw(sip_msg_t *_m)
  			return -1;
  		}
  		if(generate_uris(_m, r_uri, &(_m->parsed_uri.user), &r_uri_len, dst_uri,
@@ -212,7 +212,7 @@ index 66dbcdc..4ab536c 100644
  				<= 0) {
  			return -1;
  		}
-@@ -3332,7 +3372,8 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3352,7 +3392,8 @@ static int ki_next_gw(sip_msg_t *_m)
           * and Destination URIs. */
  
  		if(generate_uris(_m, r_uri, &(ruri_user_val.s), &r_uri_len, dst_uri,
@@ -222,7 +222,7 @@ index 66dbcdc..4ab536c 100644
  				<= 0) {
  			return -1;
  		}
-@@ -3365,6 +3406,13 @@ static int ki_next_gw(sip_msg_t *_m)
+@@ -3385,6 +3426,13 @@ static int ki_next_gw(sip_msg_t *_m)
  		LM_DBG("added flags_avp <%u>\n", (unsigned int)val.n);
  	}
  
@@ -236,7 +236,7 @@ index 66dbcdc..4ab536c 100644
  	/* Set tag_avp */
  	if(tag_avp_param) {
  		val.s = tag_str;
-@@ -3443,6 +3491,11 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -3463,6 +3511,11 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  			add_avp(flags_avp_type, flags_avp, val);
  			LM_DBG("added flags_avp <%u>\n", (unsigned int)val.n);
  		}
