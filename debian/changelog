@@ -1,3 +1,10 @@
+ngcp-kamailio (6.1.3-1+0~mr26.1.2.0) unstable; urgency=medium
+
+  * [c16b26d] New upstream version 6.1.3
+  * [9a50fe7] MT#65646 Remove already applied patches and refresh the rest
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Wed, 05 Aug 2026 14:28:24 +0200
+
 ngcp-kamailio (6.1.1-1+0~mr26.1.2.0) unstable; urgency=medium
 
   * New release.
