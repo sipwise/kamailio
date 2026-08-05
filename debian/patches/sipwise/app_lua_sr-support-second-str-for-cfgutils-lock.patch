@@ -7,7 +7,7 @@ Subject: app_lua_sr: support second str for cfgutils lock
  1 file changed, 24 insertions(+), 6 deletions(-)
 
 diff --git a/src/modules/app_lua_sr/app_lua_sr_exp.c b/src/modules/app_lua_sr/app_lua_sr_exp.c
-index 522f0cf..80a4cb6 100644
+index c38207e..267a173 100644
 --- a/src/modules/app_lua_sr/app_lua_sr_exp.c
 +++ b/src/modules/app_lua_sr/app_lua_sr_exp.c
 @@ -2783,20 +2783,29 @@ static const luaL_Reg _sr_sanity_Map[] = {

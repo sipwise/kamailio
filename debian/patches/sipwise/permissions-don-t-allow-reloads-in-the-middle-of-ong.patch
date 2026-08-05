@@ -7,10 +7,10 @@ Subject: permissions: don't allow reloads in the middle of ongoind reload
  1 file changed, 10 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/permissions/rpc.c b/src/modules/permissions/rpc.c
-index 6519c63..ae78aa4 100644
+index a12c279..d4e8e0d 100644
 --- a/src/modules/permissions/rpc.c
 +++ b/src/modules/permissions/rpc.c
-@@ -45,7 +45,8 @@ int rpc_check_reload(rpc_t *rpc, void *ctx)
+@@ -43,7 +43,8 @@ int rpc_check_reload(rpc_t *rpc, void *ctx)
  		rpc->fault(ctx, 500, "ongoing reload");
  		return -1;
  	}
@@ -20,7 +20,7 @@ index 6519c63..ae78aa4 100644
  	return 0;
  }
  
-@@ -61,10 +62,13 @@ void rpc_trusted_reload(rpc_t *rpc, void *c)
+@@ -59,10 +60,13 @@ void rpc_trusted_reload(rpc_t *rpc, void *c)
  
  	if(reload_trusted_table_cmd() != 1) {
  		rpc->fault(c, 500, "Reload failed.");
@@ -35,7 +35,7 @@ index 6519c63..ae78aa4 100644
  	return;
  }
  
-@@ -101,10 +105,13 @@ void rpc_address_reload(rpc_t *rpc, void *c)
+@@ -99,10 +103,13 @@ void rpc_address_reload(rpc_t *rpc, void *c)
  
  	if(reload_address_table_cmd() != 1) {
  		rpc->fault(c, 500, "Reload failed.");

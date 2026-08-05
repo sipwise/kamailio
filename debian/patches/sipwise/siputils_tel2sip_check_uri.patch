@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 07:52:16 +0200
+Subject: siputils_tel2sip_check_uri
+
+---
+ src/modules/siputils/checks.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/modules/siputils/checks.c b/src/modules/siputils/checks.c
+index 2822e24..6a8d162 100644
 --- a/src/modules/siputils/checks.c
 +++ b/src/modules/siputils/checks.c
-@@ -645,6 +645,7 @@ int tel2sip(struct sip_msg *_msg, char *
+@@ -583,6 +583,7 @@ int tel2sip(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
  	int i, j, in_tel_parameters = 0;
  	pv_spec_t *res;
  	pv_value_t res_val;
@@ -8,7 +18,7 @@
  
  	/* get parameters */
  	if(get_str_fparam(&uri, _msg, (fparam_t *)_uri) < 0) {
-@@ -709,6 +710,11 @@ int tel2sip(struct sip_msg *_msg, char *
+@@ -647,6 +648,11 @@ int tel2sip(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
  	/* tel_uri is not needed anymore */
  	pkg_free(tel_uri.s);
  
@@ -20,7 +30,7 @@
  	/* set result pv value and write sip uri to result pv */
  	res_val.rs = sip_uri;
  	res_val.flags = PV_VAL_STR;
-@@ -823,6 +829,7 @@ int tel2sip2(struct sip_msg *_msg, char
+@@ -761,6 +767,7 @@ int tel2sip2(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
  	pv_value_t res_val;
  	char *tmp_ptr = NULL;
  	tel_param_t params[MAX_TEL_PARAMS];
@@ -28,7 +38,7 @@
  
  	/* get parameters */
  	if(get_str_fparam(&uri, _msg, (fparam_t *)_uri) < 0) {
-@@ -935,6 +942,11 @@ int tel2sip2(struct sip_msg *_msg, char
+@@ -873,6 +880,11 @@ int tel2sip2(struct sip_msg *_msg, char *_uri, char *_hostpart, char *_res)
  	/* tel_uri is not needed anymore */
  	pkg_free(tel_uri.s);
  

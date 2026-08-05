@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 07:52:16 +0200
+Subject: pvheaders_memleak
+
+---
+ src/modules/pv_headers/pvh_xavp.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index f367588..cef6a08 100644
 --- a/src/modules/pv_headers/pvh_xavp.c
 +++ b/src/modules/pv_headers/pvh_xavp.c
-@@ -713,7 +713,13 @@ xavp_c_data_t *pvh_set_parsed(
+@@ -711,7 +711,13 @@ xavp_c_data_t *pvh_set_parsed(
  	return c_data;
  
  err:
@@ -15,7 +25,7 @@
  	return NULL;
  }
  
-@@ -886,6 +892,13 @@ int pvh_set_uri(struct sip_msg *msg, pv_
+@@ -884,6 +890,13 @@ int pvh_set_uri(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
  err:
  	if(pv_format)
  		pv_elem_free_all(pv_format);

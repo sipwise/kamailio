@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 07:52:16 +0200
+Subject: dialog_w_dlg_get_var_no_error_msg
+
+---
+ src/modules/dialog/dialog.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index 5dfdec1..b26fb0f 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -2081,7 +2081,7 @@ static int w_dlg_get_ttag(struct sip_msg
+@@ -2081,7 +2081,7 @@ static int w_dlg_get_ttag(struct sip_msg *msg, char *ci, char *ft, char *pv)
  		pv_get_null(msg, NULL, &dst_val);
  	}
  	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
@@ -9,7 +19,7 @@
  		if(val) goto error; else return -1;
  	}
  	return 1;
-@@ -2089,7 +2089,7 @@ static int w_dlg_get_ttag(struct sip_msg
+@@ -2089,7 +2089,7 @@ static int w_dlg_get_ttag(struct sip_msg *msg, char *ci, char *ft, char *pv)
  error:
  	pv_get_null(msg, NULL, &dst_val);
  	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
