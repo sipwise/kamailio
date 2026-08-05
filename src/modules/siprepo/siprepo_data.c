@@ -166,11 +166,6 @@ int siprepo_msg_set(sip_msg_t *msg, str *msgid, int rmode)
 		LM_ERR("failed to parse cseq headers\n");
 		return -1;
 	}
-	if(get_cseq(msg)->method_id==METHOD_ACK
-			|| get_cseq(msg)->method_id==METHOD_CANCEL) {
-		LM_DBG("no pre-transaction management for ACK or CANCEL\n");
-		return -1;
-	}
 	if (msg->via1==0) {
 		LM_ERR("failed to get Via header\n");
 		return -1;
@@ -241,6 +236,7 @@ int siprepo_msg_set(sip_msg_t *msg, str *msgid, int rmode)
 	it->msgno = msg->id;
 	it->pid = msg->pid;
 	it->mflags = msg->flags;
+	it->rcv = msg->rcv;
 
 	if(_siprepo_table[slotid].plist!=NULL) {
 		_siprepo_table[slotid].plist->prev = it;
@@ -311,11 +307,6 @@ int siprepo_msg_check(sip_msg_t *msg)
 	}
 	if(msg->cseq==NULL || msg->cseq->parsed==NULL) {
 		LM_ERR("failed to parse cseq headers\n");
-		return -1;
-	}
-	if(get_cseq(msg)->method_id==METHOD_ACK
-			|| get_cseq(msg)->method_id==METHOD_CANCEL) {
-		LM_DBG("no pre-transaction management for ACK or CANCEL\n");
 		return -1;
 	}
 	if (msg->via1==0) {
