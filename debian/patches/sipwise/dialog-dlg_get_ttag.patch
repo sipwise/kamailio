@@ -174,10 +174,10 @@ index 778a399..a2f0f8d 100644
  		SR_KEMIP_XVAL, ki_dlg_get_var,
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 diff --git a/src/modules/dialog/dlg_hash.c b/src/modules/dialog/dlg_hash.c
-index 492cad9..78aae53 100644
+index 549efbb..e7f7ae1 100644
 --- a/src/modules/dialog/dlg_hash.c
 +++ b/src/modules/dialog/dlg_hash.c
-@@ -910,6 +910,49 @@ static inline struct dlg_cell *internal_get_dlg(unsigned int h_entry,
+@@ -913,6 +913,49 @@ static inline struct dlg_cell *internal_get_dlg(unsigned int h_entry,
  	return 0;
  }
  
@@ -227,7 +227,7 @@ index 492cad9..78aae53 100644
  
  /*!
   * \brief Get dialog that correspond to CallId, From Tag and To Tag
-@@ -946,6 +989,35 @@ struct dlg_cell *get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir)
+@@ -949,6 +992,35 @@ struct dlg_cell *get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir)
  	return dlg;
  }
  

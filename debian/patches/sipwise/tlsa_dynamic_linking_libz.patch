@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 14:50:12 +0200
+Subject: tlsa_dynamic_linking_libz
+
+---
+ src/modules/tlsa/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/tlsa/Makefile b/src/modules/tlsa/Makefile
+index adfe80b..b453480 100644
 --- a/src/modules/tlsa/Makefile
 +++ b/src/modules/tlsa/Makefile
 @@ -53,7 +53,7 @@ else

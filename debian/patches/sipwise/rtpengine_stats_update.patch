@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 14:50:12 +0200
+Subject: rtpengine_stats_update
+
+---
+ src/modules/rtpengine/rtpengine.c | 233 +++++++++++++++++++++-----------------
+ 1 file changed, 127 insertions(+), 106 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index b107845..e558eca 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -4852,151 +4852,172 @@
+@@ -4873,151 +4873,172 @@ static int decode_mos_vals_dict(
  	return 1;
  }
  
@@ -169,7 +179,7 @@
 -					continue;
 -				}
 -			}
--
+ 
 -			/* got a valid SSRC to watch for */
 -			ssrcs[num_ssrcs] = ssrc;
 -			LM_DBG("rtpengine: found SSRC '%lli' for label '%.*s'\n", ssrc,
@@ -183,13 +193,6 @@
 -	/* if we get here, we were looking for label. see if we found one. if not, return nothing */
 -	if(num_ssrcs == 0)
 -		return;
- 
--ssrcs_done:
--	/* now look for the stats values */
--	created = bencode_dictionary_get_integer(dict, "created", 0);
--	ssrc_list = bencode_dictionary_get_expect(dict, "SSRC", BENCODE_DICTIONARY);
--	if(!ssrc_list)
--		return;
 +			LM_DBG("rtpengine stats: got stream type %i\n", stream->type);
 +			LM_DBG("rtpengine stats: stream child '%.*s'\n",
 +					stream->child ? (int)stream->child->iov[1].iov_len : 0,
@@ -199,6 +202,15 @@
 +					stream->child && stream->child->sibling
 +							? stream->child->sibling->type
 +							: -1);
+ 
+-ssrcs_done:
+-	/* now look for the stats values */
+-	created = bencode_dictionary_get_integer(dict, "created", 0);
+-	ssrc_list = bencode_dictionary_get_expect(dict, "SSRC", BENCODE_DICTIONARY);
+-	if(!ssrc_list)
+-		return;
++			ingress_ssrcs = bencode_dictionary_get_expect(
++					media, "ingress SSRCs", BENCODE_LIST);
  
 -	for(ssrc_key = ssrc_list->child; ssrc_key;
 -			ssrc_key = ssrc_key->sibling->sibling) {
@@ -217,9 +229,7 @@
 -		}
 -		/* no match */
 -		continue;
-+			ingress_ssrcs = bencode_dictionary_get_expect(
-+					media, "ingress SSRCs", BENCODE_LIST);
- 
+-
 -	ssrc_ok:
 -		ssrc_dict = ssrc_key->sibling;
 -		if(!ssrc_dict)

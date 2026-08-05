@@ -8,7 +8,7 @@ Subject: switch_from_python2_to_python3
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/utils/kamctl/dbtextdb/__init__.py b/utils/kamctl/dbtextdb/__init__.py
-index 1041be8..3820113 100644
+index 4f29647..a955d8d 100644
 --- a/utils/kamctl/dbtextdb/__init__.py
 +++ b/utils/kamctl/dbtextdb/__init__.py
 @@ -1,4 +1,4 @@
@@ -16,9 +16,9 @@ index 1041be8..3820113 100644
 +#!/usr/bin/python3
  #
  # Copyright 2008 Google Inc. All Rights Reserved.
- 
+ #
 diff --git a/utils/kamctl/dbtextdb/dbtextdb_test.py b/utils/kamctl/dbtextdb/dbtextdb_test.py
-index 8762de1..8232366 100644
+index 0624585..3ab6d4a 100644
 --- a/utils/kamctl/dbtextdb/dbtextdb_test.py
 +++ b/utils/kamctl/dbtextdb/dbtextdb_test.py
 @@ -1,4 +1,4 @@
@@ -26,4 +26,4 @@ index 8762de1..8232366 100644
 +#!/usr/bin/python3
  #
  # Copyright 2008 Google Inc. All Rights Reserved.
- 
+ #

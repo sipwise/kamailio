@@ -5,17 +5,17 @@ Subject: kamctl: TMPDIR config
 * allow choose where to store temporal files
 * use g+w for temporal fifo file
 ---
- utils/kamctl/kamctl               |   8 +-
- utils/kamctl/kamctl.rpcfifo       |  14 +-
- utils/kamctl/kamdbctl             |   2 +-
- utils/kamctl/kamdbctl.oracle      |   2 +-
- 5 files changed, 637 insertions(+), 8 deletions(-)
+ utils/kamctl/kamctl          |  8 ++++++--
+ utils/kamctl/kamctl.rpcfifo  | 14 ++++++++++----
+ utils/kamctl/kamdbctl        |  2 +-
+ utils/kamctl/kamdbctl.oracle |  2 +-
+ 4 files changed, 18 insertions(+), 8 deletions(-)
 
 diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
-index e0a339c..92c5343 100755
+index f74954a..e097df8 100755
 --- a/utils/kamctl/kamctl
 +++ b/utils/kamctl/kamctl
-@@ -80,6 +80,10 @@ if [ -z "$STARTUP_CONFIG_FILE" ]; then
+@@ -98,6 +98,10 @@ if [ -z "$STARTUP_CONFIG_FILE" ]; then
  	STARTUP_CONFIG_FILE="kamailio.cfg"
  fi
  
@@ -26,7 +26,7 @@ index e0a339c..92c5343 100755
  ##### ------------------------------------------------ #####
  ### load base functions
  #
-@@ -2971,7 +2975,7 @@ kamailio_trap() {
+@@ -2989,7 +2993,7 @@ kamailio_trap() {
  		exit
  	fi
  	DATE=`/bin/date +%Y%m%d_%H%M%S`
@@ -35,7 +35,7 @@ index e0a339c..92c5343 100755
  	minfo "Trap file: $LOG_FILE"
  	ctl_cmd_run core.psx > $LOG_FILE
  	echo -n "Trapping Kamailio with gdb: "
-@@ -2998,7 +3002,7 @@ kamailio_pstrap() {
+@@ -3016,7 +3020,7 @@ kamailio_pstrap() {
  		exit
  	fi
  	DATE=`/bin/date +%Y%m%d_%H%M%S`
@@ -45,10 +45,10 @@ index e0a339c..92c5343 100755
  	ps axw | grep kamailio | grep -v grep | grep -v kamctl | sort > $LOG_FILE
  	echo "" >> $LOG_FILE
 diff --git a/utils/kamctl/kamctl.rpcfifo b/utils/kamctl/kamctl.rpcfifo
-index f7408b5..478864a 100644
+index b8cdaee..ec07995 100644
 --- a/utils/kamctl/kamctl.rpcfifo
 +++ b/utils/kamctl/kamctl.rpcfifo
-@@ -30,6 +30,10 @@ if [ -z "$RPCFIFOPATH" ]; then
+@@ -48,6 +48,10 @@ if [ -z "$RPCFIFOPATH" ]; then
  	fi
  fi
  
@@ -59,7 +59,7 @@ index f7408b5..478864a 100644
  #
  ##### ----------------------------------------------- #####
  ### functions
-@@ -79,7 +83,7 @@ rpc_cmd()
+@@ -97,7 +101,7 @@ rpc_cmd()
  		exit 1
  	fi
  	name=kamailio_receiver_$$
@@ -68,7 +68,7 @@ index f7408b5..478864a 100644
  	# delete existing fifo file with same name
  	if test -p $path; then
  		rm -f $path
-@@ -98,7 +102,8 @@ rpc_cmd()
+@@ -116,7 +120,8 @@ rpc_cmd()
  			merr "error opening read fifo $path"
  			exit 3
  		fi
@@ -78,7 +78,7 @@ index f7408b5..478864a 100644
  	fi
  
  	PARAMEVAL="no"
-@@ -189,7 +194,7 @@ CTLCMDPRINT=rpc_cmd_print
+@@ -207,7 +212,7 @@ CTLCMDPRINT=rpc_cmd_print
  
  rpc_kamailio_monitor() {
  	name=kamailio_receiver_$$
@@ -87,7 +87,7 @@ index f7408b5..478864a 100644
  	# delete existing fifo file with same name
  	if test -p $path; then
  		rm -f $path
-@@ -205,7 +210,8 @@ rpc_kamailio_monitor() {
+@@ -223,7 +228,8 @@ rpc_kamailio_monitor() {
  			merr "monitor - error opening read fifo $path"
  			exit 1
  		fi
@@ -98,10 +98,10 @@ index f7408b5..478864a 100644
  	trap "rm $path;  clear; echo monitor ^C-ed; exit 1" 2
  	attempt=0
 diff --git a/utils/kamctl/kamdbctl b/utils/kamctl/kamdbctl
-index 9c490f8..c7d6fc8 100755
+index 939365d..69352ac 100755
 --- a/utils/kamctl/kamdbctl
 +++ b/utils/kamctl/kamdbctl
-@@ -294,7 +294,7 @@ case $1 in
+@@ -312,7 +312,7 @@ case $1 in
  			cp $DB_PATH $1
  			exit $?
  		fi
@@ -111,10 +111,10 @@ index 9c490f8..c7d6fc8 100755
  		ret=$?
  		if [ "$ret" -ne 0 ]; then
 diff --git a/utils/kamctl/kamdbctl.oracle b/utils/kamctl/kamdbctl.oracle
-index e6de52f..f1b95c5 100644
+index 7bd4722..8c1f700 100644
 --- a/utils/kamctl/kamdbctl.oracle
 +++ b/utils/kamctl/kamdbctl.oracle
-@@ -45,7 +45,7 @@ if [ -z "$KAMAILIO_ORASEL" ] ; then
+@@ -62,7 +62,7 @@ if [ -z "$KAMAILIO_ORASEL" ] ; then
  fi
  
  #################################################################
