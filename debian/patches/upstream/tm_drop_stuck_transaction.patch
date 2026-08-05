@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 14:34:26 +0200
+Subject: tm_drop_stuck_transaction
+
+---
+ src/modules/tm/t_lookup.c | 15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
+
+diff --git a/src/modules/tm/t_lookup.c b/src/modules/tm/t_lookup.c
+index c1c19cb..6424aa0 100644
 --- a/src/modules/tm/t_lookup.c
 +++ b/src/modules/tm/t_lookup.c
 @@ -2057,7 +2057,7 @@ int t_unref(struct sip_msg *p_msg)

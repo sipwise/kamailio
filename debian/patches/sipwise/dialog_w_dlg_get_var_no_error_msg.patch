@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 14:34:26 +0200
+Subject: dialog_w_dlg_get_var_no_error_msg
+
+---
+ src/modules/dialog/dialog.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index a35dd11..5519f33 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -2159,7 +2159,7 @@ static int w_dlg_get_var(
