@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 5 Aug 2026 10:44:17 +0200
+Subject: redis_dbase_no_error_msg
+
+---
+ src/modules/db_redis/redis_dbase.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 6725bf5..858b132 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -1662,11 +1662,11 @@ static int db_redis_perform_query(const
+@@ -1648,11 +1648,11 @@ static int db_redis_perform_query(const db1_con_t *_h, km_redis_con_t *con,
  
  	if(!(*keys_count) && do_table_scan) {
  		if(_n > 0) {
@@ -14,7 +24,7 @@
  			}
  		} else {
  			LM_DBG("loading full table: '%.*s\n", CON_TABLE(_h)->len,
-@@ -1854,7 +1854,7 @@ static int db_redis_perform_delete(const
+@@ -1840,7 +1840,7 @@ static int db_redis_perform_delete(const db1_con_t *_h, km_redis_con_t *con,
  
  	if(!*keys_count && do_table_scan) {
  		if(!ts_scan_start)
@@ -23,7 +33,7 @@
  					"performing delete\n",
  					CON_TABLE(_h)->len, CON_TABLE(_h)->s);
  		else
-@@ -2191,11 +2191,11 @@ static int db_redis_perform_update(const
+@@ -2155,11 +2155,11 @@ static int db_redis_perform_update(const db1_con_t *_h, km_redis_con_t *con,
  #endif
  
  	if(!(*keys_count) && do_table_scan) {
