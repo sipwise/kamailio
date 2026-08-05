@@ -1,3 +1,23 @@
+ngcp-kamailio (6.0.7-1+0~mr13.5.2.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [a1f4bf6] New upstream version 6.0.7
+  * [16ae266] MT#63868 permissions: while reloading consider if cache is disabled
+  * [78fb6ac] MT#63868 permissions: consider skipped reload as 200
+  * [9106e2c] MT#63826 db_redis: lost patches during last upgrade
+  * [eb4ef26] MT#65646 Remove already applied patches and refresh the rest
+
+  [ Marco Capetta ]
+  * [f883f70] MT#63881 tm: use bitwise check for REQ_ERR_DELAYED in t_unref()
+
+  [ Alessio Garzi ]
+  * [0a75e8f] MT#64451 Kamailio memory leak on pv_headers
+  * [7e88cb6] MT#64451 siputils: validate SIP URI produced by tel2sip and tel2sip2
+  * [07808e3] MT#64566 Adjust log level in w_dlg_get_var from error to info
+  * [29ad635] MT#64566 Adjust log level in Redis dbase from warning to debug
+
+ -- Donat Zenichev <dzenichev@sipwise.com>  Wed, 05 Aug 2026 10:29:37 +0200
+
 ngcp-kamailio (6.0.6-1+0~mr13.5.2.0) unstable; urgency=medium
 
   [ Donat Zenichev ]
