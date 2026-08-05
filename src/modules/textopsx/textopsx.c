@@ -1207,7 +1207,9 @@ static int find_hf_value2_param(struct hname_data *hname, str *param_area,
 				i++;
 		} else {
 			while(i < param_area->len && !is_space(param_area->s[i])
-					&& !(param_area->s[i] != ','))
+					&& param_area->s[i] != ',')
+				i++;
+			if(i < param_area->len && param_area->s[i] == ',')
 				i++;
 		}
 	}
@@ -2483,10 +2485,10 @@ static int pv_get_hf_iterator_hname(
 		return pv_get_null(msg, param, res);
 	}
 
-	if(_hf_iterators[i].it == NULL) {
+	if(_hf_iterators[k].it == NULL) {
 		return pv_get_null(msg, param, res);
 	}
-	return pv_get_strval(msg, param, res, &_hf_iterators[i].it->name);
+	return pv_get_strval(msg, param, res, &_hf_iterators[k].it->name);
 }
 
 /**
@@ -2649,11 +2651,12 @@ static int ki_bl_iterator_next(sip_msg_t *msg, str *iname)
 	_bl_iterators[k].it.s = p;
 	while(p < _bl_iterators[k].body.s + _bl_iterators[k].body.len) {
 		if(*p == '\n') {
+			p++;
 			break;
 		}
 		p++;
 	}
-	_bl_iterators[k].it.len = p - _bl_iterators[k].it.s + 1;
+	_bl_iterators[k].it.len = p - _bl_iterators[k].it.s;
 
 	return 1;
 }
@@ -2999,8 +3002,14 @@ static int sel_hf_value_name(str *res, select_t *s, struct sip_msg *msg)
 				if(s->params[1].v.s.s[i] == '_')
 					s->params[1].v.s.s[i] = '-';
 			}
-			i = snprintf(buf, sizeof(buf) - 1, "%.*s: X\n",
-					s->params[1].v.s.len, s->params[1].v.s.s);
+			i = snprintf(buf, sizeof(buf) - 1, "%.*s: X\n", s->params[1].v.s.len,
+					s->params[1].v.s.s);
+			if(i < 0 || i >= (int)sizeof(buf) - 1) {
+				LM_ERR("header name is too long [%.*s]\n", s->params[1].v.s.len,
+						s->params[1].v.s.s);
+				pkg_free(hname);
+				return E_CFG;
+			}
 			buf[i] = 0;
 
 			hname->hname = s->params[1].v.s;

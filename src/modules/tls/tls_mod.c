@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
 #include "../../core/locking.h"
 #include "../../core/sr_module.h"
 #include "../../core/ip_addr.h"
@@ -56,6 +57,7 @@
 #include "tls_cfg.h"
 #include "tls_rand.h"
 #include "tls_ct_wrq.h"
+
 
 #ifndef TLS_HOOKS
 #error "TLS_HOOKS must be defined, or the tls module won't work"
@@ -103,6 +105,9 @@ MODULE_VERSION
 #define KSR_SSL_COMMON
 #define KSR_SSL_PROVIDER
 #include <openssl/store.h>
+#include <openssl/conf.h>
+#include <openssl/provider.h>
+#include <openssl/params.h>
 #define KEY_PREFIX "/uri:"
 #define KEY_PREFIX_LEN (strlen(KEY_PREFIX))
 #endif
@@ -205,6 +210,7 @@ static ENGINE *ksr_tls_engine;
 
 #ifdef KSR_SSL_PROVIDER
 static int tls_provider_quirks;
+str tls_provider_config = STR_NULL;
 #endif
 
 /*
@@ -289,6 +295,8 @@ static param_export_t params[] = {
 			&tls_engine_settings.engine_algorithms},
 #endif /* KSR_SSL_ENGINE */
 #ifdef KSR_SSL_PROVIDER
+	{"provider_quirks_config", PARAM_STR,
+	 &tls_provider_config},
 	{"provider_quirks", PARAM_INT,
 			&tls_provider_quirks}, /* OpenSSL 3 provider that needs new
 									  OSSL_LIB_CTX in child */
@@ -409,7 +417,20 @@ static int mod_init(void)
 		return -1;
 	}
 #endif
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L \
+		&& OPENSSL_VERSION_NUMBER < 0x30200000L
+	unsigned long run_ver = OpenSSL_version_num();
+	if(run_ver >= 0x30200000L) {
+		LM_ERR("OpenSSL version < 3.2.0 is required\n");
+		return -1;
+	}
+#endif
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	{
+		pthread_key_t _ksr_tsd_init;
+		pthread_key_create(&_ksr_tsd_init, NULL);
+		pthread_key_delete(_ksr_tsd_init);
+	}
 	for(k = 0; k < 32; k++) {
 		if(pthread_getspecific(k) != 0) {
 			LM_WARN("detected initialized thread-locals created before tls.so; "
@@ -615,9 +636,70 @@ static int mod_child_hook(int *rank, void *dummy)
 }
 
 #ifdef KSR_SSL_PROVIDER
-static OSSL_LIB_CTX *orig_ctx;
-static OSSL_LIB_CTX *new_ctx;
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+void load_p11_via_nconf(const char *config_path)
+{
+	CONF *conf = NCONF_new(NULL);
+	STACK_OF(CONF_VALUE) * sec;
+	OSSL_PARAM params[16]; // Ensure this is large enough for your keys
+	int p_idx = 0;
+	char *q_sect = NULL;
+	char *q_prov = NULL;
+
+	// 1. Load the file into a private NCONF object
+	if(NCONF_load(conf, config_path, NULL) <= 0) {
+		// Handle error: File not found or syntax error
+		return;
+	}
+	q_sect = NCONF_get_string(conf, NULL, "quirks_sect"); // e.g., pkcs11_sect
+	q_prov = NCONF_get_string(conf, NULL, "quirks_provider"); // e.g., pkcs11
+
+	if(!q_sect || !q_prov) {
+		LM_ERR("quirks file %s missing quirks_sect or quirks_provider in "
+			   "[default]\n",
+				config_path);
+		goto cleanup;
+	}
+	// 2. Get the specific section [pkcs11_sect]
+	sec = NCONF_get_section(conf, q_sect);
+	if(!sec)
+		return;
+
+	// 3. Iterate pairs and build the OSSL_PARAM array
+	for(int i = 0; i < sk_CONF_VALUE_num(sec); i++) {
+		CONF_VALUE *v = sk_CONF_VALUE_value(sec, i);
+
+		// Map string values to OSSL_PARAMS
+		// Note: In a real app, ensure these strings persist until OSSL_PROVIDER_load
+		params[p_idx++] =
+				OSSL_PARAM_construct_utf8_string(v->name, v->value, 0);
+
+		if(p_idx >= 15)
+			break;
+	}
+	params[p_idx] = OSSL_PARAM_construct_end();
+
+	// 4. Load into a fresh Child Context
+	OSSL_LIB_CTX *child_ctx = OSSL_LIB_CTX_new();
+	OSSL_LIB_CTX_set0_default(child_ctx);
+	OSSL_PROVIDER_load(child_ctx, "default");
+
+	OSSL_PROVIDER *p11 = OSSL_PROVIDER_load_ex(child_ctx, q_prov, params);
+
+	if(p11) {
+		LM_INFO("%s: Successfully bootstrapped PKCS11 via NCONF abstraction\n",
+				config_path);
+	} else {
+		LM_ERR("failed to load provider %s from quirks file\n", q_prov);
+	}
+
+cleanup:
+	NCONF_free(
+			conf); // The params now live in the provider, we can free the parser
+}
 #endif
+#endif
+
 static int mod_child(int rank)
 {
 	if(tls_disable || (tls_domains_cfg == 0))
@@ -640,9 +722,18 @@ static int mod_child(int rank)
 	if(rank > 0) {
 #ifdef KSR_SSL_PROVIDER
 		if(tls_provider_quirks & 1) {
-			new_ctx = OSSL_LIB_CTX_new();
-			orig_ctx = OSSL_LIB_CTX_set0_default(new_ctx);
-			CONF_modules_load_file(CONF_get1_default_config_file(), NULL, 0L);
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+			load_p11_via_nconf(tls_provider_config.s);
+#else
+			OSSL_LIB_CTX *new_ctx = OSSL_LIB_CTX_new();
+			if(CONF_modules_load_file_ex(
+					   new_ctx, CONF_get1_default_config_file(), NULL, 0L)
+					<= 0) {
+				LM_ERR("Failed to load provider config in child %d\n",
+						process_no);
+			}
+			OSSL_LIB_CTX_set0_default(new_ctx);
+#endif
 		}
 #endif /* KSR_SSL_PROVIDER */
 		if(tls_engine_init() < 0)

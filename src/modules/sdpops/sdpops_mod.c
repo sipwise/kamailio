@@ -81,7 +81,7 @@ static int sdp_get_sess_version(
 		sip_msg_t *msg, str *sess_version, long *sess_version_num);
 static int sdp_set_sess_version(
 		sip_msg_t *msg, str *sess_version, long *sess_version_num);
-static int w_sdp_get_address_family(sip_msg_t *msg);
+static int w_sdp_get_address_family(sip_msg_t *msg, char *p1, char *p2);
 
 static int pv_get_sdp(sip_msg_t *msg, pv_param_t *param, pv_value_t *res);
 static int pv_set_sdp(
@@ -1016,12 +1016,13 @@ it helps to extract IP address family at c line from sdp
 			6 for  IP6
 
 */
-static int w_sdp_get_address_family(sip_msg_t *msg)
+static int ki_sdp_get_address_family(sip_msg_t *msg)
 {
-
 	sdp_session_cell_t *session;
+	sdp_stream_cell_t *stream;
 	int sdp_session_num;
 	int result = -1;
+
 	if(parse_sdp(msg) < 0) {
 		LM_ERR("Unable to parse sdp body \n");
 		return -1;
@@ -1030,23 +1031,49 @@ static int w_sdp_get_address_family(sip_msg_t *msg)
 	sdp_session_num = 0;
 
 	for(;;) {
-
 		session = get_sdp_session(msg, sdp_session_num);
 		if(!session)
 			break;
 
-		if(session->pf == AF_INET) {
-			result = 4;
-		} else if(session->pf == AF_INET6) {
-			result = 6;
+		if(session->ip_addr.s != NULL && session->ip_addr.len > 0) {
+			if(session->pf == AF_INET) {
+				result = 4;
+			} else if(session->pf == AF_INET6) {
+				result = 6;
+			} else {
+				result = -1;
+			}
 		} else {
-			result = -1;
+			stream = session->streams;
+			while(stream) {
+				if(stream->ip_addr.s != NULL && stream->ip_addr.len > 0) {
+					if(stream->pf == AF_INET) {
+						result = 4;
+					} else if(stream->pf == AF_INET6) {
+						result = 6;
+					} else {
+						result = -1;
+					}
+					break;
+				}
+				stream = stream->next;
+			}
+		}
+
+		if(result == 4 || result == 6) {
+			break;
 		}
 		sdp_session_num++;
 	}
 
 	return result;
 }
+
+static int w_sdp_get_address_family(sip_msg_t *msg, char *p1, char *p2)
+{
+	return ki_sdp_get_address_family(msg);
+}
+
 /**
  * @brief remove streams matching the m='media'
  * @return -1 - error; 0 - not found; >=1 - found
@@ -3021,6 +3048,11 @@ static sr_kemi_t sr_kemi_sdpops_exports[] = {
 	{ str_init("sdpops"), str_init("sdp_iterator_value"),
 		SR_KEMIP_XVAL, ki_sdp_iterator_value,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("sdpops"), str_init("sdp_get_address_family"),
+		SR_KEMIP_INT, ki_sdp_get_address_family,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 
