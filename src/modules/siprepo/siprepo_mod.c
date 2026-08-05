@@ -62,16 +62,9 @@ static int fixup_sr_msg_async_pull(void **param, int param_no);
 static int fixup_free_sr_msg_async_pull(void **param, int param_no);
 
 /* clang-format off */
-typedef struct sworker_task_param {
-	char *buf;
-	int len;
-	receive_info_t rcv;
-	str xdata;
-} sworker_task_param_t;
-
 static cmd_export_t cmds[]={
 	{"sr_msg_push", (cmd_function)w_sr_msg_push, 2, fixup_spve_igp,
-		fixup_free_spve_null, REQUEST_ROUTE|CORE_ONREPLY_ROUTE},
+		fixup_free_spve_igp, REQUEST_ROUTE|CORE_ONREPLY_ROUTE},
 	{"sr_msg_pull", (cmd_function)w_sr_msg_pull, 4, fixup_sssi,
 		fixup_free_sssi, REQUEST_ROUTE|CORE_ONREPLY_ROUTE},
 	{"sr_msg_async_pull", (cmd_function)w_sr_msg_async_pull, 5, fixup_sr_msg_async_pull,

@@ -69,8 +69,8 @@ static char char2digit(char localchar)
 	}
 }
 
-static void isup_put_number(
-		unsigned char *dest, char *src, int *len, int *oddeven)
+static int isup_put_number(
+		unsigned char *dest, int dest_len, char *src, int *len, int *oddeven)
 {
 	int i = 0;
 	int numlen = strlen(src);
@@ -83,6 +83,12 @@ static void isup_put_number(
 		*len = numlen / 2;
 	}
 
+	if(*len > dest_len) {
+		LM_ERR("phone number too long (%d chars, max %d bytes)\n", numlen,
+				dest_len);
+		return -1;
+	}
+
 
 	while(i < numlen) {
 		if(!(i % 2))
@@ -92,16 +98,22 @@ static void isup_put_number(
 		}
 		i++;
 	}
+
+	return 1;
 }
 
 static int encode_called_party(char *number, unsigned char *flags, int nai,
 		unsigned char *buf, int len)
 {
 	int numlen, oddeven;
+	int res;
 	buf[0] = flags[0] & 0x7F;
 	buf[1] = flags[1];
 
-	isup_put_number(&buf[2], number, &numlen, &oddeven);
+	res = isup_put_number(&buf[2], len - 2, number, &numlen, &oddeven);
+	if(res < 0) {
+		return -1;
+	}
 
 	if(oddeven) {
 		buf[0] |= 0x80;
@@ -119,12 +131,16 @@ static int encode_calling_party(char *number, int nai, int presentation,
 		int screening, unsigned char *buf, int len)
 {
 	int oddeven, datalen;
+	int res;
 
 	if(!number[0] && presentation != SS7_PRESENTATION_ADDR_NOT_AVAILABLE)
 		return 0;
 
 	if(number[0] && presentation != SS7_PRESENTATION_ADDR_NOT_AVAILABLE) {
-		isup_put_number(&buf[2], number, &datalen, &oddeven);
+		res = isup_put_number(&buf[2], len - 2, number, &datalen, &oddeven);
+		if(res < 0) {
+			return -1;
+		}
 	} else {
 		datalen = 0;
 		oddeven = 0;
@@ -144,8 +160,12 @@ static int encode_forwarding_number(
 		char *number, int nai, unsigned char *buf, int len)
 {
 	int oddeven, datalen;
+	int res;
 
-	isup_put_number(&buf[2], number, &datalen, &oddeven);
+	res = isup_put_number(&buf[2], len - 2, number, &datalen, &oddeven);
+	if(res < 0) {
+		return -1;
+	}
 
 	buf[0] = (oddeven << 7) | nai; /* Nature of Address Indicator */
 	/* Assume E.164 ISDN numbering plan, calling number complete */
@@ -643,6 +663,9 @@ int isup_update_destination(struct sdp_mangler *mangle, char *dest, int hops,
 	// modify the mandatory fixed header
 	res2 = encode_called_party(
 			dest, buf + offset + 1, nai, tmp_buf + 2, 255 - 1);
+	if(res2 < 0) {
+		return -1;
+	}
 	tmp_buf[1] = (char)res2;
 	res = buf[offset] + 1;
 
@@ -748,6 +771,8 @@ int isup_update_calling(struct sdp_mangler *mangle, char *origin, int nai,
 				case ISUP_PARM_CALLING_PARTY_NUM:
 					res2 = encode_calling_party(origin, nai, presentation,
 							screening, &new_party[1], 255 - 1);
+					if(res2 < 0)
+						return -1;
 					new_party[0] = (char)res2;
 					replace_body_segment(mangle, offset + 1,
 							(int)buf[offset + 1] + 1, new_party, res2 + 1);
@@ -769,6 +794,8 @@ int isup_update_calling(struct sdp_mangler *mangle, char *origin, int nai,
 			new_party[0] = ISUP_PARM_CALLING_PARTY_NUM;
 			res = encode_calling_party(origin, nai, presentation, screening,
 					new_party + 2, 255 - 2);
+			if(res < 0)
+				return -1;
 			new_party[1] = (char)res;
 
 			add_body_segment(mangle, offset, new_party, res + 2);
@@ -823,6 +850,8 @@ int isup_update_forwarding(struct sdp_mangler *mangle, char *forwardn, int nai,
 				case ISUP_PARM_REDIRECTING_NUMBER:
 					res2 = encode_forwarding_number(
 							forwardn, nai, &new_party[1], 255 - 1);
+					if(res2 < 0)
+						return -1;
 					new_party[0] = (char)res2;
 					replace_body_segment(mangle, offset + 1,
 							(int)buf[offset + 1] + 1, new_party, res2 + 1);
@@ -830,6 +859,8 @@ int isup_update_forwarding(struct sdp_mangler *mangle, char *forwardn, int nai,
 				case ISUP_PARM_ORIGINAL_CALLED_NUM:
 					res2 = encode_forwarding_number(
 							forwardn, nai, &new_party[1], 255 - 1);
+					if(res2 < 0)
+						return -1;
 					new_party[0] = (char)res2;
 					replace_body_segment(mangle, offset + 1,
 							(int)buf[offset + 1] + 1, new_party, res2 + 1);

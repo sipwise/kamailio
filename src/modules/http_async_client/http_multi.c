@@ -142,6 +142,16 @@ void event_cb(int fd, short kind, void *userp)
 			reply_error(cell);
 			curl_multi_remove_handle(g->multi, easy);
 			curl_easy_cleanup(easy);
+			/* sock_cb with CURL_POLL_REMOVE (triggered by remove_handle above)
+			 * may have already freed cell->ev; guard before freeing here */
+			if(cell->evset && cell->ev) {
+				event_del(cell->ev);
+				event_free(cell->ev);
+				cell->ev = NULL;
+				cell->evset = 0;
+			}
+			unlink_http_m_cell(cell);
+			free_http_m_cell(cell);
 		}
 	}
 
@@ -186,8 +196,11 @@ int sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp)
 					whatstr[what]);
 			if(cell->action == CURL_POLL_IN && what == CURL_POLL_OUT) {
 				if(cell->reply) {
-					if(cell->reply->result)
+					if(cell->reply->result) {
+						if(cell->reply->result->s)
+							shm_free(cell->reply->result->s);
 						shm_free(cell->reply->result);
+					}
 					shm_free(cell->reply);
 					cell->reply = NULL;
 				}
@@ -474,6 +487,16 @@ int new_request(str *query, http_m_params_t *query_params, http_multi_cbe_t cb,
 	cell->easy = easy;
 	cell->error[0] = '\0';
 	cell->params = *query_params;
+	/* Transfer ownership of dynamically allocated fields to the cell.
+	 * The caller must not free these after new_request() returns. */
+	query_params->headers = NULL;
+	query_params->tls_client_cert = NULL;
+	query_params->tls_client_key = NULL;
+	query_params->tls_ca_path = NULL;
+	query_params->body.s = NULL;
+	query_params->body.len = 0;
+	query_params->username = NULL;
+	query_params->password = NULL;
 	cell->param = param;
 	cell->cb = cb;
 	cell->url = (char *)shm_malloc(query->len + 1);
@@ -599,6 +622,7 @@ error:
 		LM_DBG("cleaning up curl handler %p\n", easy);
 		curl_easy_cleanup(easy);
 	}
+	unlink_http_m_cell(cell);
 	free_http_m_cell(cell);
 	return -1;
 }
@@ -639,49 +663,70 @@ void check_multi_info(struct http_m_global *g)
 				update_stat(errors, 1);
 				reply_error(cell);
 			} else {
+				if(cell->reply == NULL) {
+					LM_ERR("successful transfer but reply is NULL for handle "
+						   "%p\n",
+							easy);
+					reply_error(cell);
+				} else {
+					if(curl_easy_getinfo(cell->easy, CURLINFO_TOTAL_TIME,
+							   &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.total =
+								(uint32_t)(tmp_time * 1000000);
+					if(curl_easy_getinfo(
+							   cell->easy, CURLINFO_NAMELOOKUP_TIME, &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.lookup =
+								(uint32_t)(tmp_time * 1000000);
+					if(curl_easy_getinfo(
+							   cell->easy, CURLINFO_CONNECT_TIME, &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.connect =
+								(uint32_t)(tmp_time * 1000000);
+					if(curl_easy_getinfo(
+							   cell->easy, CURLINFO_REDIRECT_TIME, &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.redirect =
+								(uint32_t)(tmp_time * 1000000);
+					if(curl_easy_getinfo(
+							   cell->easy, CURLINFO_APPCONNECT_TIME, &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.appconnect =
+								(uint32_t)(tmp_time * 1000000);
+					if(curl_easy_getinfo(cell->easy,
+							   CURLINFO_PRETRANSFER_TIME, &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.pretransfer =
+								(uint32_t)(tmp_time * 1000000);
+					if(curl_easy_getinfo(cell->easy,
+							   CURLINFO_STARTTRANSFER_TIME, &tmp_time)
+							== CURLE_OK)
+						cell->reply->time.starttransfer =
+								(uint32_t)(tmp_time * 1000000);
 
-				if(curl_easy_getinfo(cell->easy, CURLINFO_TOTAL_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.total = (uint32_t)(tmp_time * 1000000);
-				if(curl_easy_getinfo(
-						   cell->easy, CURLINFO_NAMELOOKUP_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.lookup = (uint32_t)(tmp_time * 1000000);
-				if(curl_easy_getinfo(
-						   cell->easy, CURLINFO_CONNECT_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.connect = (uint32_t)(tmp_time * 1000000);
-				if(curl_easy_getinfo(
-						   cell->easy, CURLINFO_REDIRECT_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.redirect = (uint32_t)(tmp_time * 1000000);
-				if(curl_easy_getinfo(
-						   cell->easy, CURLINFO_APPCONNECT_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.appconnect =
-							(uint32_t)(tmp_time * 1000000);
-				if(curl_easy_getinfo(
-						   cell->easy, CURLINFO_PRETRANSFER_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.pretransfer =
-							(uint32_t)(tmp_time * 1000000);
-				if(curl_easy_getinfo(
-						   cell->easy, CURLINFO_STARTTRANSFER_TIME, &tmp_time)
-						== CURLE_OK)
-					cell->reply->time.starttransfer =
-							(uint32_t)(tmp_time * 1000000);
+					cell->reply->error[0] = '\0';
+					cell->cb(cell->reply, cell->param);
 
-				cell->reply->error[0] = '\0';
-				cell->cb(cell->reply, cell->param);
-
-				LM_DBG("reply: [%d] %.*s [%d]\n", (int)cell->reply->retcode,
-						cell->reply->result->len, cell->reply->result->s,
-						cell->reply->result->len);
-				update_stat(replies, 1);
+					if(cell->reply->result)
+						LM_DBG("reply: [%d] %.*s [%d]\n",
+								(int)cell->reply->retcode,
+								cell->reply->result->len,
+								cell->reply->result->s,
+								cell->reply->result->len);
+					update_stat(replies, 1);
+				}
 			}
 
 			if(cell != 0) {
 				LM_DBG("cleaning up cell %p\n", cell);
+				if(cell->evset && cell->ev) {
+					LM_DBG("freeing event %p\n", cell->ev);
+					event_del(cell->ev);
+					event_free(cell->ev);
+					cell->ev = NULL;
+					cell->evset = 0;
+				}
 				unlink_http_m_cell(cell);
 				free_http_m_cell(cell);
 			}

@@ -623,6 +623,12 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd, int flags,
 				HA_MD5, &cred->digest.username.whole, realm, passwd, 0, 0, ha1);
 		LM_DBG("HA1 string calculated: %s\n", ha1);
 	} else {
+		if(passwd->len >= (int)sizeof(ha1)) {
+			LM_ERR("HA1 value too long: %d (max %lu)\n", passwd->len,
+					(unsigned long)(sizeof(ha1) - 1));
+			ret = AUTH_ERROR;
+			goto end;
+		}
 		memcpy(ha1, passwd->s, passwd->len);
 		ha1[passwd->len] = '\0';
 	}
@@ -1328,6 +1334,12 @@ static int w_auth_get_www_authenticate(
 	val.rs.s = pv_get_buffer();
 	val.rs.len = 0;
 	if(hf.s != NULL) {
+		if(hf.len + 1 >= pv_get_buffer_size()) {
+			LM_ERR("challenge header is too large for pv buffer: %d > %d\n",
+					hf.len + 1, pv_get_buffer_size());
+			pkg_free(hf.s);
+			return -1;
+		}
 		memcpy(val.rs.s, hf.s, hf.len);
 		val.rs.len = hf.len;
 		val.rs.s[val.rs.len] = '\0';
@@ -1394,6 +1406,12 @@ static int ki_auth_get_www_authenticate(
 	val.rs.s = pv_get_buffer();
 	val.rs.len = 0;
 	if(hf.s != NULL) {
+		if(hf.len + 1 >= pv_get_buffer_size()) {
+			LM_ERR("challenge header is too large for pv buffer: %d > %d\n",
+					hf.len + 1, pv_get_buffer_size());
+			pkg_free(hf.s);
+			return -1;
+		}
 		memcpy(val.rs.s, hf.s, hf.len);
 		val.rs.len = hf.len;
 		val.rs.s[val.rs.len] = '\0';
