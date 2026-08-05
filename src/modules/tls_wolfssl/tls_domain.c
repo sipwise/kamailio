@@ -83,35 +83,8 @@ static unsigned char dh3072_g[] = {0x02};
 
 static void setup_dh(WOLFSSL_CTX *ctx)
 {
-	/*
- * not needed for OpenSSL 1.1.0+ and LibreSSL
- * DH_new() is deprecated in OpenSSL 3
- */
-	DH *dh;
-	BIGNUM *p;
-	BIGNUM *g;
-
-	dh = DH_new();
-	if(dh == NULL) {
-		return;
-	}
-
-	p = BN_bin2bn(dh3072_p, sizeof(dh3072_p), NULL);
-	g = BN_bin2bn(dh3072_g, sizeof(dh3072_g), NULL);
-
-	if(p == NULL || g == NULL) {
-		DH_free(dh);
-		return;
-	}
-
-	dh->p = p;
-	dh->g = g;
-
-
-	wolfSSL_CTX_set_options(ctx, WOLFSSL_OP_SINGLE_DH_USE);
-	wolfSSL_CTX_set_tmp_dh(ctx, dh);
-
-	DH_free(dh);
+	wolfSSL_CTX_SetTmpDH(
+			ctx, dh3072_p, sizeof(dh3072_p), dh3072_g, sizeof(dh3072_g));
 }
 
 
@@ -589,18 +562,21 @@ static int load_crl(tls_domain_t *d)
 	LOG(L_INFO, "%s: Certificate revocation lists will be checked (%.*s)\n",
 			tls_domain_str(d), d->crl_file.len, d->crl_file.s);
 
-	do {
-		if(wolfSSL_CTX_load_verify_locations(d->ctx[0], d->crl_file.s, 0)
-				!= 1) {
-			ERR("%s: Unable to load certificate revocation list '%s'\n",
-					tls_domain_str(d), d->crl_file.s);
-			TLS_ERR("load_crl:");
-			return -1;
-		}
-		store = wolfSSL_CTX_get_cert_store(d->ctx[0]);
-		wolfSSL_X509_STORE_set_flags(
-				store, WOLFSSL_CRL_CHECK | WOLFSSL_CRL_CHECKALL);
-	} while(0);
+
+	if(wolfSSL_CTX_EnableCRL(d->ctx[0], 0) != WOLFSSL_SUCCESS) {
+		ERR("%s: Unable to enable CRL checking '%s'\n", tls_domain_str(d),
+				d->crl_file.s);
+		TLS_ERR("load_crl:");
+		return -1;
+	}
+	if(wolfSSL_CTX_LoadCRL(d->ctx[0], d->crl_file.s, WOLFSSL_FILETYPE_PEM, 0)
+			!= WOLFSSL_SUCCESS) {
+		ERR("%s: Unable to load CRL file '%s'\n", tls_domain_str(d),
+				d->crl_file.s);
+		TLS_ERR("load_crl:");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -620,18 +596,16 @@ static int set_cipher_list(tls_domain_t *d)
 {
 	char *cipher_list;
 
+	setup_dh(d->ctx[0]);
 	cipher_list = d->cipher_list.s;
 	if(!cipher_list)
 		return 0;
 
-	do {
-		if(wolfSSL_CTX_set_cipher_list(d->ctx[0], cipher_list) == 0) {
-			ERR("%s: Failure to set SSL context cipher list \"%s\"\n",
-					tls_domain_str(d), cipher_list);
-			return -1;
-		}
-		setup_dh(d->ctx[0]);
-	} while(0);
+	if(wolfSSL_CTX_set_cipher_list(d->ctx[0], cipher_list) == 0) {
+		ERR("%s: Failure to set SSL context cipher list \"%s\"\n",
+				tls_domain_str(d), cipher_list);
+		return -1;
+	}
 	return 0;
 }
 

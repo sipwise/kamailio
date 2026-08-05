@@ -108,35 +108,49 @@ static str *build_headers(struct sip_msg *msg)
 	static str name = STR_STATIC_INIT("In-Reply-To: ");
 	static str nl = STR_STATIC_INIT("\r\n");
 	static char buf[1024];
-	static str rv;
+	static str rv = {NULL, 0};
 	str *callid;
+	str ctbody = STR_NULL;
 
+	buf[0] = '\0';
 	rv.s = buf;
-	rv.len = all_hdrs.len + ctname.len + msg->content_type->body.len;
-
+	rv.len = all_hdrs.len;
+	if(rv.len > sizeof(buf) - 1) {
+		LM_ERR("headers too long\n");
+		rv.len = 0;
+		return &rv;
+	}
 	memcpy(buf, all_hdrs.s, all_hdrs.len);
-	memcpy(buf + all_hdrs.len, ctname.s, ctname.len);
-	memcpy(buf + all_hdrs.len + ctname.len, msg->content_type->body.s,
-			msg->content_type->body.len);
+
+	if(msg->content_type != NULL) {
+		ctbody = msg->content_type->body;
+		rv.len += ctname.len + ctbody.len;
+		if(rv.len > sizeof(buf) - 1) {
+			LM_ERR("buffer too small for Content-Type header\n");
+			rv.len -= ctname.len + ctbody.len;
+			return &rv;
+		}
+		if(ctbody.len > 0) {
+			memcpy(buf + all_hdrs.len, ctname.s, ctname.len);
+			memcpy(buf + all_hdrs.len + ctname.len, ctbody.s, ctbody.len);
+		}
+	}
 
 	if((callid = get_callid(msg)) == NULL) {
 		return &rv;
 	}
 
 	rv.len += nl.len + name.len + callid->len;
-
-	if(rv.len > sizeof(buf)) {
-		LM_ERR("Header buffer too small for In-Reply-To header\n");
+	if(rv.len > sizeof(buf) - 1) {
+		LM_ERR("buffer too small for In-Reply-To header\n");
+		rv.len -= nl.len + name.len + callid->len;
 		return &rv;
 	}
 
-	memcpy(buf + all_hdrs.len + ctname.len + msg->content_type->body.len, nl.s,
-			nl.len);
-	memcpy(buf + all_hdrs.len + ctname.len + msg->content_type->body.len
-					+ nl.len,
-			name.s, name.len);
-	memcpy(buf + all_hdrs.len + ctname.len + msg->content_type->body.len
-					+ nl.len + name.len,
+	memcpy(buf + all_hdrs.len + ctname.len + ctbody.len, nl.s, nl.len);
+	memcpy(buf + all_hdrs.len + ctname.len + ctbody.len + nl.len, name.s,
+			name.len);
+	memcpy(buf + all_hdrs.len + ctname.len + ctbody.len + nl.len + name.len,
 			callid->s, callid->len);
 	return &rv;
 }
@@ -1727,6 +1741,9 @@ void imc_inv_callback(struct cell *t, int type, struct tmcb_params *ps)
 build_inform:
 	body_final.s = body_buf;
 	body_final.len = member->uri.len - 4 /* sip: part of URI */ + 20;
+	if(member->uri.len - 4 > sizeof(body_buf)) {
+		goto error;
+	}
 	memcpy(body_final.s, member->uri.s + 4, member->uri.len - 4);
 	memcpy(body_final.s + member->uri.len - 4, " is not registered.  ", 21);
 
