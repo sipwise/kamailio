@@ -74,3 +74,4 @@ sipwise/dialog_w_dlg_get_var_no_error_msg.patch
 ###
 
 sipwise/pua_dialoginfo-caller_trying.patch
+sipwise/mp_on_notify
