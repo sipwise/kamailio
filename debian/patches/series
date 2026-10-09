@@ -74,3 +74,4 @@ sipwise/rtpengine_stats_update.patch
 ### git commit + git-review as usual
 ###
 sipwise/pua_dialoginfo-caller_trying.patch
+sipwise/mp_on_notify

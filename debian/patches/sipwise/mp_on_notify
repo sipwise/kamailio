@@ -1,0 +1,102 @@
+--- a/src/modules/presence/notify.c
++++ b/src/modules/presence/notify.c
+@@ -2532,7 +2532,8 @@ int set_wipeer_subs_updated(str *pres_ur
+ 		update_vals[n_update_cols].val.int_val =
+ 				core_case_hash(&callid, &from_tag, 0)
+ 				% (pres_waitn_time * pres_notifier_poll_rate
+-						* pres_notifier_processes);
++						* pres_notifier_processes
++						* pres_notifier_cluster_size);
+ 		n_update_cols++;
+ 
+ 		if(full) {
+@@ -2594,7 +2595,8 @@ int set_updated(subs_t *sub)
+ 	update_vals[0].nul = 0;
+ 	update_vals[0].val.int_val = core_case_hash(&sub->callid, &sub->from_tag, 0)
+ 								 % (pres_waitn_time * pres_notifier_poll_rate
+-										 * pres_notifier_processes);
++										 * pres_notifier_processes
++										 * pres_notifier_cluster_size);
+ 
+ 	if(pa_dbf.use_table(pa_db, &active_watchers_table) < 0) {
+ 		LM_ERR("use table failed\n");
+@@ -3210,8 +3212,10 @@ error:
+ void pres_timer_send_notify(unsigned int ticks, void *param)
+ {
+ 	int process_num = *((int *)param);
+-	int round =
+-			subset + (pres_waitn_time * pres_notifier_poll_rate * process_num);
++	int round = subset
++				+ (pres_waitn_time * pres_notifier_poll_rate
++						* (pres_notifier_cluster_id * pres_notifier_processes
++								+ process_num));
+ 
+ 	if(++subset > (pres_waitn_time * pres_notifier_poll_rate) - 1)
+ 		subset = 0;
+--- a/src/modules/presence/presence.c
++++ b/src/modules/presence/presence.c
+@@ -165,6 +165,8 @@ int publ_cache_mode = PS_PCACHE_HYBRID;
+ int pres_waitn_time = 5;
+ int pres_notifier_poll_rate = 10;
+ int pres_notifier_processes = 1;
++int pres_notifier_cluster_size = 1;
++int pres_notifier_cluster_id = 0;
+ int pres_force_delete = 0;
+ int pres_startup_mode = 1;
+ str pres_xavp_cfg = {0};
+@@ -228,6 +230,8 @@ static param_export_t params[]={
+ 	{ "waitn_time",             PARAM_INT, &pres_waitn_time },
+ 	{ "notifier_poll_rate",     PARAM_INT, &pres_notifier_poll_rate },
+ 	{ "notifier_processes",     PARAM_INT, &pres_notifier_processes },
++	{ "notifier_cluster_size",  PARAM_INT, &pres_notifier_cluster_size },
++	{ "notifier_cluster_id",    PARAM_INT, &pres_notifier_cluster_id },
+ 	{ "force_delete",           PARAM_INT, &pres_force_delete },
+ 	{ "startup_mode",           PARAM_INT, &pres_startup_mode },
+ 	{ "expires_offset",         PARAM_INT, &pres_expires_offset },
+@@ -513,6 +517,18 @@ static int mod_init(void)
+ 		pres_notifier_processes = 0;
+ 	}
+ 
++	if(pres_notifier_cluster_size <= 0) {
++		pres_notifier_cluster_size = 1;
++	}
++
++	if(pres_notifier_cluster_id < 0
++			|| pres_notifier_cluster_id >= pres_notifier_cluster_size) {
++		LM_ERR("notifier_cluster_id (%d) must be in [0, notifier_cluster_size) "
++			   "(notifier_cluster_size=%d)\n",
++				pres_notifier_cluster_id, pres_notifier_cluster_size);
++		goto dberror;
++	}
++
+ 	if(pres_notifier_processes > 0) {
+ 		if((pres_notifier_id =
+ 						   shm_malloc(sizeof(int) * pres_notifier_processes))
+@@ -1391,12 +1407,14 @@ static int update_pw_dialogs_dbonlymode(
+ 		db_vals[n_update_cols].val.int_val =
+ 				(int)((kam_rand() / (KAM_RAND_MAX + 1.0))
+ 						* (pres_waitn_time * pres_notifier_poll_rate
+-								* pres_notifier_processes));
++								* pres_notifier_processes
++								* pres_notifier_cluster_size));
+ 	} else {
+ 		db_vals[n_update_cols].val.int_val =
+ 				core_case_hash(&subs->callid, &subs->from_tag, 0)
+ 				% (pres_waitn_time * pres_notifier_poll_rate
+-						* pres_notifier_processes);
++						* pres_notifier_processes
++						* pres_notifier_cluster_size);
+ 	}
+ 	n_update_cols++;
+ 
+--- a/src/modules/presence/presence.h
++++ b/src/modules/presence/presence.h
+@@ -95,6 +95,8 @@ extern int pres_fetch_rows;
+ extern int pres_waitn_time;
+ extern int pres_notifier_poll_rate;
+ extern int pres_notifier_processes;
++extern int pres_notifier_cluster_size;
++extern int pres_notifier_cluster_id;
+ extern int pres_force_delete;
+ extern int pres_startup_mode;
+ extern str pres_xavp_cfg;
