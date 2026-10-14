@@ -67,3 +67,4 @@ sipwise/rtpengine_stats_update.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/pua_dialoginfo-caller_trying.patch
