@@ -67,3 +67,4 @@ sipwise/dialog_w_dlg_get_var_no_error_msg.patch
 ### git commit + git-review as usual
 ###
 
+sipwise/pua_dialoginfo-caller_trying.patch
