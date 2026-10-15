@@ -1,0 +1,352 @@
+From 3667bebf8d0bea07ed16218fd921d07db87aeb21 Mon Sep 17 00:00:00 2001
+From: Alexis Hadjisotiriou <ah@gilawa.com>
+Date: Wed, 2 Sep 2026 13:55:32 +0000
+Subject: [PATCH] sipt: Add robust length validations in ISUP message parser
+
+---
+ src/modules/sipt/sipt.c       |  24 +++---
+ src/modules/sipt/ss7.h        |   2 +
+ src/modules/sipt/ss7_parser.c | 144 ++++++++++++++++++++++++++++++++--
+ 3 files changed, 152 insertions(+), 18 deletions(-)
+
+diff --git a/src/modules/sipt/sipt.c b/src/modules/sipt/sipt.c
+index c34a1b11a7..ae24402335 100644
+--- a/src/modules/sipt/sipt.c
++++ b/src/modules/sipt/sipt.c
+@@ -316,9 +316,9 @@ static int sipt_get_calling_party_nai(
+ static int sipt_get_calling_party(
+ 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ {
+-	static char sb_s_buf[26];
++	static char sb_s_buf[MAX_SB_BUF_LEN];
+ 	str body;
+-	memset(sb_s_buf, 0, 26);
++	memset(sb_s_buf, 0, MAX_SB_BUF_LEN);
+ 
+ 	if(sipt_check_IAM(msg, &body) != 1) {
+ 		LM_INFO("could not check IAM\n");
+@@ -366,9 +366,9 @@ static int sipt_get_redirection_number_nai(
+ static int sipt_get_redirection_number(
+ 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ {
+-	static char sb_s_buf[26];
++	static char sb_s_buf[MAX_SB_BUF_LEN];
+ 	str body;
+-	memset(sb_s_buf, 0, 26);
++	memset(sb_s_buf, 0, MAX_SB_BUF_LEN);
+ 	if(sipt_check_ACM_CPG(msg, &body) != 1) {
+ 		LM_INFO("could not check ACM or CPG\n");
+ 		return -1;
+@@ -433,9 +433,9 @@ static int sipt_get_redirecting_number_nai(
+ static int sipt_get_redirecting_number(
+ 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ {
+-	static char sb_s_buf[26];
++	static char sb_s_buf[MAX_SB_BUF_LEN];
+ 	str body;
+-	memset(sb_s_buf, 0, 26);
++	memset(sb_s_buf, 0, MAX_SB_BUF_LEN);
+ 
+ 	if(sipt_check_IAM(msg, &body) != 1) {
+ 		LM_INFO("could not check IAM\n");
+@@ -471,9 +471,9 @@ static int sipt_get_original_called_number_nai(
+ static int sipt_get_original_called_number(
+ 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ {
+-	static char sb_s_buf[26];
++	static char sb_s_buf[MAX_SB_BUF_LEN];
+ 	str body;
+-	memset(sb_s_buf, 0, 26);
++	memset(sb_s_buf, 0, MAX_SB_BUF_LEN);
+ 
+ 	if(sipt_check_IAM(msg, &body) != 1) {
+ 		LM_INFO("could not check IAM\n");
+@@ -509,9 +509,9 @@ static int sipt_get_generic_number_nai(
+ static int sipt_get_generic_number(
+ 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ {
+-	static char sb_s_buf[26];
++	static char sb_s_buf[MAX_SB_BUF_LEN];
+ 	str body;
+-	memset(sb_s_buf, 0, 26);
++	memset(sb_s_buf, 0, MAX_SB_BUF_LEN);
+ 	if(sipt_check_IAM(msg, &body) != 1) {
+ 		LM_INFO("could not check IAM\n");
+ 		return -1;
+@@ -595,9 +595,9 @@ static int sipt_get_called_party_nai(
+ static int sipt_get_called_party(
+ 		struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ {
+-	static char sb_s_buf[26];
++	static char sb_s_buf[MAX_SB_BUF_LEN];
+ 	str body;
+-	memset(sb_s_buf, 0, 26);
++	memset(sb_s_buf, 0, MAX_SB_BUF_LEN);
+ 	if(sipt_check_IAM(msg, &body) != 1) {
+ 		LM_INFO("could not check IAM\n");
+ 		return -1;
+diff --git a/src/modules/sipt/ss7.h b/src/modules/sipt/ss7.h
+index 0d71d91096..739ec3ae27 100644
+--- a/src/modules/sipt/ss7.h
++++ b/src/modules/sipt/ss7.h
+@@ -149,6 +149,8 @@
+ #define SS7_SCREENING_NETWORK_PROVIDED_FAILED 0x02
+ #define SS7_SCREENING_NETWORK_PROVIDED 0x03
+ 
++/* Maximum buffer length */
++#define MAX_SB_BUF_LEN 26
+ 
+ #ifndef bool
+ #define bool unsigned char
+diff --git a/src/modules/sipt/ss7_parser.c b/src/modules/sipt/ss7_parser.c
+index 0b2c5c99a4..fcef828386 100644
+--- a/src/modules/sipt/ss7_parser.c
++++ b/src/modules/sipt/ss7_parser.c
+@@ -296,9 +296,27 @@ int isup_get_calling_party(unsigned char *buf, int len, char *sb_buf)
+ 
+ 	if(offset != -1 && len - offset - 2 > 1) {
+ 		sbparamlen = (buf[offset + 1] & 0xFF) - 2;
++		/*+ 1 byte: param type identifier + 1 byte: param length + 2 bytes: The ISUP address header =4*/
++		if(sbparamlen <= 0 || offset + 4 + sbparamlen > len) {
++			LM_WARN("Rejected malformed ISUP parameter length. sbparamlen=%d, "
++					"offset=%d, len=%d\n",
++					sbparamlen, offset, len);
++			return -1;
++		}
+ 		oddeven = (buf[offset + 2] >> 7) & 0x1;
+ 
+ 		while((sbparamlen > 0) && (buf[offset] != 0)) {
++			if(sb_i + 2 >= MAX_SB_BUF_LEN) {
++				LM_WARN("Stopped loop to prevent buffer overflow. sb_i=%d\n",
++						sb_i);
++				break;
++			}
++			if(offset + 4 + sb_j >= len) {
++				LM_WARN("Stopped loop to prevent out-of-bounds packet read. "
++						"sb_j=%d, len=%d\n",
++						sb_j, len);
++				break;
++			}
+ 			sb_buf[sb_i] = "0123456789ABCDEF"[(buf[offset + 4 + sb_j] & 0x0F)];
+ 			if(sbparamlen > 1 || oddeven == 0) {
+ 				sb_buf[sb_i + 1] = "0123456789ABCDEF"[(
+@@ -308,7 +326,12 @@ int isup_get_calling_party(unsigned char *buf, int len, char *sb_buf)
+ 			sbparamlen--;
+ 			sb_j++;
+ 		}
+-		sb_buf[sb_i] = '\x0';
++		// Ensure safe null-termination within bounds
++		if(sb_i < MAX_SB_BUF_LEN) {
++			sb_buf[sb_i] = '\x0';
++		} else {
++			sb_buf[MAX_SB_BUF_LEN - 1] = '\x0';
++		}
+ 		return 1;
+ 	}
+ 	return -1;
+@@ -372,9 +395,26 @@ int isup_get_called_party(unsigned char *buf, int len, char *sb_buf)
+ 		return -1;
+ 
+ 	sbparamlen = (message->called_party_number[0] & 0xFF) - 2;
++	/*+ 1 byte: param type identifier + 1 byte: param length + 2 bytes: The ISUP address header =4*/
++	if(sbparamlen <= 0 || offset + 4 + sbparamlen > len) {
++		LM_WARN("Rejected malformed ISUP parameter length. sbparamlen=%d, "
++				"offset=%d, len=%d\n",
++				sbparamlen, offset, len);
++		return -1;
++	}
+ 	oddeven = (message->called_party_number[1] >> 7) & 0x1;
+ 
+ 	while((sbparamlen > 0) && (message->called_party_number[offset] != 0)) {
++		if(sb_i + 2 >= MAX_SB_BUF_LEN) {
++			LM_WARN("Stopped loop to prevent buffer overflow. sb_i=%d\n", sb_i);
++			break;
++		}
++		if(offset + 4 + sb_j >= len) {
++			LM_WARN("Stopped loop to prevent out-of-bounds packet read. "
++					"sb_j=%d, len=%d\n",
++					sb_j, len);
++			break;
++		}
+ 		sb_buf[sb_i] = "0123456789ABCDEF"[(
+ 				message->called_party_number[offset + sb_j] & 0x0F)];
+ 		if(sbparamlen > 1 || oddeven == 0) {
+@@ -385,7 +425,11 @@ int isup_get_called_party(unsigned char *buf, int len, char *sb_buf)
+ 		sbparamlen--;
+ 		sb_j++;
+ 	}
+-	sb_buf[sb_i] = '\x0';
++	if(sb_i < MAX_SB_BUF_LEN) {
++		sb_buf[sb_i] = '\x0';
++	} else {
++		sb_buf[MAX_SB_BUF_LEN - 1] = '\x0';
++	}
+ 	return 1;
+ }
+ 
+@@ -449,8 +493,26 @@ int isup_get_redirection_number(unsigned char *buf, int len, char *sb_buf)
+ 
+ 	if(offset != -1 && len - offset - 2 > 1) {
+ 		sbparamlen = (buf[offset + 1] & 0xFF) - 2;
++		/*+ 1 byte: param type identifier + 1 byte: param length + 2 bytes: The ISUP address header =4*/
++		if(sbparamlen <= 0 || offset + 4 + sbparamlen > len) {
++			LM_WARN("Rejected malformed ISUP parameter length. sbparamlen=%d, "
++					"offset=%d, len=%d\n",
++					sbparamlen, offset, len);
++			return -1;
++		}
+ 
+ 		while((sbparamlen > 0) && (buf[offset] != 0)) {
++			if(sb_i + 2 >= MAX_SB_BUF_LEN) {
++				LM_WARN("Stopped loop to prevent buffer overflow. sb_i=%d\n",
++						sb_i);
++				break;
++			}
++			if(offset + 4 + sb_j >= len) {
++				LM_WARN("Stopped loop to prevent "
++						"out-of-bounds packet read. sb_j=%d, len=%d\n",
++						sb_j, len);
++				break;
++			}
+ 			sb_buf[sb_i] = "0123456789ABCDEF"[(buf[offset + 4 + sb_j] & 0x0F)];
+ 			sb_buf[sb_i + 1] =
+ 					"0123456789ABCDEF"[(buf[offset + 4 + sb_j] >> 4 & 0x0F)];
+@@ -458,7 +520,11 @@ int isup_get_redirection_number(unsigned char *buf, int len, char *sb_buf)
+ 			sbparamlen--;
+ 			sb_j++;
+ 		}
+-		sb_buf[sb_i] = '\x0';
++		if(sb_i < MAX_SB_BUF_LEN) {
++			sb_buf[sb_i] = '\x0';
++		} else {
++			sb_buf[MAX_SB_BUF_LEN - 1] = '\x0';
++		}
+ 		return 1;
+ 	}
+ 	return -1;
+@@ -504,9 +570,27 @@ int isup_get_redirecting_number(unsigned char *buf, int len, char *sb_buf)
+ 
+ 	if(offset != -1 && len - offset - 2 > 1) {
+ 		sbparamlen = (buf[offset + 1] & 0xFF) - 2;
++		/*+ 1 byte: param type identifier + 1 byte: param length + 2 bytes: The ISUP address header =4*/
++		if(sbparamlen <= 0 || offset + 4 + sbparamlen > len) {
++			LM_WARN("Rejected malformed ISUP parameter length. sbparamlen=%d, "
++					"offset=%d, len=%d\n",
++					sbparamlen, offset, len);
++			return -1;
++		}
+ 		oddeven = (buf[offset + 2] >> 7) & 0x1;
+ 
+ 		while((sbparamlen > 0) && (buf[offset] != 0)) {
++			if(sb_i + 2 >= MAX_SB_BUF_LEN) {
++				LM_WARN("Stopped loop to prevent buffer overflow. sb_i=%d\n",
++						sb_i);
++				break;
++			}
++			if(offset + 4 + sb_j >= len) {
++				LM_WARN("Stopped loop to prevent out-of-bounds packet read. "
++						"sb_j=%d, len=%d\n",
++						sb_j, len);
++				break;
++			}
+ 			sb_buf[sb_i] = "0123456789ABCDEF"[(buf[offset + 4 + sb_j] & 0x0F)];
+ 			if(sbparamlen > 1 || oddeven == 0) {
+ 				sb_buf[sb_i + 1] = "0123456789ABCDEF"[(
+@@ -516,7 +600,11 @@ int isup_get_redirecting_number(unsigned char *buf, int len, char *sb_buf)
+ 			sbparamlen--;
+ 			sb_j++;
+ 		}
+-		sb_buf[sb_i] = '\x0';
++		if(sb_i < MAX_SB_BUF_LEN) {
++			sb_buf[sb_i] = '\x0';
++		} else {
++			sb_buf[MAX_SB_BUF_LEN - 1] = '\x0';
++		}
+ 		return 1;
+ 	}
+ 	return -1;
+@@ -542,9 +630,27 @@ int isup_get_original_called_number(unsigned char *buf, int len, char *sb_buf)
+ 
+ 	if(offset != -1 && len - offset - 2 > 1) {
+ 		sbparamlen = (buf[offset + 1] & 0xFF) - 2;
++		/*+ 1 byte: param type identifier + 1 byte: param length + 2 bytes: The ISUP address header =4*/
++		if(sbparamlen <= 0 || offset + 4 + sbparamlen > len) {
++			LM_WARN("Rejected malformed ISUP parameter length. sbparamlen=%d, "
++					"offset=%d, len=%d\n",
++					sbparamlen, offset, len);
++			return -1;
++		}
+ 		oddeven = (buf[offset + 2] >> 7) & 0x1;
+ 
+ 		while((sbparamlen > 0) && (buf[offset] != 0)) {
++			if(sb_i + 2 >= MAX_SB_BUF_LEN) {
++				LM_WARN("Stopped loop to prevent buffer overflow. sb_i=%d\n",
++						sb_i);
++				break;
++			}
++			if(offset + 4 + sb_j >= len) {
++				LM_WARN("Stopped loop to prevent out-of-bounds packet read. "
++						"sb_j=%d, len=%d\n",
++						sb_j, len);
++				break;
++			}
+ 			sb_buf[sb_i] = "0123456789ABCDEF"[(buf[offset + 4 + sb_j] & 0x0F)];
+ 			if(sbparamlen > 1 || oddeven == 0) {
+ 				sb_buf[sb_i + 1] = "0123456789ABCDEF"[(
+@@ -554,7 +660,11 @@ int isup_get_original_called_number(unsigned char *buf, int len, char *sb_buf)
+ 			sbparamlen--;
+ 			sb_j++;
+ 		}
+-		sb_buf[sb_i] = '\x0';
++		if(sb_i < MAX_SB_BUF_LEN) {
++			sb_buf[sb_i] = '\x0';
++		} else {
++			sb_buf[MAX_SB_BUF_LEN - 1] = '\x0';
++		}
+ 		return 1;
+ 	}
+ 	return -1;
+@@ -580,9 +690,27 @@ int isup_get_generic_number(unsigned char *buf, int len, char *sb_buf)
+ 
+ 	if(offset != -1 && len - offset - 2 > 1) {
+ 		sbparamlen = (buf[offset + 1] & 0xFF) - 2;
++		/*+ 1 byte: param type identifier + 1 byte: param length + 2 bytes: The ISUP address header =4*/
++		if(sbparamlen <= 0 || offset + 4 + sbparamlen > len) {
++			LM_WARN("Rejected malformed ISUP parameter length. sbparamlen=%d, "
++					"offset=%d, len=%d\n",
++					sbparamlen, offset, len);
++			return -1;
++		}
+ 		oddeven = (buf[offset + 3] >> 7) & 0x1;
+ 
+ 		while((sbparamlen > 0) && (buf[offset] != 0)) {
++			if(sb_i + 2 >= MAX_SB_BUF_LEN) {
++				LM_WARN("Stopped loop to prevent buffer overflow. sb_i=%d\n",
++						sb_i);
++				break;
++			}
++			if(offset + 4 + sb_j >= len) {
++				LM_WARN("Stopped loop to prevent out-of-bounds packet read. "
++						"sb_j=%d, len=%d\n",
++						sb_j, len);
++				break;
++			}
+ 			sb_buf[sb_i] = "0123456789ABCDEF"[(buf[offset + 5 + sb_j] & 0x0F)];
+ 			if(sbparamlen > 1 || oddeven == 0) {
+ 				sb_buf[sb_i + 1] = "0123456789ABCDEF"[(
+@@ -592,7 +720,11 @@ int isup_get_generic_number(unsigned char *buf, int len, char *sb_buf)
+ 			sbparamlen--;
+ 			sb_j++;
+ 		}
+-		sb_buf[sb_i] = '\x0';
++		if(sb_i < MAX_SB_BUF_LEN) {
++			sb_buf[sb_i] = '\x0';
++		} else {
++			sb_buf[MAX_SB_BUF_LEN - 1] = '\x0';
++		}
+ 		return 1;
+ 	}
+ 	return -1;
+-- 
+2.43.0
+
