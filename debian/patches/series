@@ -28,6 +28,7 @@ sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream master
 upstream/tm_drop_stuck_transaction.patch
+upstream/sipt_robust_length_validation_isup.patch
 #
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
