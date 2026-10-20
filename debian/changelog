@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.7-1+0~mr13.5.1.9) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [98ecc1d] MT#66308 upstream: sipt, add robust length validation in ISUP
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 20 Oct 2026 11:15:04 +0200
+
 ngcp-kamailio (6.0.7-1+0~mr13.5.1.8) unstable; urgency=medium
 
   * [a1f4bf6] New upstream version 6.0.7
