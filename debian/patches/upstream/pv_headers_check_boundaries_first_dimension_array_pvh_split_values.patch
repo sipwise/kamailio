@@ -1,0 +1,111 @@
+From 3938782758c21db7f356d0e9a27190bf449f03b2 Mon Sep 17 00:00:00 2001
+From: Victor Seva <vseva@sipwork.pro>
+Date: Wed, 9 Sep 2026 12:39:33 +0200
+Subject: [PATCH] pv_headers: check boundaries for first dimension array at
+ pvh_split_values
+
+---
+ src/modules/pv_headers/pvh_func.c |  6 ++++--
+ src/modules/pv_headers/pvh_hash.c |  2 +-
+ src/modules/pv_headers/pvh_str.c  | 24 ++++++++++++++++++------
+ src/modules/pv_headers/pvh_str.h  |  4 ++--
+ 4 files changed, 25 insertions(+), 11 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 7227d7c276..93ecddf955 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -101,9 +101,11 @@ int pvh_collect_headers(struct sip_msg *msg)
+ 		if((marker = pvh_detect_split_char(val.s)) != NULL
+ 				&& str_hash_case_get(&split_hdrs, name.s, name.len)) {
+ 
+-			if(pvh_split_values(&val, hvals, &d_size, 1, marker) < 0) {
++			if(pvh_split_values(
++					   &val, hvals, pvh_hdr_name_size, &d_size, 1, marker)
++					< 0) {
+ 				LM_ERR("could not parse %.*s header comma separated "
+-					   "value",
++					   "value\n",
+ 						name.len, name.s);
+ 				return -1;
+ 			}
+diff --git a/src/modules/pv_headers/pvh_hash.c b/src/modules/pv_headers/pvh_hash.c
+index 52d131abd0..3e82e3c1af 100644
+--- a/src/modules/pv_headers/pvh_hash.c
++++ b/src/modules/pv_headers/pvh_hash.c
+@@ -39,7 +39,7 @@ int pvh_str_hash_init(struct str_hash_table *ht, str *keys, char *desc)
+ 	int idx = 0, d_size = 0;
+ 	str val = STR_NULL;
+ 
+-	if(pvh_split_values(keys, split, &d_size, 0, NULL) < 0) {
++	if(pvh_split_values(keys, split, pvh_hdr_name_size, &d_size, 0, NULL) < 0) {
+ 		LM_ERR("could not parse %s param\n", desc);
+ 		return -1;
+ 	}
+diff --git a/src/modules/pv_headers/pvh_str.c b/src/modules/pv_headers/pvh_str.c
+index 742043cbbd..e8cde12118 100644
+--- a/src/modules/pv_headers/pvh_str.c
++++ b/src/modules/pv_headers/pvh_str.c
+@@ -156,8 +156,8 @@ char *pvh_detect_split_char(char *val)
+ 	return pvh_detect_split_char(val + (quote_b - val + 1));
+ }
+ 
+-int pvh_split_values(str *s, char d[][_pvh_params.hdr_value_size], int *d_size,
+-		int keep_spaces, char *marker)
++int pvh_split_values(str *s, char d[][_pvh_params.hdr_value_size],
++		unsigned int d_capacity, int *d_size, int keep_spaces, char *marker)
+ {
+ 	char *p = NULL;
+ 	int idx = 0, c_idx = 0;
+@@ -187,18 +187,30 @@ int pvh_split_values(str *s, char d[][_pvh_params.hdr_value_size], int *d_size,
+ 			c_idx = 0;
+ 			continue;
+ 		}
+-		if(c_idx == 0)
++		if(c_idx == 0) {
++			if((unsigned int)(*d_size + 1) >= d_capacity) {
++				LM_ERR("pvh_hdr_name_size %u reached\n", d_capacity);
++				goto error;
++			}
+ 			(*d_size)++;
+-		strncpy(&d[*d_size][c_idx++], p, 1);
++		}
++		if(c_idx + 1 >= _pvh_params.hdr_value_size) {
++			LM_ERR("split value exceeds configured size (%u)\n",
++					_pvh_params.hdr_value_size);
++			goto error;
++		}
++		d[*d_size][c_idx++] = *p;
+ 	}
+ 
+ 	if(c_idx > 0) {
+-		if(c_idx >= _pvh_params.hdr_value_size)
+-			c_idx--;
+ 		d[*d_size][c_idx] = '\0';
+ 	}
+ 
+ 	(*d_size)++;
+ 
+ 	return 1;
++
++error:
++	*d_size = 0;
++	return -1;
+ }
+diff --git a/src/modules/pv_headers/pvh_str.h b/src/modules/pv_headers/pvh_str.h
+index 5415040540..7ec8bd355c 100644
+--- a/src/modules/pv_headers/pvh_str.h
++++ b/src/modules/pv_headers/pvh_str.h
+@@ -38,7 +38,7 @@ int pvh_str_copy(str *dst, str *src, unsigned int max_size);
+ int pvh_str_append(str *dst, str *src, unsigned int max_size);
+ int pvh_extract_display_uri(char *suri, str *display, str *duri);
+ char *pvh_detect_split_char(char *s);
+-int pvh_split_values(str *s, char d[][_pvh_params.hdr_value_size], int *d_size,
+-		int keep_spaces, char *marker);
++int pvh_split_values(str *s, char d[][_pvh_params.hdr_value_size],
++		unsigned int d_capacity, int *d_size, int keep_spaces, char *marker);
+ 
+ #endif /* PV_STR_H */
+-- 
+2.43.0
+
