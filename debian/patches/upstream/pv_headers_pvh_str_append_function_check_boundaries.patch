@@ -1,0 +1,239 @@
+From 5d1010c0aa50d363458804bf5d9885b027052c77 Mon Sep 17 00:00:00 2001
+From: Victor Seva <vseva@sipwork.pro>
+Date: Tue, 8 Sep 2026 12:38:58 +0200
+Subject: [PATCH] pv_headers: pvh_str_append function to help check boundaries
+
+---
+ src/modules/pv_headers/pvh_str.c  |  21 +++++
+ src/modules/pv_headers/pvh_str.h  |   1 +
+ src/modules/pv_headers/pvh_xavp.c | 124 +++++++++++++++++++-----------
+ 3 files changed, 99 insertions(+), 47 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_str.c b/src/modules/pv_headers/pvh_str.c
+index 1916f93e00..742043cbbd 100644
+--- a/src/modules/pv_headers/pvh_str.c
++++ b/src/modules/pv_headers/pvh_str.c
+@@ -64,6 +64,27 @@ int pvh_str_copy(str *dst, str *src, unsigned int max_size)
+ 	return 1;
+ }
+ 
++int pvh_str_append(str *dst, str *src, unsigned int max_size)
++{
++	int src_len = 0;
++
++	if(src == NULL || dst == NULL || src->len <= 0)
++		return -1;
++
++	if(dst->len + src->len + 1 >= max_size) {
++		src_len = max_size - dst->len - 1;
++	} else {
++		src_len = src->len;
++	}
++	if(src_len <= 0)
++		return -2;
++	memcpy(dst->s + dst->len, src->s, src_len);
++	dst->s[dst->len + src_len] = '\0';
++	dst->len += src_len;
++
++	return 1;
++}
++
+ int pvh_extract_display_uri(char *suri, str *display, str *duri)
+ {
+ 	char *ptr_a = NULL;
+diff --git a/src/modules/pv_headers/pvh_str.h b/src/modules/pv_headers/pvh_str.h
+index 91060bc142..5415040540 100644
+--- a/src/modules/pv_headers/pvh_str.h
++++ b/src/modules/pv_headers/pvh_str.h
+@@ -35,6 +35,7 @@
+ int pvh_str_new(str *s, int size);
+ int pvh_str_free(str *s);
+ int pvh_str_copy(str *dst, str *src, unsigned int max_size);
++int pvh_str_append(str *dst, str *src, unsigned int max_size);
+ int pvh_extract_display_uri(char *suri, str *display, str *duri);
+ char *pvh_detect_split_char(char *s);
+ int pvh_split_values(str *s, char d[][_pvh_params.hdr_value_size], int *d_size,
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index 4110d39485..cfa2e963ac 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -915,8 +915,10 @@ int pvh_merge_uri(struct sip_msg *msg, enum action_type type, str *cur,
+ 	struct to_param **sparam = NULL;
+ 	str *merged = NULL;
+ 	char *c_ptr = NULL;
+-	str uri_t;
+-	int os = 0;
++	unsigned int max_hdr = _pvh_params.hdr_value_size;
++	str uri_t = STR_NULL, str_t = STR_NULL;
++	str space = {" ", 1}, lt = {"<", 1}, gt = {">", 1}, eq = {"=", 1};
++	str colon = {":", 1}, semicolon = {";", 1};
+ 	int t_len = 0;
+ 
+ 	parse_addr_spec(cur->s, cur->s + cur->len, &tb, 0);
+@@ -931,90 +933,118 @@ int pvh_merge_uri(struct sip_msg *msg, enum action_type type, str *cur,
+ 	}
+ 	puri = tb.parsed_uri;
+ 
+-	c_data->value.s = (char *)shm_malloc(_pvh_params.hdr_value_size);
++	c_data->value.s = (char *)shm_malloc(max_hdr);
+ 	if(c_data->value.s == NULL) {
+ 		SHM_MEM_ERROR;
+ 		goto err;
+ 	}
+ 	merged = &c_data->value;
++	merged->len = 0;
+ 
+ 	if(type == SET_URI_T && strchr(new->s, '<')) {
+-		pvh_str_copy(merged, new, _pvh_params.hdr_value_size);
++		pvh_str_copy(merged, new, max_hdr);
+ 		goto reparse;
+ 	}
+ 
+-	os = 0;
+ 	if(type == SET_USERPHONE_T) {
+-		memcpy(merged->s + os, new->s, new->len);
+-		os += new->len;
+-		memcpy(merged->s + os, " ", 1);
+-		os += 1;
++		if(pvh_str_append(merged, new, max_hdr) < 0) {
++			LM_ERR("new uri[%d] exceeds header_value_size\n", new->len);
++			goto err;
++		}
++		if(pvh_str_append(merged, &space, max_hdr) < 0) {
++			goto err;
++		}
+ 	} else if(tb.display.len > 0) {
+-		memcpy(merged->s + os, tb.display.s, tb.display.len);
+-		os += tb.display.len;
+-		memcpy(merged->s + os, " ", 1);
+-		os += 1;
++		if(pvh_str_append(merged, &tb.display, max_hdr) < 0) {
++			goto err;
++		}
++		if(pvh_str_append(merged, &space, max_hdr) < 0) {
++			goto err;
++		}
++	}
++	if(pvh_str_append(merged, &lt, max_hdr) < 0) {
++		goto err;
+ 	}
+-	memcpy(merged->s + os, "<", 1);
+-	os += 1;
+ 	if(type != SET_URI_T) {
+ 		uri_type_to_str(puri.type, &uri_t);
+ 		t_len = uri_t.len + 1;
+-		memcpy(merged->s + os, uri_t.s, uri_t.len);
+-		os += uri_t.len;
+-		memcpy(merged->s + os, ":", 1);
+-		os += 1;
++		if(pvh_str_append(merged, &uri_t, max_hdr) < 0) {
++			goto err;
++		}
++		if(pvh_str_append(merged, &colon, max_hdr) < 0) {
++			goto err;
++		}
+ 	}
+ 	switch(type) {
+ 		case SET_USERPHONE_T:
+-			memcpy(merged->s + os, tb.uri.s + t_len, tb.uri.len - t_len);
+-			os += tb.uri.len - t_len;
++			str_t.s = tb.uri.s + t_len;
++			str_t.len = tb.uri.len - t_len;
++			if(pvh_str_append(merged, &str_t, max_hdr) < 0) {
++				goto err;
++			}
+ 			break;
+ 		case SET_URI_T:
+-			memcpy(merged->s + os, new->s, new->len);
+-			os += new->len;
++			if(pvh_str_append(merged, new, max_hdr) == -2) {
++				LM_ERR("new uri[%d] exceeds header_value_size\n", new->len);
++				goto err;
++			}
+ 			break;
+ 		case SET_USER_T:
+-			memcpy(merged->s + os, new->s, new->len);
+-			os += new->len;
+-			memcpy(merged->s + os, tb.uri.s + t_len + puri.user.len,
+-					tb.uri.len - t_len - puri.user.len);
+-			os += tb.uri.len - t_len - puri.user.len;
++			if(pvh_str_append(merged, new, max_hdr) < 0) {
++				LM_ERR("new user[%d] exceeds header_value_size\n", new->len);
++				goto err;
++			}
++			str_t.s = tb.uri.s + t_len + puri.user.len;
++			str_t.len = tb.uri.len - t_len - puri.user.len;
++			if(pvh_str_append(merged, &str_t, max_hdr) < 0) {
++				goto err;
++			}
+ 			break;
+ 		case SET_HOST_T:
+ 			if((c_ptr = strchr(tb.uri.s, '@')) == NULL) {
+ 				LM_ERR("invalid uri: %.*s\n", tb.uri.len, tb.uri.s);
+ 				goto err;
+ 			}
+-			memcpy(merged->s + os, tb.uri.s + t_len,
+-					c_ptr - tb.uri.s - t_len + 1);
+-			os += c_ptr - tb.uri.s - t_len + 1;
+-			memcpy(merged->s + os, new->s, new->len);
+-			os += new->len;
+-			memcpy(merged->s + os, c_ptr + puri.host.len + 1,
+-					tb.uri.s + tb.uri.len - c_ptr - puri.host.len - 1);
+-			os += tb.uri.s + tb.uri.len - c_ptr - puri.host.len - 1;
++			str_t.s = tb.uri.s + t_len;
++			str_t.len = c_ptr - tb.uri.s - t_len + 1;
++			if(pvh_str_append(merged, &str_t, max_hdr) < 0) {
++				goto err;
++			}
++			if(pvh_str_append(merged, new, max_hdr) < 0) {
++				LM_ERR("new host[%d] exceeds header_value_size\n", new->len);
++				goto err;
++			}
++			str_t.s = c_ptr + puri.host.len + 1;
++			str_t.len = tb.uri.s + tb.uri.len - c_ptr - puri.host.len - 1;
++			if(pvh_str_append(merged, &str_t, max_hdr) < 0) {
++				LM_ERR("new host[%d] exceeds header_value_size\n", new->len);
++				goto err;
++			}
+ 			break;
+ 		default:
+ 			LM_ERR("unknown set uri op\n");
+ 			goto err;
+ 	}
+-	memcpy(merged->s + os, ">", 1);
+-	os += 1;
++	if(pvh_str_append(merged, &gt, max_hdr) < 0) {
++		goto err;
++	}
+ 	if((param = tb.param_lst) != NULL) {
+ 		while(param) {
+-			memcpy(merged->s + os, ";", 1);
+-			os += 1;
+-			memcpy(merged->s + os, param->name.s, param->name.len);
+-			os += param->name.len;
+-			memcpy(merged->s + os, "=", 1);
+-			os += 1;
+-			memcpy(merged->s + os, param->value.s, param->value.len);
+-			os += param->value.len;
++			if(pvh_str_append(merged, &semicolon, max_hdr) < 0) {
++				goto err;
++			}
++			if(pvh_str_append(merged, &param->name, max_hdr) < 0) {
++				goto err;
++			}
++			if(pvh_str_append(merged, &eq, max_hdr) < 0) {
++				goto err;
++			}
++			if(pvh_str_append(merged, &param->value, max_hdr) < 0) {
++				goto err;
++			}
+ 			param = param->next;
+ 		}
+ 	}
+-	merged->len = os;
+ 	merged->s[merged->len] = '\0';
+ 
+ reparse:
+-- 
+2.43.0
+
