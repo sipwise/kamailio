@@ -1,0 +1,34 @@
+From f8e85fd42b901a13b269ebd8bbf28debcf9c2982 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 16 Sep 2026 09:58:30 +0200
+Subject: [PATCH] pv_headers: cast to fix warnings in log messages on 32b
+
+---
+ src/modules/pv_headers/pvh_str.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_str.c b/src/modules/pv_headers/pvh_str.c
+index e8cde12118..112bbf3d5e 100644
+--- a/src/modules/pv_headers/pvh_str.c
++++ b/src/modules/pv_headers/pvh_str.c
+@@ -143,14 +143,15 @@ char *pvh_detect_split_char(char *val)
+ 
+ 	quote_a = strchr(val, '"');
+ 	if(quote_a == NULL || split < quote_a) {
+-		LM_DBG("split marker detected[%ld], not between quotes\n", split - val);
++		LM_DBG("split marker detected[%ld], not between quotes\n",
++				(long int)(split - val));
+ 		return split;
+ 	}
+ 
+ 	quote_b = strchr(val + (split - quote_a + 1), '"');
+ 	if(quote_b == NULL) {
+ 		LM_DBG("split marker detected[%ld], quote occurrence unbalanced[%ld]\n",
+-				split - val, quote_b - val);
++				(long int)(split - val), (long int)(quote_b - val));
+ 		return split;
+ 	}
+ 	return pvh_detect_split_char(val + (quote_b - val + 1));
+-- 
+2.43.0
+
