@@ -29,6 +29,12 @@ sipwise/sca-add-pai_avp-parameter.patch
 ## upstream master
 upstream/tm_drop_stuck_transaction.patch
 upstream/sipt_robust_length_validation_isup.patch
+## pv_headers upstream
+upstream/pv_headers_pvh_str_append_function_check_boundaries.patch
+upstream/pv_headers_check_boundaries_pvh_remove_header_param_helper.patch
+upstream/pv_headers_check_boundaries_first_dimension_array_pvh_split_values.patch
+upstream/pv_headers_cast_fix_warnings_in_log_messages_on_32b.patch
+upstream/pv_headers_fix_unset_display_name_var_tn_fn.patch
 #
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
