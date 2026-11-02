@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.7-1+0~mr13.5.1.10) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [45537f1] MT#66474 pv_headers: add a list of upstream fixes
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 02 Nov 2026 12:23:46 +0100
+
 ngcp-kamailio (6.0.7-1+0~mr13.5.1.9) unstable; urgency=medium
 
   [ Donat Zenichev ]
