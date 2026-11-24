@@ -1,0 +1,53 @@
+From af23bdd2a1edcf1baafb267365df38e44c770f33 Mon Sep 17 00:00:00 2001
+From: Bit-Savva Mikhail <mikhail.bit-savva@al-enterprise.com>
+Date: Mon, 9 Nov 2026 16:35:19 +0100
+Subject: [PATCH] tm: export reply lock functions to inter-module api
+
+- add t_reply_lock() and t_reply_unlock() to tm_binds, mapped to
+  tm_reply_mutex_lock() and tm_reply_mutex_unlock()
+- allow modules that access transaction data from callbacks executed
+  outside the reply lock to serialize with onreply and failure routes
+---
+ src/modules/tm/t_reply.h | 1 +
+ src/modules/tm/tm_load.c | 2 ++
+ src/modules/tm/tm_load.h | 2 ++
+ 3 files changed, 5 insertions(+)
+
+diff --git a/src/modules/tm/t_reply.h b/src/modules/tm/t_reply.h
+index 250dd2e..3bd4d0a 100644
+--- a/src/modules/tm/t_reply.h
++++ b/src/modules/tm/t_reply.h
+@@ -129,6 +129,7 @@ int t_get_reply_totag(struct sip_msg *msg, str *totag);
+ 
+ void tm_reply_mutex_lock(tm_cell_t *t);
+ void tm_reply_mutex_unlock(tm_cell_t *t);
++typedef void (*treply_mutex_f)(tm_cell_t *t);
+ 
+ #define LOCK_REPLIES(_t) tm_reply_mutex_lock((_t))
+ #define UNLOCK_REPLIES(_t) tm_reply_mutex_unlock((_t))
+diff --git a/src/modules/tm/tm_load.c b/src/modules/tm/tm_load.c
+index c54e039..732b700 100644
+--- a/src/modules/tm/tm_load.c
++++ b/src/modules/tm/tm_load.c
+@@ -148,6 +148,8 @@ int load_tm(struct tm_binds *tmb)
+ 	tmb->t_reply_error = ki_t_reply_error;
+ 	tmb->get_tb = tm_get_tb;
+ 	tmb->set_tb = tm_set_tb;
++	tmb->t_reply_lock = tm_reply_mutex_lock;
++	tmb->t_reply_unlock = tm_reply_mutex_unlock;
+ 	return 1;
+ }
+ 
+diff --git a/src/modules/tm/tm_load.h b/src/modules/tm/tm_load.h
+index e6e315d..62a7eee 100644
+--- a/src/modules/tm/tm_load.h
++++ b/src/modules/tm/tm_load.h
+@@ -135,6 +135,8 @@ struct tm_binds
+ 	t_no_param_f t_reply_error;
+ 	tm_get_tb_f get_tb;
+ 	tm_set_tb_f set_tb;
++	treply_mutex_f t_reply_lock;
++	treply_mutex_f t_reply_unlock;
+ };
+ 
+ typedef struct tm_binds tm_api_t;
