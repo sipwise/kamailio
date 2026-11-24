@@ -47,6 +47,8 @@ upstream/presence-remove-destroy-of-internal-structures-on-mo.patch
 upstream/pua-remove-destroy-of-internal-structures-on-mod-des.patch
 upstream/tm_drop_stuck_transaction.patch
 upstream/pv_headers_add_more_guards_from_upstream.patch
+upstream/tm_export_reply_lock_functions.patch
+upstream/pv_headers_hold_tm_reply_lock_in_reply_callback.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/kamctl-TMPDIR-config.patch
