@@ -1,3 +1,10 @@
+ngcp-kamailio (6.0.7-1+0~mr13.5.1.11) unstable; urgency=medium
+
+  [ Bit-Savva Mikhail ]
+  * [e76fff5] MT#66269 pv_headers: hold tm reply lock in reply callback
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 26 Nov 2026 11:10:45 +0100
+
 ngcp-kamailio (6.0.7-1+0~mr13.5.1.10) unstable; urgency=medium
 
   [ Donat Zenichev ]
